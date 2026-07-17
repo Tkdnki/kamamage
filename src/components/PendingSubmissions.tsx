@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useServer } from '../context/ServerContext';
 import PriceVoteButtons from './PriceVoteButtons';
-import { Clock, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 interface SubmissionRow {
   id: string;
