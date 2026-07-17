@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import Navigation from './components/Navigation';
 import HdvPrices from './components/HdvPrices';
 import CraftProfitability from './components/CraftProfitability';
@@ -12,6 +13,7 @@ function AppContent() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <Analytics />
       <Navigation />
       
       <main className="flex-grow">
