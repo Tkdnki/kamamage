@@ -132,49 +132,7 @@ const WEIGHT_TO_RUNE: Record<number, string> = {
   100: 'Pa Ga',
 };
 
-// effectId → nom de rune pour le calcul de brisage
-const EFFECT_ID_TO_RUNE: Record<number, string> = {
-  111: 'Pa Ga',
-  127: 'Pme Ga',
-  128: 'Pme Ga',
-  113: 'Portée',
-  114: 'Invoc',
-  125: 'Vi',
-  118: 'Fo',
-  119: 'Age',
-  123: 'Cha',
-  124: 'Sa',
-  126: 'Ine',
-  112: 'Do',
-  138: 'Do Pou',
-  186: 'Do Pou',
-  110: 'So',
-  178: 'So',
-  179: 'So',
-  176: 'Prospe',
-  177: 'Prospe',
-  115: 'Cri',
-  160: 'Fui',
-  161: 'Fui',
-  752: 'Fui',
-  754: 'Fui',
-  753: 'Tac',
-  755: 'Tac',
-  168: 'Pod',
-  169: 'Ini',
-  174: 'Ini',
-  175: 'Ini',
-  200: 'Ra Vi',
-  201: 'Ra Fo',
-  202: 'Ra Ine',
-  203: 'Ra Age',
-  204: 'Ra Cha',
-  205: 'Pa Vi',
-  206: 'Pa Fo',
-  207: 'Pa Ine',
-  208: 'Pa Age',
-  209: 'Pa Cha',
-};
+
 
 interface StatLine {
   effectId: number;
@@ -1075,7 +1033,7 @@ export default function ForgemagieHelper() {
                 <>
                   <div className="flex items-center gap-4 mb-4 pb-4 border-b border-white/5">
                     <div className="relative shrink-0">
-                      <ItemImage item={{ imgUrl: itemFull.img, name: itemFull.name.fr, type: itemFull.type?.name?.fr, _id: itemFull._id }} className="h-14 w-14 bg-[#151f32]/85 rounded-xl p-1 border border-white/10" imgClassName="h-10 w-10 object-contain" />
+                      <ItemImage item={{ imgUrl: itemFull.img, name: itemFull.name.fr, type: itemFull.type?.name?.fr, dofusdbId: itemFull.id }} className="h-14 w-14 bg-[#151f32]/85 rounded-xl p-1 border border-white/10" imgClassName="h-10 w-10 object-contain" />
                       <span className="absolute -bottom-1 -right-1 text-[9px] bg-gradient-to-r from-purple-500 to-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded">
                         Lvl {itemFull.level}
                       </span>

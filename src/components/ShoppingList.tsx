@@ -1,6 +1,6 @@
 import { useNavigation } from '../context/NavigationContext';
 import ItemImage from './ItemImage';
-import { ShoppingCart, Trash2, RotateCcw, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, RotateCcw, CheckCircle2 } from 'lucide-react';
 
 export default function ShoppingList() {
   const { shoppingCart, updateCartGathered, resetCart } = useNavigation();
@@ -60,7 +60,6 @@ export default function ShoppingList() {
           <div className="flex flex-col gap-2">
             {entries.map(entry => {
               const done = entry.quantityGathered >= entry.quantityNeeded;
-              const remaining = Math.max(0, entry.quantityNeeded - entry.quantityGathered);
               return (
                 <div
                   key={entry.item._id}
