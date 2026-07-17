@@ -7,6 +7,7 @@ import ShoppingList from './components/ShoppingList';
 import { DofusProvider } from './context/DofusContext';
 import { ServerProvider } from './context/ServerContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
+import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
   const { activeView } = useNavigation();
@@ -40,11 +41,13 @@ function AppContent() {
 export default function App() {
   return (
     <ServerProvider>
-      <DofusProvider>
-        <NavigationProvider>
-          <AppContent />
-        </NavigationProvider>
-      </DofusProvider>
+      <AuthProvider>
+        <DofusProvider>
+          <NavigationProvider>
+            <AppContent />
+          </NavigationProvider>
+        </DofusProvider>
+      </AuthProvider>
     </ServerProvider>
   );
 }

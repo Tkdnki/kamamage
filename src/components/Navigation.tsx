@@ -1,6 +1,7 @@
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
+import { useAuth } from '../context/AuthContext';
 import type { ViewType } from '../context/NavigationContext';
 
 export type { ViewType } from '../context/NavigationContext';
@@ -60,10 +61,13 @@ export default function Navigation() {
           </div>
         </div>
 
-        {/* Desktop Navigation */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Server Selector */}
-          <select
+          {/* Desktop Navigation */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Auth Button */}
+            <AuthButton />
+
+            {/* Server Selector */}
+            <select
             value={selectedServer}
             onChange={e => setSelectedServer(e.target.value)}
             className="bg-[#0c101d]/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-purple-500/40 appearance-none cursor-pointer"
@@ -107,5 +111,48 @@ export default function Navigation() {
         </div>
       </div>
     </header>
+  );
+}
+
+function AuthButton() {
+  const { user, profile, loading, signInWithDiscord, signOut } = useAuth();
+
+  if (loading) return null;
+
+  if (!user) {
+    return (
+      <button
+        onClick={signInWithDiscord}
+        className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#5865F2] hover:bg-[#4752c4] px-3 py-1.5 rounded-lg transition-all shadow-lg shadow-[#5865F2]/20"
+      >
+        <LogIn className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Connexion</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative group">
+      <button className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-lg transition-all">
+        <User className="h-3.5 w-3.5 text-purple-400" />
+        <span className="hidden sm:inline max-w-[100px] truncate">{profile?.pseudo ?? user.email}</span>
+      </button>
+      <div className="absolute right-0 top-full mt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+        <div className="bg-[#0c101d] border border-white/10 rounded-lg py-1 shadow-xl">
+          <div className="px-3 py-1.5 text-[10px] text-slate-500 border-b border-white/5">
+            Score: <span className="text-purple-400 font-bold">{profile?.score ?? 0}</span>
+            {profile?.role === 'admin' && (
+              <span className="ml-1.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded-full">Admin</span>
+            )}
+          </div>
+          <button
+            onClick={signOut}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-rose-400 hover:bg-white/5 transition-colors"
+          >
+            <LogOut className="h-3 w-3" /> Déconnexion
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
