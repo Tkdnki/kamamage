@@ -127,7 +127,6 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
   { _id: 'ing_eau', name: 'Eau de source', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/310.png' },
   { _id: 'ing_riz', name: 'Riz grain', type: 'Céréale', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1004.png' },
   { _id: 'ing_fiole', name: 'Fiole de Pandapils', type: 'Ressource', level: 10, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2180.png' },
-  { _id: 'ing_ble', name: 'Blé doré', type: 'Céréale', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/289.png' },
   { _id: 'ing_orge', name: 'Orge brute', type: 'Céréale', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/290.png' },
   { _id: 'ing_seigle', name: 'Seigle sauvage', type: 'Céréale', level: 40, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/291.png' },
   { _id: 'ing_goujon', name: 'Goujon frais', type: 'Poisson', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/598.png' },
@@ -142,7 +141,6 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
   { _id: 'ing_bauxite', name: 'Minerai de Bauxite', type: 'Minerai', level: 80, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/317.png' },
   { _id: 'ing_seve_tremble', name: 'Sève de Tremble', type: 'Sève', level: 180, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/11054.png' },
   { _id: 'ing_huile_friture', name: 'Huile de Friture', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/315.png' },
-  { _id: 'ing_farine_ble', name: 'Farine de Blé', type: 'Farine', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/961.png' },
 
   // ITEMS CRAFTABLES PAR MÉTIER
 
@@ -357,17 +355,6 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
 
   // 9. Paysan
   {
-    _id: 'pays_pain_incarnam',
-    name: 'Pain d\'Incarnam',
-    type: 'Pain',
-    level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/532.png',
-    job: 'Paysan',
-    recipe: [
-      { 'Blé doré': { id: 'ing_ble', quantity: '4' } }
-    ]
-  },
-  {
     _id: 'pays_briochette',
     name: 'Briochette',
     type: 'Pain',
@@ -375,7 +362,6 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/534.png',
     job: 'Paysan',
     recipe: [
-      { 'Blé doré': { id: 'ing_ble', quantity: '10' } },
       { 'Orge brute': { id: 'ing_orge', quantity: '10' } },
       { 'Seigle sauvage': { id: 'ing_seigle', quantity: '5' } }
     ]
@@ -402,8 +388,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/603.png',
     job: 'Pêcheur',
     recipe: [
-      { 'Truite arc-en-ciel': { id: 'ing_truite', quantity: '4' } },
-      { 'Farine de Blé': { id: 'ing_farine_ble', quantity: '2' } }
+      { 'Truite arc-en-ciel': { id: 'ing_truite', quantity: '4' } }
     ]
   },
 

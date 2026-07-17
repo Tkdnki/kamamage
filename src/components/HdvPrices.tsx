@@ -95,14 +95,12 @@ export default function HdvPrices() {
             <Search className="h-5 w-5 text-dofus-accent" />
             Rechercher un item
           </h2>
-          <p className="text-xs text-slate-400 mb-4">
-            Recherchez dans la base locale ou directement sur Dofapi (équipements et ressources).
-          </p>
+
 
           <div className="relative">
             <input
               type="text"
-              placeholder="Ex: Blé doré, Gelano, Fer..."
+              placeholder="Ex: Gelano, Fer, Bois..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#080d16] border border-white/10 rounded-lg py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-dofus-accent/60 transition-colors"

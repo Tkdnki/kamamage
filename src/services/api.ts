@@ -1,6 +1,6 @@
 import type { DofusDbItem, DofusDbRecipe, DofusDbPaginatedResponse } from '../types/dofusdb';
-import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import type { DofusItem } from '../data/mockData';
+
 
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const TIMEOUT_MS = 5000;
@@ -47,37 +47,24 @@ export function normalizeDofusDbItem(raw: DofusDbItem): DofusItem {
 
 /**
  * Recherche des items par nom (partiel, insensible à la casse) sur DofusDB.
- * Utilise le filtre `name.fr[$regex]` avec l'option `i` pour la casse.
- * Timeout 5 s + fallback vers mockData en cas d'échec.
+ * La liste est vide tant que l'utilisateur n'a pas tapé 3 caractères.
+ * En cas d'échec de l'API, retourne un tableau vide sans injecter de fausses données.
  */
 export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
-  if (!cleanQuery) return [];
-
-  // 1. Résultats locaux immédiats (mockData)
-  const localMatches = DOFUS_MOCK_ITEMS.filter(item =>
-    item.name.toLowerCase().includes(cleanQuery.toLowerCase())
-  );
-
-  // Pour les requêtes très courtes, on évite de surcharger l'API
-  if (cleanQuery.length < 3) return localMatches;
+  if (!cleanQuery || cleanQuery.length < 3) return [];
 
   try {
     const encoded = encodeURIComponent(cleanQuery);
     const path = `/items?name.fr[$regex]=${encoded}&name.fr[$options]=i&$limit=25`;
     const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbItem>>(path);
 
-    const onlineItems: DofusItem[] = (data.data ?? []).map(normalizeDofusDbItem);
+    const items: DofusItem[] = (data.data ?? []).map(normalizeDofusDbItem);
 
-    // Fusion : les items locaux (mockData) ont priorité car ils portent les recettes et le job
-    const mergedMap = new Map<string, DofusItem>();
-    onlineItems.forEach(item => mergedMap.set(item.name.toLowerCase(), item));
-    localMatches.forEach(item => mergedMap.set(item.name.toLowerCase(), item)); // écrase l'online
-
-    return Array.from(mergedMap.values());
+    return items;
   } catch (err) {
-    console.warn('[KamaMage] searchItems — DofusDB inaccessible, fallback local :', err);
-    return localMatches;
+    console.warn('[KamaMage] searchItems — DofusDB inaccessible :', err);
+    return [];
   }
 }
 

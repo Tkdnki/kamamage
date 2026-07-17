@@ -24,3 +24,4 @@ CREATE TABLE IF NOT EXISTS kama_hdv_prices (
 -- Index pour accélérer les requêtes par serveur
 CREATE INDEX IF NOT EXISTS idx_kama_prices_server ON kama_prices (server_name);
 CREATE INDEX IF NOT EXISTS idx_kama_hdv_prices_server ON kama_hdv_prices (server_name);
+
