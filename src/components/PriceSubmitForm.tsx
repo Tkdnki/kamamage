@@ -13,7 +13,7 @@ interface PriceSubmitFormProps {
 }
 
 export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, onSubmitted }: PriceSubmitFormProps) {
-  const { user, profile, loading: authLoading, signInWithDiscord } = useAuth();
+  const { user, loading: authLoading, signInWithDiscord } = useAuth();
   const { selectedServer } = useServer();
   const [price, setPrice] = useState(currentPrice ? String(currentPrice) : '');
   const [submitting, setSubmitting] = useState(false);
