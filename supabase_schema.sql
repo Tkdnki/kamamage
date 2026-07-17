@@ -135,6 +135,70 @@ CREATE TABLE IF NOT EXISTS consolidated_prices (
 );
 
 -- ============================================================
+-- VOTES PARTICIPATIFS
+-- ============================================================
+
+-- Colonne de suppression douce sur les soumissions
+ALTER TABLE price_submissions ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS price_votes (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  submission_id UUID NOT NULL REFERENCES price_submissions(id) ON DELETE CASCADE,
+  user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  vote_type     BOOLEAN NOT NULL,  -- true = pouce haut, false = pouce bas
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT unique_vote UNIQUE (submission_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_votes_submission ON price_votes (submission_id);
+
+-- RPC : Enregistrer/mettre à jour un vote et gérer la suppression auto
+CREATE OR REPLACE FUNCTION handle_vote(p_submission_id UUID, p_vote_type BOOLEAN)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_submitter_id UUID;
+  v_submitter_role TEXT;
+  v_thumbs_down INT;
+BEGIN
+  -- Vérifier que la soumission existe et n'est pas déjà supprimée
+  SELECT submitted_by INTO v_submitter_id
+  FROM public.price_submissions
+  WHERE id = p_submission_id AND is_deleted = false;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Submission not found or already deleted';
+  END IF;
+
+  -- Upsert du vote
+  INSERT INTO public.price_votes (submission_id, user_id, vote_type)
+  VALUES (p_submission_id, auth.uid(), p_vote_type)
+  ON CONFLICT (submission_id, user_id)
+  DO UPDATE SET vote_type = p_vote_type, created_at = now();
+
+  -- Compter les pouces bas
+  SELECT count(*) INTO v_thumbs_down
+  FROM public.price_votes
+  WHERE submission_id = p_submission_id AND vote_type = false;
+
+  -- Si >= 3 pouces bas, vérifier le rôle du soumetteur
+  IF v_thumbs_down >= 3 THEN
+    SELECT role INTO v_submitter_role
+    FROM public.profiles
+    WHERE id = v_submitter_id;
+
+    IF v_submitter_role IS DISTINCT FROM 'admin' THEN
+      UPDATE public.price_submissions
+      SET is_deleted = true
+      WHERE id = p_submission_id;
+    END IF;
+  END IF;
+END;
+$$;
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 
@@ -158,7 +222,7 @@ ALTER TABLE price_submissions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "submissions_select_public" ON price_submissions;
 CREATE POLICY "submissions_select_public" ON price_submissions
-  FOR SELECT USING (true);
+  FOR SELECT USING (is_deleted = false);
 
 DROP POLICY IF EXISTS "submissions_insert_auth" ON price_submissions;
 CREATE POLICY "submissions_insert_auth" ON price_submissions
@@ -190,6 +254,21 @@ CREATE POLICY "consolidated_no_insert" ON consolidated_prices
 DROP POLICY IF EXISTS "consolidated_no_update" ON consolidated_prices;
 CREATE POLICY "consolidated_no_update" ON consolidated_prices
   FOR UPDATE USING (false);
+
+-- --- price_votes ---
+ALTER TABLE price_votes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "votes_select_public" ON price_votes;
+CREATE POLICY "votes_select_public" ON price_votes
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "votes_insert_own" ON price_votes;
+CREATE POLICY "votes_insert_own" ON price_votes
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "votes_update_own" ON price_votes;
+CREATE POLICY "votes_update_own" ON price_votes
+  FOR UPDATE USING (auth.uid() = user_id);
 
 -- --- kama_prices / kama_hdv_prices existantes ---
 -- Lecture publique, écriture via Edge Function seulement
