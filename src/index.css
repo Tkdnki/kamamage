@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-dofus-bg text-slate-100 font-['Outfit',sans-serif] min-h-screen antialiased overflow-x-hidden;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(230, 193, 92, 0.03) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(230, 193, 92, 0.02) 0%, transparent 50%),
+      linear-gradient(to bottom, #090d16 0%, #0d121f 100%);
+    background-attachment: fixed;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-dofus-dark;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dofus-accent/40 rounded-full hover:bg-dofus-accent/60 transition-colors;
+  }
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 2px rgba(230, 193, 92, 0.2)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 10px rgba(230, 193, 92, 0.5)); }
+}
+
+/* Custom Utilities */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.glass-panel {
+  @apply bg-dofus-panel/85 backdrop-blur-md border border-white/5 shadow-xl;
+}
+
+.glass-panel-light {
+  @apply bg-dofus-panelLight/90 backdrop-blur-md border border-white/10 shadow-2xl;
+}
+
+.glow-hover {
+  @apply transition-all duration-300 hover:border-dofus-accent/30 hover:shadow-glow-amber;
+}
+
+.kama-text {
+  @apply text-dofus-accent font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)];
+}
