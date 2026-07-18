@@ -45,7 +45,9 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
     );
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const val = parseInt(price, 10);
     if (isNaN(val) || val < 0) {
       setError('Prix invalide');
@@ -105,12 +107,23 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
             min={0}
             value={price}
             onChange={e => {
+              e.stopPropagation();
               const raw = e.target.value;
-              setPrice(raw === '' ? '' : String(parseInt(raw, 10) || 0));
-              setError('');
-              setSuccess(false);
+              if (raw === '' || raw === '-' || raw === '.') {
+                setPrice('');
+                setError('');
+                setSuccess(false);
+                return;
+              }
+              const parsed = parseInt(raw, 10);
+              if (!isNaN(parsed)) {
+                setPrice(String(parsed));
+                setError('');
+                setSuccess(false);
+              }
             }}
             placeholder="Prix"
+            onKeyDown={e => e.stopPropagation()}
             className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield]"
           />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-500">K</span>
