@@ -4,6 +4,8 @@ import HdvPrices from './components/HdvPrices';
 import CraftProfitability from './components/CraftProfitability';
 import ForgemagieHelper from './components/ForgemagieHelper';
 import ShoppingList from './components/ShoppingList';
+import ProfileSettings from './components/ProfileSettings';
+import PseudoSetupModal from './components/PseudoSetupModal';
 import { DofusProvider } from './context/DofusContext';
 import { ServerProvider } from './context/ServerContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
@@ -22,8 +24,10 @@ function AppContent() {
         {activeView === 'crafts' && <CraftProfitability />}
         {activeView === 'forgemagie' && <ForgemagieHelper />}
         {activeView === 'shopping' && <ShoppingList />}
+        {activeView === 'profile' && <ProfileSettings />}
       </main>
 
+      <PseudoSetupModal />
       <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500 bg-[#070a12]/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="mb-1">

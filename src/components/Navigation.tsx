@@ -1,4 +1,4 @@
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
@@ -116,6 +116,7 @@ export default function Navigation() {
 
 function AuthButton() {
   const { user, profile, loading, signInWithDiscord, signOut } = useAuth();
+  const { setActiveView } = useNavigation();
 
   if (loading) return null;
 
@@ -145,6 +146,12 @@ function AuthButton() {
               <span className="ml-1.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded-full">Admin</span>
             )}
           </div>
+          <button
+            onClick={() => setActiveView('profile')}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <Settings className="h-3 w-3" /> Profil
+          </button>
           <button
             onClick={signOut}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-rose-400 hover:bg-white/5 transition-colors"

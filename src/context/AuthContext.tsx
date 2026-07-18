@@ -16,9 +16,11 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  needsPseudo: boolean;
   signInWithDiscord: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  updatePseudo: (pseudo: string) => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsPseudo, setNeedsPseudo] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,8 +56,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('id', userId)
       .single();
-    if (data) setProfile(data);
+    if (data) {
+      setProfile(data);
+      setNeedsPseudo(!data.pseudo || data.pseudo === user?.email);
+    }
   }
+
+  const updatePseudo = async (pseudo: string): Promise<{ error?: string }> => {
+    if (!user) return { error: 'Non connecté' };
+    if (!pseudo.trim()) return { error: 'Le pseudo ne peut pas être vide' };
+    const { error } = await supabase
+      .from('profiles')
+      .update({ pseudo: pseudo.trim() })
+      .eq('id', user.id);
+    if (error) return { error: error.message };
+    setProfile(prev => prev ? { ...prev, pseudo: pseudo.trim() } : prev);
+    setNeedsPseudo(false);
+    return {};
+  };
 
   const signInWithDiscord = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'discord' });
@@ -71,8 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, profile, loading,
-      signInWithDiscord, signInWithGoogle, signOut,
+      session, user, profile, loading, needsPseudo,
+      signInWithDiscord, signInWithGoogle, signOut, updatePseudo,
     }}>
       {children}
     </AuthContext.Provider>

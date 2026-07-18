@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { DofusItem } from '../data/mockData';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
-export type ViewType = 'hdv' | 'crafts' | 'forgemagie' | 'shopping';
+export type ViewType = 'hdv' | 'crafts' | 'forgemagie' | 'shopping' | 'profile';
 
 export interface CartEntry {
   item: DofusItem;
