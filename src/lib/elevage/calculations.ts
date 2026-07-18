@@ -66,8 +66,19 @@ export function computeTable(
 export function findOptimalLevel(rows: ElevageRow[]): ElevageRow | null {
   if (rows.length === 0) return null;
 
-  const maxBenefit = Math.max(...rows.map(r => r.benefitPercent));
-  const candidates = rows.filter(r => Math.abs(r.benefitPercent - maxBenefit) < 0.0001);
+  let maxPourcentage = 0;
+  for (const r of rows) {
+    if (r.benefitPercent > maxPourcentage) maxPourcentage = r.benefitPercent;
+  }
 
-  return candidates.reduce((best, current) => current.level < best.level ? current : best);
+  const candidats: ElevageRow[] = [];
+  for (const r of rows) {
+    if (Math.abs(r.benefitPercent - maxPourcentage) < 0.0001) {
+      candidats.push(r);
+    }
+  }
+
+  candidats.sort((a, b) => a.level - b.level);
+
+  return candidats[0] ?? null;
 }
