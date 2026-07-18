@@ -13,6 +13,7 @@ import {
   ShoppingCart, Check, Pencil
 } from 'lucide-react';
 import ItemImage from './ItemImage';
+import QuickPriceInput from './QuickPriceInput';
 
 const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Alchimiste': Droplets, 'Bijoutier': Gem, 'Bricoleur': Wrench,
@@ -222,50 +223,59 @@ export default function CraftProfitability() {
                   const itemStats = getCraftStats(item, item.ingredients);
 
                   return (
-                    <button
+                    <div
                       key={item._id}
-                      onClick={() => { setSelectedItemId(item._id); setEditingIngredientId(null); }}
-                      className={`w-full text-left flex items-center justify-between p-3 rounded-xl border transition-all duration-300 group ${
+                      className={`w-full p-3 rounded-xl border transition-all duration-300 group ${
                         isSelected
                           ? 'bg-dofus-accent/5 border-dofus-accent/40 shadow-inner'
                           : 'bg-[#090d16]/30 border-white/5 hover:border-white/10 hover:bg-[#151f32]/10'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                          <ItemImage item={item} className="h-10 w-10 bg-[#151f32]/80 rounded-lg p-1 border border-white/10" />
-                          <span className="absolute -bottom-1 -right-1 text-[8px] bg-[#070a12] text-slate-300 font-bold px-1 rounded border border-white/10">
-                            {item.level}
-                          </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 cursor-pointer min-w-0" onClick={() => { setSelectedItemId(item._id); setEditingIngredientId(null); }}>
+                          <div className="relative shrink-0">
+                            <ItemImage item={item} className="h-10 w-10 bg-[#151f32]/80 rounded-lg p-1 border border-white/10" />
+                            <span className="absolute -bottom-1 -right-1 text-[8px] bg-[#070a12] text-slate-300 font-bold px-1 rounded border border-white/10">
+                              {item.level}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className={`text-sm font-semibold transition-colors leading-tight ${isSelected ? 'text-dofus-accent' : 'text-slate-200 group-hover:text-white'}`}>
+                              {item.name}
+                            </h4>
+                            <span className="text-[9px] text-slate-400 capitalize">{item.type}</span>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className={`text-sm font-semibold transition-colors leading-tight ${isSelected ? 'text-dofus-accent' : 'text-slate-200 group-hover:text-white'}`}>
-                            {item.name}
-                          </h4>
-                          <span className="text-[9px] text-slate-400 capitalize">{item.type}</span>
+
+                        <div className="text-right shrink-0">
+                          {itemStats.hasMissingPrices ? (
+                            <span className="text-[9px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                              <AlertTriangle className="h-3 w-3" /> Prix ?
+                            </span>
+                          ) : itemStats.isSellPriceMissing ? (
+                            <span className="text-[9px] text-slate-500 bg-[#151f32] px-2 py-0.5 rounded-full font-bold">
+                              Prix Vente ?
+                            </span>
+                          ) : (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              itemStats.benefit >= 0
+                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                                : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                            }`}>
+                              {itemStats.benefit >= 0 ? '+' : ''}{Math.round(itemStats.benefit).toLocaleString()} K
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        {itemStats.hasMissingPrices ? (
-                          <span className="text-[9px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                            <AlertTriangle className="h-3 w-3" /> Prix ?
-                          </span>
-                        ) : itemStats.isSellPriceMissing ? (
-                          <span className="text-[9px] text-slate-500 bg-[#151f32] px-2 py-0.5 rounded-full font-bold">
-                            Prix Vente ?
-                          </span>
-                        ) : (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            itemStats.benefit >= 0
-                              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-                              : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-                          }`}>
-                            {itemStats.benefit >= 0 ? '+' : ''}{Math.round(itemStats.benefit).toLocaleString()} K
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                      <QuickPriceInput
+                        currentPrice={hdvPrices[item._id]?.x1}
+                        onSetPrice={(val) => {
+                          const current = hdvPrices[item._id];
+                          setHdvPrice(item._id, val, current?.x10 ?? 0, current?.x100 ?? 0, current?.x1000 ?? 0);
+                        }}
+                      />
+                    </div>
                   );
                 })}
               </div>
