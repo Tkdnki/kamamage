@@ -123,13 +123,17 @@ function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitte
               }
             }}
             placeholder="Prix"
-            onKeyDown={e => e.stopPropagation()}
+            onKeyDown={e => {
+              if (e.key === 'Enter') e.preventDefault();
+              e.stopPropagation();
+            }}
             className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield]"
           />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-500">K</span>
         </div>
 
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={submitting || !price}
           className="flex items-center gap-1 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-2.5 py-1.5 rounded-lg transition-colors"
