@@ -369,12 +369,12 @@ export default function CraftProfitability() {
                                         <input
                                           type="number"
                                           min="0"
-                                          value={currentVal ?? ''}
+                                          defaultValue={currentVal ?? ''}
                                           placeholder="0"
                                           disabled={!user}
                                           title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
                                           className="w-16 bg-[#070a12] border border-amber-500/30 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
-                                          onChange={e => {
+                                          onBlur={e => {
                                             const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
                                             if (!isNaN(val) && val >= 0) handleQuickLotChange(ing.id, lot, val);
                                           }}
