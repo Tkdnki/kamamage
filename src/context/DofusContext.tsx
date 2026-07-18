@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef, useMemo, useReducer, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
@@ -19,8 +19,6 @@ export interface HdvPrices {
   [itemId: string]: PriceData;
 }
 
-type PricesByServer = Record<string, HdvPrices>;
-
 interface DofusContextType {
   hdvPrices: HdvPrices;
   trackedItemIds: string[];
@@ -36,14 +34,36 @@ const DofusContext = createContext<DofusContextType | undefined>(undefined);
 
 export function DofusProvider({ children }: { children: ReactNode }) {
   const { selectedServer } = useServer();
-  const [hdvPricesByServer, setHdvPricesByServer] = useLocalStorage<PricesByServer>('kamamage_hdv_prices', {});
+  const storageKey = `hdvPrices_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
 
   const [trackedItemIds, setTrackedItemIds] = useLocalStorage<string[]>('kamamage_tracked_items', [
     'ing_ble', 'ing_frene', 'ing_fer', 'ing_laine_bouftou'
   ]);
   const [customItems, setCustomItems] = useLocalStorage<DofusItem[]>('kamamage_custom_items', []);
 
-  const hdvPrices: HdvPrices = hdvPricesByServer[selectedServer] ?? {};
+  const [renderTick, forceUpdate] = useReducer(x => x + 1, 0);
+
+  const hdvPrices = useMemo<HdvPrices>(() => {
+    try {
+      const item = window.localStorage.getItem(storageKey);
+      return item ? JSON.parse(item) : {};
+    } catch {
+      return {};
+    }
+  }, [storageKey, renderTick]);
+
+  const setHdvPrices = useCallback((value: HdvPrices | ((prev: HdvPrices) => HdvPrices)) => {
+    let current: HdvPrices = {};
+    try {
+      const item = window.localStorage.getItem(storageKey);
+      current = item ? JSON.parse(item) : {};
+    } catch {}
+    const next = typeof value === 'function' ? value(current) : value;
+    if (JSON.stringify(next) !== JSON.stringify(current)) {
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+      forceUpdate();
+    }
+  }, [storageKey]);
 
   const setHdvPrice = (itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
     let sum = 0;
@@ -53,17 +73,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     if (x100 > 0) { sum += x100 / 100; count++; }
     if (x1000 > 0) { sum += x1000 / 1000; count++; }
     const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
-
-    setHdvPricesByServer(prev => {
-      const serverPrices = prev[selectedServer] ?? {};
-      return {
-        ...prev,
-        [selectedServer]: {
-          ...serverPrices,
-          [itemId]: { x1, x10, x100, x1000, unitAverage }
-        }
-      };
-    });
+    setHdvPrices(prev => ({ ...prev, [itemId]: { x1, x10, x100, x1000, unitAverage } }));
   };
 
   // Debounce synchronisation HDV
@@ -83,27 +93,16 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   // Récupération HDV distante au montage / changement serveur
   useEffect(() => {
     let cancelled = false;
-
-    // Clear local prices for the new server to prevent stale data
-    setHdvPricesByServer(prev => {
-      const current = prev[selectedServer];
-      if (current && Object.keys(current).length > 0) {
-        return { ...prev, [selectedServer]: {} };
-      }
-      return prev;
-    });
-
     fetchHdvPricesFromServer(selectedServer).then(remote => {
       if (cancelled || !remote || Object.keys(remote).length === 0) return;
-      setHdvPricesByServer(prev => {
-        const local = prev[selectedServer] ?? {};
+      setHdvPrices(prev => {
         const merged = { ...remote };
-        for (const [key, val] of Object.entries(local)) {
+        for (const [key, val] of Object.entries(prev)) {
           merged[key] = { ...merged[key], ...val };
           if (remote[key]?.author) merged[key].author = remote[key].author;
         }
-        if (JSON.stringify(local) === JSON.stringify(merged)) return prev;
-        return { ...prev, [selectedServer]: merged };
+        if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
+        return merged;
       });
     });
     return () => { cancelled = true; };
@@ -130,7 +129,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   };
 
   const getItemPriceInfo = (itemId: string) => {
-    const priceData = hdvPricesByServer[selectedServer]?.[itemId];
+    const priceData = hdvPrices[itemId];
     if (priceData && priceData.unitAverage > 0) {
       return { price: priceData.unitAverage, isMissing: false };
     }
