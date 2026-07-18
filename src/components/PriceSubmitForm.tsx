@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useServer } from '../context/ServerContext';
-import { LogIn, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { LogIn, Send, CheckCircle2, AlertCircle, Coins } from 'lucide-react';
 
 interface PriceSubmitFormProps {
   itemKey: string;
@@ -80,28 +80,61 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
     onSubmitted?.();
   };
 
+  const LOT_FACTORS = [
+    { label: 'x1', factor: 1 },
+    { label: 'x10', factor: 10 },
+    { label: 'x100', factor: 100 },
+    { label: 'x1000', factor: 1000 },
+  ] as const;
+
+  const applyLot = useCallback((e: React.MouseEvent, factor: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const current = parseInt(price, 10) || 0;
+    setPrice(String(current * factor));
+    setError('');
+    setSuccess(false);
+  }, [price]);
+
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative flex-1">
-        <input
-          type="number"
-          min={0}
-          value={price}
-          onChange={e => { setPrice(e.target.value); setError(''); setSuccess(false); }}
-          placeholder="Prix"
-          className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield]"
-        />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-500">K</span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <input
+            type="number"
+            min={0}
+            value={price}
+            onChange={e => { setPrice(e.target.value); setError(''); setSuccess(false); }}
+            placeholder="Prix"
+            className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield]"
+          />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-500">K</span>
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !price}
+          className="flex items-center gap-1 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-2.5 py-1.5 rounded-lg transition-colors"
+        >
+          <Send className={`h-3 w-3 ${submitting ? 'animate-pulse' : ''}`} />
+          {submitting ? '...' : 'Soumettre'}
+        </button>
       </div>
 
-      <button
-        onClick={handleSubmit}
-        disabled={submitting || !price}
-        className="flex items-center gap-1 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-2.5 py-1.5 rounded-lg transition-colors"
-      >
-        <Send className={`h-3 w-3 ${submitting ? 'animate-pulse' : ''}`} />
-        {submitting ? '...' : 'Soumettre'}
-      </button>
+      <div className="flex items-center gap-1">
+        <Coins className="h-3 w-3 text-slate-500 shrink-0" />
+        {LOT_FACTORS.map(({ label, factor }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={e => applyLot(e, factor)}
+            className="text-[10px] font-bold text-slate-400 hover:text-white bg-[#090d16]/60 hover:bg-purple-500/20 border border-white/10 hover:border-purple-500/40 px-2 py-1 rounded-md transition-all"
+          >
+            {label}
+          </button>
+        ))}
+        <span className="text-[8px] text-slate-600 ml-1">raccourcis lot</span>
+      </div>
 
       {error && (
         <span className="flex items-center gap-1 text-[9px] text-rose-400">
