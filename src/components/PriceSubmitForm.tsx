@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useRef, useState, useCallback, memo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useServer } from '../context/ServerContext';
@@ -22,7 +22,7 @@ const LOT_FACTORS = [
 function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitted }: PriceSubmitFormProps) {
   const { user, loading: authLoading, signInWithDiscord } = useAuth();
   const { selectedServer } = useServer();
-  const [price, setPrice] = useState(currentPrice ? String(currentPrice) : '');
+  const inputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -52,11 +52,19 @@ function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitte
     );
   }
 
+  const getPriceValue = () => {
+    if (!inputRef.current) return 0;
+    const raw = inputRef.current.value;
+    if (raw === '' || raw === '-' || raw === '.') return 0;
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const handleSubmit = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const val = parseInt(price, 10);
-    if (isNaN(val) || val < 0) {
+    const val = getPriceValue();
+    if (val <= 0) {
       setError('Prix invalide');
       return;
     }
@@ -87,41 +95,27 @@ function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitte
 
     setSuccess(true);
     onSubmitted?.();
-  }, [price, selectedServer, category, itemKey, lot, user, onSubmitted]);
+  }, [selectedServer, category, itemKey, lot, user, onSubmitted]);
 
   const applyLot = useCallback((e: React.MouseEvent, factor: number) => {
     e.preventDefault();
     e.stopPropagation();
-    const current = parseInt(price, 10) || 0;
-    setPrice(String(current * factor));
+    if (!inputRef.current) return;
+    const current = getPriceValue();
+    inputRef.current.value = String(current * factor);
     setError('');
     setSuccess(false);
-  }, [price]);
+  }, []);
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <input
+            ref={inputRef}
             type="number"
             min={0}
-            value={price}
-            onChange={e => {
-              e.stopPropagation();
-              const raw = e.target.value;
-              if (raw === '' || raw === '-' || raw === '.') {
-                setPrice('');
-                setError('');
-                setSuccess(false);
-                return;
-              }
-              const parsed = parseInt(raw, 10);
-              if (!isNaN(parsed)) {
-                setPrice(String(parsed));
-                setError('');
-                setSuccess(false);
-              }
-            }}
+            defaultValue={currentPrice ? String(currentPrice) : ''}
             placeholder="Prix"
             onKeyDown={e => {
               if (e.key === 'Enter') e.preventDefault();
@@ -135,7 +129,7 @@ function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitte
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting || !price}
+          disabled={submitting}
           className="flex items-center gap-1 text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-2.5 py-1.5 rounded-lg transition-colors"
         >
           <Send className={`h-3 w-3 ${submitting ? 'animate-pulse' : ''}`} />
