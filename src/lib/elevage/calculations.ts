@@ -65,5 +65,5 @@ export function computeTable(
 
 export function findOptimalLevel(rows: ElevageRow[]): ElevageRow | null {
   if (rows.length === 0) return null;
-  return rows.reduce((best, current) => current.netProfit > best.netProfit ? current : best);
+  return rows.reduce((best, current) => current.benefitPercent > best.benefitPercent ? current : best);
 }

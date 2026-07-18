@@ -63,7 +63,7 @@ export default function ElevageCalculator() {
               Capture
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Achetez des <strong className="text-slate-200">Volkornes</strong> ou <strong className="text-slate-200">Muldos</strong> Gen 1 en HDV.
+              Capturez des <strong className="text-slate-200">Volkornes</strong> ou <strong className="text-slate-200">Muldos</strong> Gen 1.
             </p>
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
