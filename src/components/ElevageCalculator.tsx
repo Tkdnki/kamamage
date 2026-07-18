@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { ENCLOS_LEVELS, CARBURANT_TYPES, CARBURANT_TAILLES, HDV_ITEM_IDS, getCarburantDisplayName } from '../lib/elevage/constants';
 import { computeTable, findOptimalLevel } from '../lib/elevage/calculations';
 import type { MontureType, ElevageRow } from '../lib/elevage/calculations';
-import { Sparkles, Beef, AlertTriangle, Coins, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { Sparkles, Beef, Lightbulb, AlertTriangle, Coins, TrendingUp, TrendingDown, Info, Target } from 'lucide-react';
 
 export default function ElevageCalculator() {
   const { hdvPrices } = useDofus();
@@ -15,6 +15,8 @@ export default function ElevageCalculator() {
 
   const [enclosIndex, setEnclosIndex] = useState(ENCLOS_LEVELS.length - 1);
   const enclosCount = ENCLOS_LEVELS[enclosIndex].count;
+
+  const optimalRowRef = useRef<HTMLTableRowElement>(null);
 
   const carburantType = CARBURANT_TYPES.find(t => t.id === carbType) ?? CARBURANT_TYPES[3];
   const carburantTaille = CARBURANT_TAILLES.find(t => t.id === carbTaille) ?? CARBURANT_TAILLES[2];
@@ -35,6 +37,12 @@ export default function ElevageCalculator() {
 
   const optimal = useMemo(() => findOptimalLevel(rows), [rows]);
 
+  useEffect(() => {
+    if (optimalRowRef.current) {
+      optimalRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [optimal?.level]);
+
   const missingItems: string[] = [];
   if (!filetPrice) missingItems.push('Filet de capture');
   if (!runePrice) missingItems.push(montureType === 'muldo' ? 'Rune Ga Pme' : 'Rune Ga PA');
@@ -42,10 +50,48 @@ export default function ElevageCalculator() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+      {/* Guide block */}
+      <div className="glass-panel rounded-xl p-5 sm:p-6 border border-amber-500/20 shadow-xl bg-gradient-to-r from-[#0f1421] to-[#151f32]">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-3">
+          <Lightbulb className="h-5 w-5 text-amber-400" />
+          Comment optimiser vos gains ?
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
+            <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/20 text-[9px] font-extrabold">1</span>
+              Capture
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Achetez des <strong className="text-slate-200">Volkornes</strong> ou <strong className="text-slate-200">Muldos</strong> Gen 1 en HDV.
+            </p>
+          </div>
+          <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
+            <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/20 text-[9px] font-extrabold">2</span>
+              XP
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Utilisez des <strong className="text-slate-200">consommables</strong> pour atteindre le niveau optimal.
+            </p>
+          </div>
+          <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
+            <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/20 text-[9px] font-extrabold">3</span>
+              Brisage
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Brisez-les en <strong className="text-slate-200">HDV</strong> pour extraire vos runes et générer des bénéfices.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Calculator panel */}
       <div className="glass-panel rounded-xl p-5 sm:p-6 border border-white/5 shadow-xl">
         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <Beef className="h-5 w-5 text-amber-400" />
-          Calculateur d'Élevage
+          Simulateur de Brisage : Muldos &amp; Volkornes
         </h2>
 
         {/* Type toggle */}
@@ -147,8 +193,9 @@ export default function ElevageCalculator() {
             Tableau des bénéfices
           </h3>
           {optimal && !hasMissingPrices && (
-            <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded-full">
-              Niveau optimal : {optimal.level}
+            <span className="text-[10px] bg-emerald-500/15 border-2 border-emerald-500/40 text-emerald-400 font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+              <Target className="h-3 w-3" />
+              Niveau recommandé : {optimal.level}
             </span>
           )}
         </div>
@@ -183,17 +230,25 @@ export default function ElevageCalculator() {
                   return (
                     <tr
                       key={row.level}
+                      ref={isOptimal ? optimalRowRef : undefined}
                       className={`border-b border-white/5 transition-colors ${
                         isOptimal
-                          ? 'bg-emerald-500/10 border-emerald-500/20'
+                          ? 'bg-emerald-500/15 border-y-2 border-emerald-500/40'
                           : row.netProfit >= 0
                           ? 'hover:bg-white/[0.02]'
                           : 'hover:bg-white/[0.02] opacity-60'
                       }`}
                     >
                       <td className={`py-2.5 px-3 font-bold ${isOptimal ? 'text-emerald-400' : 'text-white'}`}>
-                        {row.level}
-                        {isOptimal && <Sparkles className="h-3 w-3 inline ml-1 text-emerald-400" />}
+                        <span className="flex items-center gap-1.5">
+                          {row.level}
+                          {isOptimal && (
+                            <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Recommandé
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="text-right py-2.5 px-3 text-slate-300 font-mono">{row.cumulatedXp.toLocaleString()}</td>
                       <td className="text-right py-2.5 px-3 text-slate-300 font-mono">{row.fuelCostPerMount.toLocaleString()} K</td>
@@ -225,6 +280,23 @@ export default function ElevageCalculator() {
           </div>
         )}
       </div>
+
+      {/* Info note */}
+      {!hasMissingPrices && rows.length > 0 && (
+        <div className="glass-panel rounded-xl p-4 sm:p-5 border border-white/5 shadow-xl">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">Info Brisage</h4>
+              <p className="text-[12px] text-slate-400 leading-relaxed">
+                Bien que le gain des runes PA (Volkornes) et PM (Muldos) soit garanti au niveau 100,
+                il est tout à fait possible d'obtenir ces runes en brisant les montures à des niveaux inférieurs.
+                Le calculateur vous indique ici le <strong className="text-slate-200">meilleur compromis rentabilité/temps</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
