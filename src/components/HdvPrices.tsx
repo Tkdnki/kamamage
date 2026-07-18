@@ -61,6 +61,8 @@ export default function HdvPrices() {
     ? hdvPrices[activeHdvItem._id] || { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 }
     : { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 };
 
+  console.log('[HdvPrices] activePrices pour', activeHdvItem?._id, activeHdvItem?.name, ':', activePrices, '| hdvPrices brutes:', hdvPrices[activeHdvItem?._id ?? '']);
+
   const handleActivePriceChange = (lot: 'x1' | 'x10' | 'x100' | 'x1000', valString: string) => {
     if (!activeHdvItem) return;
     const val = valString === '' ? 0 : Math.max(0, parseInt(valString, 10));

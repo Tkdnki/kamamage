@@ -92,6 +92,8 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
     return null;
   }
 
+  console.log('[Sync] fetchHdvPricesFromServer raw data:', data);
+
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;

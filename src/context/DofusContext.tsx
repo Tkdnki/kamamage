@@ -87,7 +87,11 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       if (cancelled || !remote || Object.keys(remote).length === 0) return;
       setHdvPricesByServer(prev => {
         const local = prev[selectedServer] ?? {};
-        const merged = { ...remote, ...local };
+        const merged = { ...remote };
+        for (const [key, val] of Object.entries(local)) {
+          merged[key] = { ...merged[key], ...val };
+          if (remote[key]?.author) merged[key].author = remote[key].author;
+        }
         if (JSON.stringify(local) === JSON.stringify(merged)) return prev;
         return { ...prev, [selectedServer]: merged };
       });
