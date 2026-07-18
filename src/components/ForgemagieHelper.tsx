@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { pushRunePricesToServer, fetchRunePricesFromServer } from '../lib/sync';
+import { pushRunePricesToServer, fetchRunePricesFromServer, fetchRunePricesWithAuthor } from '../lib/sync';
 import { useAuth } from '../context/AuthContext';
 import PendingSubmissions from './PendingSubmissions';
 import { createPortal } from 'react-dom';
@@ -459,6 +459,7 @@ export default function ForgemagieHelper() {
   const [runePriceManagerOpen, setRunePriceManagerOpen] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncInProgress, setSyncInProgress] = useState(false);
+  const [runePriceAuthors, setRunePriceAuthors] = useState<Record<string, string | null>>({});
 
   // Debounce pour synchronisation collaborative
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -496,6 +497,13 @@ export default function ForgemagieHelper() {
       setSyncInProgress(false);
     });
     return () => { cancelled = true; };
+  }, [selectedServer]);
+
+  // Récupération des auteurs des prix
+  useEffect(() => {
+    fetchRunePricesWithAuthor(selectedServer).then(authors => {
+      setRunePriceAuthors(authors);
+    });
   }, [selectedServer]);
 
   const handleForceSync = useCallback(() => {
@@ -1346,24 +1354,29 @@ export default function ForgemagieHelper() {
                       return (
                         <div key={runeName} className="flex items-center gap-1.5 bg-[#090d16]/30 rounded-lg px-2 py-1.5 border border-white/5">
                           <span className="text-[10px] font-semibold text-slate-300 w-10 shrink-0">{runeName}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={price || ''}
-                            placeholder="0"
-                            disabled={!user}
-                            title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
-                            className="w-full bg-[#070a12] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
-                            onChange={e => {
-                              const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                              if (!isNaN(val) && val >= 0) {
-                                setAllRunePrices(prev => ({
-                                  ...prev,
-                                  [selectedServer]: { ...(prev[selectedServer] ?? {}), [runeName]: val },
-                                }));
-                              }
-                            }}
+                          <div className="flex flex-col items-end flex-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={price || ''}
+                              placeholder="0"
+                              disabled={!user}
+                              title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                              className="w-full bg-[#070a12] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
+                              onChange={e => {
+                                const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                                if (!isNaN(val) && val >= 0) {
+                                  setAllRunePrices(prev => ({
+                                    ...prev,
+                                    [selectedServer]: { ...(prev[selectedServer] ?? {}), [runeName]: val },
+                                  }));
+                                }
+                              }}
                           />
+                          {runePriceAuthors[runeName] && (
+                            <span className="text-[7px] text-slate-600 mt-0.5 leading-tight">Par {runePriceAuthors[runeName]}</span>
+                          )}
+                          </div>
                         </div>
                       );
                     })}

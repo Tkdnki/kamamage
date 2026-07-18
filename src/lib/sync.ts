@@ -1,17 +1,38 @@
 import { supabase } from './supabaseClient';
 import type { PriceData } from '../context/DofusContext';
 
-// ─── Lecture des prix consolidés (public) ──────────────────────────────
+// ─── RPC upsert (contourne RLS via SECURITY DEFINER) ────────────────────
 
-export async function fetchConsolidatedPrices(server: string, category: string): Promise<Record<string, number> | null> {
+async function upsertPrice(server: string, category: string, itemKey: string, lot: string | null, price: number) {
+  const { error } = await supabase.rpc('upsert_consolidated_price', {
+    p_server_name: server,
+    p_category: category,
+    p_item_key: itemKey,
+    p_lot: lot,
+    p_price: price,
+  });
+  if (error) console.warn(`[Sync] upsert_consolidated_price error:`, error.message);
+}
+
+// ─── Runes ──────────────────────────────────────────────────────────────
+
+export async function pushRunePricesToServer(server: string, data: Record<string, number>): Promise<void> {
+  await Promise.all(
+    Object.entries(data).map(([itemKey, price]) =>
+      upsertPrice(server, 'rune', itemKey, null, price)
+    )
+  );
+}
+
+export async function fetchRunePricesFromServer(server: string): Promise<Record<string, number> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price')
+    .select('item_key, price, updated_by, profiles!left(pseudo)')
     .eq('server_name', server)
-    .eq('category', category);
+    .eq('category', 'rune');
 
   if (error) {
-    console.warn('[Sync] fetchConsolidatedPrices error:', error.message);
+    console.warn('[Sync] fetchRunePrices error:', error.message);
     return null;
   }
 
@@ -22,27 +43,47 @@ export async function fetchConsolidatedPrices(server: string, category: string):
   return prices;
 }
 
-// ─── Runes (lecture via consolidated_prices, écriture via price_submissions) ──
+export async function fetchRunePricesWithAuthor(server: string): Promise<Record<string, { price: number; author: string | null }>> {
+  const { data, error } = await supabase
+    .from('consolidated_prices')
+    .select('item_key, price, profiles!left(pseudo)')
+    .eq('server_name', server)
+    .eq('category', 'rune');
 
-export async function fetchRunePricesFromServer(server: string): Promise<Record<string, number> | null> {
-  return fetchConsolidatedPrices(server, 'rune');
+  if (error) {
+    console.warn('[Sync] fetchRunePricesWithAuthor error:', error.message);
+    return {};
+  }
+
+  const result: Record<string, { price: number; author: string | null }> = {};
+  for (const row of data ?? []) {
+    result[row.item_key] = {
+      price: row.price,
+      author: (row as any).profiles?.pseudo ?? null,
+    };
+  }
+  return result;
 }
 
-// Stub de compatibilité : l'écriture passe désormais par price_submissions (voir PriceSubmitForm)
-export async function pushRunePricesToServer(_server: string, _data: Record<string, number>): Promise<void> {
-  // Remplacé par le système de soumission collaborative
-}
+// ─── HDV ────────────────────────────────────────────────────────────────
 
-// ─── HDV ─────────────────────────────────────────────────────────────────────
-
-export async function pushHdvPricesToServer(_server: string, _data: Record<string, PriceData>): Promise<void> {
-  // Remplacé par le système de soumission collaborative
+export async function pushHdvPricesToServer(server: string, data: Record<string, PriceData>): Promise<void> {
+  await Promise.all(
+    Object.entries(data).flatMap(([itemId, pd]) => {
+      const lots: { lot: string; price: number }[] = [];
+      if (pd.x1 > 0) lots.push({ lot: 'x1', price: pd.x1 });
+      if (pd.x10 > 0) lots.push({ lot: 'x10', price: pd.x10 });
+      if (pd.x100 > 0) lots.push({ lot: 'x100', price: pd.x100 });
+      if (pd.x1000 > 0) lots.push({ lot: 'x1000', price: pd.x1000 });
+      return lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price));
+    })
+  );
 }
 
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot')
+    .select('item_key, price, lot, profiles!left(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -61,7 +102,6 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
     else if (row.lot === 'x1000') prices[id].x1000 = row.price;
   }
 
-  // Recalculer unitAverage
   for (const id of Object.keys(prices)) {
     const p = prices[id];
     let sum = 0, count = 0;
@@ -73,4 +113,40 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   }
 
   return prices;
+}
+
+export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null }>> {
+  const { data, error } = await supabase
+    .from('consolidated_prices')
+    .select('item_key, price, lot, profiles!left(pseudo)')
+    .eq('server_name', server)
+    .eq('category', 'hdv');
+
+  if (error) {
+    console.warn('[Sync] fetchHdvPricesWithAuthor error:', error.message);
+    return {};
+  }
+
+  const result: Record<string, any> = {};
+  for (const row of data ?? []) {
+    const id = row.item_key;
+    if (!result[id]) result[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null };
+    if (row.lot === 'x1') result[id].x1 = row.price;
+    else if (row.lot === 'x10') result[id].x10 = row.price;
+    else if (row.lot === 'x100') result[id].x100 = row.price;
+    else if (row.lot === 'x1000') result[id].x1000 = row.price;
+    if ((row as any).profiles?.pseudo) result[id].author = (row as any).profiles.pseudo;
+  }
+
+  for (const id of Object.keys(result)) {
+    const p = result[id];
+    let sum = 0, count = 0;
+    if (p.x1 > 0) { sum += p.x1; count++; }
+    if (p.x10 > 0) { sum += p.x10 / 10; count++; }
+    if (p.x100 > 0) { sum += p.x100 / 100; count++; }
+    if (p.x1000 > 0) { sum += p.x1000 / 1000; count++; }
+    p.unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
+  }
+
+  return result;
 }

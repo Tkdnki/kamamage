@@ -130,9 +130,30 @@ CREATE TABLE IF NOT EXISTS consolidated_prices (
   item_key      TEXT NOT NULL,
   lot           TEXT DEFAULT NULL,
   price         INTEGER NOT NULL,
+  updated_by    UUID REFERENCES profiles(id),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (server_name, category, item_key, lot)
 );
+
+-- RPC : upsert d'un prix consolidé (contourne RLS via SECURITY DEFINER)
+CREATE OR REPLACE FUNCTION upsert_consolidated_price(
+  p_server_name TEXT,
+  p_category    TEXT,
+  p_item_key    TEXT,
+  p_lot         TEXT DEFAULT NULL,
+  p_price       INTEGER DEFAULT 0
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO public.consolidated_prices (server_name, category, item_key, lot, price, updated_by, updated_at)
+  VALUES (p_server_name, p_category, p_item_key, p_lot, p_price, auth.uid(), now())
+  ON CONFLICT (server_name, category, item_key, lot)
+  DO UPDATE SET price = p_price, updated_by = auth.uid(), updated_at = now();
+END;
+$$;
 
 -- ============================================================
 -- VOTES PARTICIPATIFS
