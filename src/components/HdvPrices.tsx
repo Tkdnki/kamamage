@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useDofus } from '../context/DofusContext';
 import type { PriceData } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
+import { useAuth } from '../context/AuthContext';
 import { searchItems } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import { Search, Plus, Trash2, X, Coins, TrendingDown, Sparkles, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import ItemImage from './ItemImage';
 
 export default function HdvPrices() {
+  const { user } = useAuth();
   const { 
     hdvPrices, 
     trackedItemIds, 
@@ -227,8 +229,10 @@ export default function HdvPrices() {
                   type="number"
                   value={activePrices.x1 || ''}
                   placeholder="Prix"
+                  disabled={!user}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
                   onChange={(e) => handleActivePriceChange('x1', e.target.value)}
-                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40"
+                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -237,8 +241,10 @@ export default function HdvPrices() {
                   type="number"
                   value={activePrices.x10 || ''}
                   placeholder="Prix"
+                  disabled={!user}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
                   onChange={(e) => handleActivePriceChange('x10', e.target.value)}
-                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40"
+                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -247,8 +253,10 @@ export default function HdvPrices() {
                   type="number"
                   value={activePrices.x100 || ''}
                   placeholder="Prix"
+                  disabled={!user}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
                   onChange={(e) => handleActivePriceChange('x100', e.target.value)}
-                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40"
+                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -257,8 +265,10 @@ export default function HdvPrices() {
                   type="number"
                   value={activePrices.x1000 || ''}
                   placeholder="Prix"
+                  disabled={!user}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
                   onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
-                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40"
+                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
             </div>

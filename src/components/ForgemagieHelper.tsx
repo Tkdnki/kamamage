@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { pushRunePricesToServer, fetchRunePricesFromServer } from '../lib/sync';
+import { useAuth } from '../context/AuthContext';
 import PendingSubmissions from './PendingSubmissions';
 import { createPortal } from 'react-dom';
 import { searchItems } from '../services/api';
@@ -422,6 +423,7 @@ function getSuggestionsForItem(
 
 
 export default function ForgemagieHelper() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<DofusItem[]>([]);
   const [, setIsSearchLoading] = useState(false);
@@ -1349,7 +1351,9 @@ export default function ForgemagieHelper() {
                             min={0}
                             value={price || ''}
                             placeholder="0"
-                            className="w-full bg-[#070a12] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            disabled={!user}
+                            title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                            className="w-full bg-[#070a12] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
                             onChange={e => {
                               const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
                               if (!isNaN(val) && val >= 0) {

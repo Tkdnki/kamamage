@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { ComponentType } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
+import { useAuth } from '../context/AuthContext';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
@@ -22,6 +23,7 @@ const JOB_ICONS: { [key: string]: ComponentType<any> } = {
 };
 
 export default function CraftProfitability() {
+  const { user } = useAuth();
   const { hdvPrices, setHdvPrice, trackItem } = useDofus();
   const { navigateToHdvItem, addIngredientsToCart } = useNavigation();
 
@@ -342,7 +344,9 @@ export default function CraftProfitability() {
                                           min="0"
                                           value={currentVal ?? ''}
                                           placeholder="0"
-                                          className="w-16 bg-[#070a12] border border-amber-500/30 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          disabled={!user}
+                                          title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                                          className="w-16 bg-[#070a12] border border-amber-500/30 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
                                           onChange={e => {
                                             const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
                                             if (!isNaN(val) && val >= 0) handleQuickLotChange(ing.id, lot, val);
