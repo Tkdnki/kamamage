@@ -245,7 +245,7 @@ export default function HdvPrices() {
                   value={activePrices.x1 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                   onChange={(e) => handleActivePriceChange('x1', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -257,7 +257,7 @@ export default function HdvPrices() {
                   value={activePrices.x10 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                   onChange={(e) => handleActivePriceChange('x10', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -269,7 +269,7 @@ export default function HdvPrices() {
                   value={activePrices.x100 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                   onChange={(e) => handleActivePriceChange('x100', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -281,7 +281,7 @@ export default function HdvPrices() {
                   value={activePrices.x1000 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                   onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
