@@ -3,7 +3,9 @@ import { useDofus } from '../context/DofusContext';
 import type { PriceData } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
+import { useServer } from '../context/ServerContext';
 import { searchItems } from '../services/api';
+import { fetchHdvPricesWithAuthor } from '../lib/sync';
 import type { DofusItem } from '../data/mockData';
 import { Search, Plus, Trash2, X, Coins, TrendingDown, Sparkles, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import ItemImage from './ItemImage';
@@ -19,6 +21,7 @@ export default function HdvPrices() {
     setHdvPrice 
   } = useDofus();
   const { pendingHdvItem, clearPendingHdvItem } = useNavigation();
+  const { selectedServer: server } = useServer();
 
   const [activeHdvItem, setActiveHdvItem] = useState<DofusItem | null>(null);
   const [isTrackedListOpen, setIsTrackedListOpen] = useState(true);
@@ -60,8 +63,18 @@ export default function HdvPrices() {
   const activePrices: PriceData = activeHdvItem
     ? hdvPrices[activeHdvItem._id] || { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 }
     : { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 };
+  const [activeAuthor, setActiveAuthor] = useState<string | null>(null);
 
-  console.log('[HdvPrices] activePrices pour', activeHdvItem?._id, activeHdvItem?.name, ':', activePrices, '| hdvPrices brutes:', hdvPrices[activeHdvItem?._id ?? '']);
+  // Fetch author directly from Supabase for the active item
+  useEffect(() => {
+    if (!activeHdvItem) { setActiveAuthor(null); return; }
+    fetchHdvPricesWithAuthor(server).then(data => {
+      const entry = data[activeHdvItem._id];
+      setActiveAuthor(entry?.author ?? null);
+    });
+  }, [activeHdvItem?._id, server]);
+
+  const displayAuthor = activePrices.author ?? activeAuthor;
 
   const handleActivePriceChange = (lot: 'x1' | 'x10' | 'x100' | 'x1000', valString: string) => {
     if (!activeHdvItem) return;
@@ -232,7 +245,7 @@ export default function HdvPrices() {
                   value={activePrices.x1 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x1', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -244,7 +257,7 @@ export default function HdvPrices() {
                   value={activePrices.x10 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x10', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -256,7 +269,7 @@ export default function HdvPrices() {
                   value={activePrices.x100 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x100', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -268,14 +281,14 @@ export default function HdvPrices() {
                   value={activePrices.x1000 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
+                  title={displayAuthor ? `Modifié par ${displayAuthor}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
-            {activePrices.author && (
-              <p className="text-[9px] text-slate-600 mb-3">Modifié par {activePrices.author}</p>
+            {displayAuthor && (
+              <p className="text-[9px] text-slate-600 mb-3">Modifié par {displayAuthor}</p>
             )}
 
             {/* Optimisation & Unit average */}
