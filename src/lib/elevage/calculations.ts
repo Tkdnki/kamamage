@@ -3,19 +3,12 @@ import { TABLE_XP_MONTURE } from './constants';
 export type MontureType = 'muldo' | 'volkorne';
 
 export function probaRune(type: MontureType, level: number): number {
-  if (type === 'muldo') {
-    return (3 * level * 90 * 60 / 200 / 100 + 1) / 100;
-  }
-  return (3 * level * 100 * 60 / 200 / 100 + 1) / 100;
+  const multi = type === 'muldo' ? 90 : 100;
+  return ((3 * 0.01 * level * multi * 60 / 200) + 1) / 100;
 }
 
 export function xpToLevel(level: number): number {
   return TABLE_XP_MONTURE[level] ?? 0;
-}
-
-export function carburantUnitsNeeded(totalXp: number, xpPerUnit: number): number {
-  if (xpPerUnit <= 0) return 0;
-  return Math.ceil(totalXp / xpPerUnit);
 }
 
 export interface ElevageRow {
@@ -25,19 +18,24 @@ export interface ElevageRow {
   expectedGain: number;
   fuelCostPerMount: number;
   netProfit: number;
+  benefitPercent: number;
+  totalCycleProfit: number;
+  extraitsRequired: number;
+  hoursToLevel: number;
 }
 
 export function computeTable(
   type: MontureType,
   runePrice: number,
-  carburantXp: number,
   carburantPrice: number,
   filetPrice: number,
-  mountCount: number
+  enclosCount: number,
 ): ElevageRow[] {
-  if (runePrice <= 0 || carburantXp <= 0 || carburantPrice <= 0 || filetPrice <= 0 || mountCount <= 0) {
+  if (runePrice <= 0 || carburantPrice <= 0 || filetPrice <= 0 || enclosCount <= 0) {
     return [];
   }
+
+  const prixParXP = carburantPrice / 3000;
 
   const results: ElevageRow[] = [];
 
@@ -47,12 +45,19 @@ export function computeTable(
 
     const runeProb = probaRune(type, level);
     const expectedGain = runeProb * runePrice;
-    const units = carburantUnitsNeeded(cumulatedXp, carburantXp);
-    const totalFuelCost = units * carburantPrice;
-    const fuelCostPerMount = totalFuelCost / mountCount;
+    const fuelCostPerMount = (cumulatedXp * prixParXP) / 10;
     const netProfit = expectedGain - fuelCostPerMount - filetPrice;
+    const totalCost = fuelCostPerMount + filetPrice;
+    const benefitPercent = totalCost > 0 ? netProfit / totalCost : 0;
+    const totalCycleProfit = netProfit * enclosCount * 10;
+    const extraitsRequired = cumulatedXp / 3000;
+    const hoursToLevel = cumulatedXp / 3600;
 
-    results.push({ level, cumulatedXp, runeProb, expectedGain, fuelCostPerMount, netProfit });
+    results.push({
+      level, cumulatedXp, runeProb, expectedGain,
+      fuelCostPerMount, netProfit, benefitPercent,
+      totalCycleProfit, extraitsRequired, hoursToLevel,
+    });
   }
 
   return results;

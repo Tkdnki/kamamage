@@ -10,20 +10,17 @@ export default function ElevageCalculator() {
 
   const [montureType, setMontureType] = useState<MontureType>('muldo');
 
-  const [carbType, setCarbType] = useState(typeof CARBURANT_TYPES[3] !== 'undefined' ? CARBURANT_TYPES[3].id : 'elixir');
-  const [carbTaille, setCarbTaille] = useState(typeof CARBURANT_TAILLES[4] !== 'undefined' ? CARBURANT_TAILLES[4].id : 'gigantesque');
+  const [carbType, setCarbType] = useState(CARBURANT_TYPES[3].id);
+  const [carbTaille, setCarbTaille] = useState(CARBURANT_TAILLES[2].id);
 
   const [enclosIndex, setEnclosIndex] = useState(ENCLOS_LEVELS.length - 1);
-  const [mountsPerEnclos, setMountsPerEnclos] = useState(10);
-
   const enclosCount = ENCLOS_LEVELS[enclosIndex].count;
-  const mountCount = enclosCount * mountsPerEnclos;
 
-  const carburantType = (typeof CARBURANT_TYPES.find(t => t.id === carbType) !== 'undefined' ? CARBURANT_TYPES.find(t => t.id === carbType) : CARBURANT_TYPES[3])!;
-  const carburantTaille = (typeof CARBURANT_TAILLES.find(t => t.id === carbTaille) !== 'undefined' ? CARBURANT_TAILLES.find(t => t.id === carbTaille) : CARBURANT_TAILLES[4])!;
+  const carburantType = CARBURANT_TYPES.find(t => t.id === carbType) ?? CARBURANT_TYPES[3];
+  const carburantTaille = CARBURANT_TAILLES.find(t => t.id === carbTaille) ?? CARBURANT_TAILLES[2];
 
   const runeItemId = montureType === 'muldo' ? HDV_ITEM_IDS.rune.muldo : HDV_ITEM_IDS.rune.volkorne;
-  const carburantItemId = HDV_ITEM_IDS.carburant(carburantType.id, carburantTaille.id);
+  const carburantItemId = HDV_ITEM_IDS.carburant(carbType, carbTaille);
 
   const runePrice = hdvPrices[runeItemId]?.unitAverage ?? 0;
   const carburantPrice = hdvPrices[carburantItemId]?.unitAverage ?? 0;
@@ -33,13 +30,10 @@ export default function ElevageCalculator() {
 
   const rows = useMemo<ElevageRow[]>(() => {
     if (hasMissingPrices) return [];
-    return computeTable(montureType, runePrice, carburantTaille.xp, carburantPrice, filetPrice, mountCount);
-  }, [montureType, runePrice, carburantTaille.xp, carburantPrice, filetPrice, mountCount, hasMissingPrices]);
+    return computeTable(montureType, runePrice, carburantPrice, filetPrice, enclosCount);
+  }, [montureType, runePrice, carburantPrice, filetPrice, enclosCount, hasMissingPrices]);
 
   const optimal = useMemo(() => findOptimalLevel(rows), [rows]);
-
-  const debugKeys = [runeItemId, carburantItemId, HDV_ITEM_IDS.filet_capture].filter(k => !hdvPrices[k]);
-  const hdvKeys = Object.keys(hdvPrices);
 
   const missingItems: string[] = [];
   if (!filetPrice) missingItems.push('Filet de capture');
@@ -81,7 +75,7 @@ export default function ElevageCalculator() {
         </div>
 
         {/* Configuration grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Type de carburant</label>
             <select
@@ -90,19 +84,19 @@ export default function ElevageCalculator() {
               className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500/40"
             >
               {CARBURANT_TYPES.map(t => (
-                <option key={t.id} value={t.id}>{t.label} (max {t.maxFill.toLocaleString()})</option>
+                <option key={t.id} value={t.id}>{t.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Taille du carburant</label>
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Taille</label>
             <select
               value={carbTaille}
               onChange={e => setCarbTaille(e.target.value)}
               className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500/40"
             >
               {CARBURANT_TAILLES.map(t => (
-                <option key={t.id} value={t.id}>{t.label} ({t.xp.toLocaleString()} XP)</option>
+                <option key={t.id} value={t.id}>{t.label} — {t.xp.toLocaleString()} XP</option>
               ))}
             </select>
           </div>
@@ -118,22 +112,6 @@ export default function ElevageCalculator() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Montures par enclos</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={mountsPerEnclos}
-                onChange={e => setMountsPerEnclos(Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-                className="w-16 bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-white text-center focus:outline-none focus:border-amber-500/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="text-xs text-slate-400">
-                × {enclosCount} = <span className="text-white font-bold">{mountCount}</span> montures
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Prix HDV */}
@@ -144,24 +122,18 @@ export default function ElevageCalculator() {
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <span className="text-slate-400">Filet : <span className={`font-bold ${filetPrice ? 'text-slate-200' : 'text-amber-400'}`}>{filetPrice ? `${filetPrice.toLocaleString()} K` : 'Manquant'}</span></span>
             <span className="text-slate-400">Rune : <span className={`font-bold ${runePrice ? 'text-slate-200' : 'text-amber-400'}`}>{runePrice ? `${runePrice.toLocaleString()} K` : 'Manquant'}</span></span>
-            <span className="text-slate-400">Carburant : <span className={`font-bold ${carburantPrice ? 'text-slate-200' : 'text-amber-400'}`}>{carburantPrice ? `${carburantPrice.toLocaleString()} K` : 'Manquant'}</span></span>
+            <span className="text-slate-400">{getCarburantDisplayName(carburantType.label, carburantTaille.id)} : <span className={`font-bold ${carburantPrice ? 'text-slate-200' : 'text-amber-400'}`}>{carburantPrice ? `${carburantPrice.toLocaleString()} K` : 'Manquant'}</span></span>
           </div>
         </div>
 
         {hasMissingPrices && (
           <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
+            <div>
               <p className="text-xs font-bold text-amber-400">Prix HDV manquants</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Renseignez les prix suivants dans l'onglet <strong>Prix HDV</strong> pour activer les calculs : {missingItems.join(', ')}.
               </p>
-              <details className="mt-2">
-                <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">Debug : clés cherchées</summary>
-                <pre className="text-[10px] text-slate-500 mt-1 whitespace-pre-wrap">
-                  {`Clés cherchées :\n  rune  → "${runeItemId}" (trouvée: ${!!hdvPrices[runeItemId]})\n  carbu → "${carburantItemId}" (trouvée: ${!!hdvPrices[carburantItemId]})\n  filet → "${HDV_ITEM_IDS.filet_capture}" (trouvée: ${!!hdvPrices[HDV_ITEM_IDS.filet_capture]})\n\nClés dans hdvPrices (${hdvKeys.length}) :\n  ${hdvKeys.slice(0, 30).join('\n  ')}`}
-                </pre>
-              </details>
             </div>
           </div>
         )}
@@ -195,10 +167,14 @@ export default function ElevageCalculator() {
                 <tr className="border-b border-white/5 bg-[#0c101d]/50">
                   <th className="text-left py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Niveau</th>
                   <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">XP cumulée</th>
-                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Carburant/monture</th>
-                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Probabilité rune</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Carbu/monture</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Probabilité</th>
                   <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Gain espéré</th>
                   <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Bénéfice net</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">% Bénéfice</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Bénéfice total</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Extraits</th>
+                  <th className="text-right py-3 px-3 text-slate-400 font-bold uppercase tracking-wider">Heures</th>
                 </tr>
               </thead>
               <tbody>
@@ -233,6 +209,14 @@ export default function ElevageCalculator() {
                           {row.netProfit >= 0 ? '+' : ''}{Math.round(row.netProfit).toLocaleString()} K
                         </span>
                       </td>
+                      <td className={`text-right py-2.5 px-3 font-mono ${isOptimal ? 'text-emerald-400' : 'text-slate-300'}`}>
+                        {(row.benefitPercent * 100).toFixed(1)}%
+                      </td>
+                      <td className={`text-right py-2.5 px-3 font-mono ${isOptimal ? 'text-emerald-400' : 'text-slate-200'}`}>
+                        {Math.round(row.totalCycleProfit).toLocaleString()} K
+                      </td>
+                      <td className="text-right py-2.5 px-3 text-slate-300 font-mono">{row.extraitsRequired.toFixed(1)}</td>
+                      <td className="text-right py-2.5 px-3 text-slate-300 font-mono">{row.hoursToLevel.toFixed(1)}h</td>
                     </tr>
                   );
                 })}
