@@ -30,44 +30,53 @@ export const CARBURANT_TYPES = [
 export const CARBURANT_TAILLES = [
   { id: 'minuscule', label: 'Minuscule', xp: 1000 },
   { id: 'petit', label: 'Petit', xp: 2000 },
-  { id: 'standard', label: 'Standard', xp: 3000 },
+  { id: 'normal', label: 'Normal', xp: 3000 },
   { id: 'grand', label: 'Grand', xp: 4000 },
   { id: 'gigantesque', label: 'Gigantesque', xp: 5000 },
 ] as const;
 
 const CARBURANT_IDS: Record<string, Record<string, string>> = {
   extrait: {
-    minuscule: '69a716bc96df4304dfddf52e',
-    petit: '69a716bc96df4304dfddf534',
-    standard: '69a716bc96df4304dfddf53f',
-    grand: '69a716bc96df4304dfddf549',
-    gigantesque: '69a716bc96df4304dfddf554',
+    minuscule: '33314',
+    petit: '33320',
+    normal: '33331',
+    grand: '33341',
+    gigantesque: '33352',
   },
   philtre: {
-    minuscule: '69a716bc96df4304dfddf55e',
-    petit: '69a716bc96df4304dfddf569',
-    standard: '69a716bc96df4304dfddf573',
-    grand: '69a716bc96df4304dfddf57e',
-    gigantesque: '69a716bc96df4304dfddf588',
+    minuscule: '33362',
+    petit: '33373',
+    normal: '33383',
+    grand: '33394',
+    gigantesque: '33404',
   },
   potion: {
-    minuscule: '69a716bc96df4304dfddf593',
-    petit: '69a716bc96df4304dfddf59d',
-    standard: '69a716bc96df4304dfddf5a8',
-    grand: '69a716bc96df4304dfddf5b2',
-    gigantesque: '69a716bc96df4304dfddf5bd',
+    minuscule: '33415',
+    petit: '33425',
+    normal: '33436',
+    grand: '33446',
+    gigantesque: '33457',
   },
   elixir: {
-    minuscule: '69a716bc96df4304dfddf5c7',
-    petit: '69a716bc96df4304dfddf5d0',
-    standard: '69a716bc96df4304dfddf5d9',
-    grand: '69a716bc96df4304dfddf5e2',
-    gigantesque: '69a716bc96df4304dfddf5eb',
+    minuscule: '33467',
+    petit: '33476',
+    normal: '33485',
+    grand: '33494',
+    gigantesque: '33503',
   },
 };
 
 export const HDV_ITEM_IDS = {
-  filet_capture: '69a716bc96df4304dfddf26f',
-  rune: { muldo: '69a716bb96df4304dfdda76d', volkorne: '69a716bb96df4304dfdda76c' },
+  filet_capture: '32521',
+  rune: { muldo: '1558', volkorne: '1557' },
   carburant: (type: string, taille: string) => CARBURANT_IDS[type]?.[taille] ?? '',
 } as const;
+
+export function getCarburantDisplayName(typeLabel: string, tailleId: string): string {
+  if (tailleId === 'normal') {
+    return `${typeLabel} de Mangeoire`;
+  }
+  const taille = CARBURANT_TAILLES.find(t => t.id === tailleId);
+  const prefix = taille?.label ?? '';
+  return `${prefix} ${typeLabel} de Mangeoire`;
+}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDofus } from '../context/DofusContext';
-import { ENCLOS_LEVELS, CARBURANT_TYPES, CARBURANT_TAILLES, HDV_ITEM_IDS } from '../lib/elevage/constants';
+import { ENCLOS_LEVELS, CARBURANT_TYPES, CARBURANT_TAILLES, HDV_ITEM_IDS, getCarburantDisplayName } from '../lib/elevage/constants';
 import { computeTable, findOptimalLevel } from '../lib/elevage/calculations';
 import type { MontureType, ElevageRow } from '../lib/elevage/calculations';
 import { Sparkles, Beef, AlertTriangle, Coins, TrendingUp, TrendingDown, Info } from 'lucide-react';
@@ -25,9 +25,9 @@ export default function ElevageCalculator() {
   const runeItemId = montureType === 'muldo' ? HDV_ITEM_IDS.rune.muldo : HDV_ITEM_IDS.rune.volkorne;
   const carburantItemId = HDV_ITEM_IDS.carburant(carburantType.id, carburantTaille.id);
 
-  const runePrice = hdvPrices[runeItemId]?.x1 ?? 0;
-  const carburantPrice = hdvPrices[carburantItemId]?.x1 ?? 0;
-  const filetPrice = hdvPrices[HDV_ITEM_IDS.filet_capture]?.x1 ?? 0;
+  const runePrice = hdvPrices[runeItemId]?.unitAverage ?? 0;
+  const carburantPrice = hdvPrices[carburantItemId]?.unitAverage ?? 0;
+  const filetPrice = hdvPrices[HDV_ITEM_IDS.filet_capture]?.unitAverage ?? 0;
 
   const hasMissingPrices = !runePrice || !filetPrice || !carburantPrice;
 
@@ -38,10 +38,13 @@ export default function ElevageCalculator() {
 
   const optimal = useMemo(() => findOptimalLevel(rows), [rows]);
 
+  const debugKeys = [runeItemId, carburantItemId, HDV_ITEM_IDS.filet_capture].filter(k => !hdvPrices[k]);
+  const hdvKeys = Object.keys(hdvPrices);
+
   const missingItems: string[] = [];
   if (!filetPrice) missingItems.push('Filet de capture');
   if (!runePrice) missingItems.push(montureType === 'muldo' ? 'Rune Ga Pme' : 'Rune Ga PA');
-  if (!carburantPrice) missingItems.push(`${carburantType.label} ${carburantTaille.label}`);
+  if (!carburantPrice) missingItems.push(getCarburantDisplayName(carburantType.label, carburantTaille.id));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
@@ -148,11 +151,17 @@ export default function ElevageCalculator() {
         {hasMissingPrices && (
           <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-amber-400">Prix HDV manquants</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Renseignez les prix suivants dans l'onglet <strong>Prix HDV</strong> pour activer les calculs : {missingItems.join(', ')}.
               </p>
+              <details className="mt-2">
+                <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300">Debug : clés cherchées</summary>
+                <pre className="text-[10px] text-slate-500 mt-1 whitespace-pre-wrap">
+                  {`Clés cherchées :\n  rune  → "${runeItemId}" (trouvée: ${!!hdvPrices[runeItemId]})\n  carbu → "${carburantItemId}" (trouvée: ${!!hdvPrices[carburantItemId]})\n  filet → "${HDV_ITEM_IDS.filet_capture}" (trouvée: ${!!hdvPrices[HDV_ITEM_IDS.filet_capture]})\n\nClés dans hdvPrices (${hdvKeys.length}) :\n  ${hdvKeys.slice(0, 30).join('\n  ')}`}
+                </pre>
+              </details>
             </div>
           </div>
         )}
