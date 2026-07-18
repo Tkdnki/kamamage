@@ -34,6 +34,7 @@ export default function CraftProfitability() {
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc'>('level-asc');
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -54,10 +55,22 @@ export default function CraftProfitability() {
   }, [activeJob]);
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return craftItems;
-    const q = searchQuery.toLowerCase();
-    return craftItems.filter(item => item.name.toLowerCase().includes(q));
-  }, [craftItems, searchQuery]);
+    let list = craftItems;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(item => item.name.toLowerCase().includes(q));
+    }
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'level-asc': return a.level - b.level;
+        case 'level-desc': return b.level - a.level;
+        case 'name-asc': return a.name.localeCompare(b.name);
+        case 'name-desc': return b.name.localeCompare(a.name);
+        default: return 0;
+      }
+    });
+    return list;
+  }, [craftItems, searchQuery, sortBy]);
 
   const selectedItem = selectedItemId
     ? craftItems.find(item => item._id === selectedItemId) ?? craftItems[0] ?? null
@@ -175,6 +188,20 @@ export default function CraftProfitability() {
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-dofus-accent/40"
               />
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider shrink-0">Trier</span>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                className="flex-1 bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-dofus-accent/40 appearance-none cursor-pointer"
+              >
+                <option value="level-asc">Niveau ↑</option>
+                <option value="level-desc">Niveau ↓</option>
+                <option value="name-asc">Nom A-Z</option>
+                <option value="name-desc">Nom Z-A</option>
+              </select>
             </div>
 
             {isLoadingItems ? (
