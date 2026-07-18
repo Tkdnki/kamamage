@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useServer } from '../context/ServerContext';
@@ -12,7 +12,14 @@ interface PriceSubmitFormProps {
   onSubmitted?: () => void;
 }
 
-export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, onSubmitted }: PriceSubmitFormProps) {
+const LOT_FACTORS = [
+  { label: 'x1', factor: 1 },
+  { label: 'x10', factor: 10 },
+  { label: 'x100', factor: 100 },
+  { label: 'x1000', factor: 1000 },
+] as const;
+
+function PriceSubmitFormInner({ itemKey, category, lot, currentPrice, onSubmitted }: PriceSubmitFormProps) {
   const { user, loading: authLoading, signInWithDiscord } = useAuth();
   const { selectedServer } = useServer();
   const [price, setPrice] = useState(currentPrice ? String(currentPrice) : '');
@@ -45,7 +52,7 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
     );
   }
 
-  const handleSubmit = async (e: React.MouseEvent) => {
+  const handleSubmit = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const val = parseInt(price, 10);
@@ -80,14 +87,7 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
 
     setSuccess(true);
     onSubmitted?.();
-  };
-
-  const LOT_FACTORS = [
-    { label: 'x1', factor: 1 },
-    { label: 'x10', factor: 10 },
-    { label: 'x100', factor: 100 },
-    { label: 'x1000', factor: 1000 },
-  ] as const;
+  }, [price, selectedServer, category, itemKey, lot, user, onSubmitted]);
 
   const applyLot = useCallback((e: React.MouseEvent, factor: number) => {
     e.preventDefault();
@@ -162,3 +162,6 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
     </div>
   );
 }
+
+const PriceSubmitForm = memo(PriceSubmitFormInner);
+export default PriceSubmitForm;
