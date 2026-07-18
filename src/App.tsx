@@ -10,9 +10,11 @@ import { DofusProvider } from './context/DofusContext';
 import { ServerProvider } from './context/ServerContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { AuthProvider } from './context/AuthContext';
+import { useServer } from './context/ServerContext';
 
 function AppContent() {
   const { activeView } = useNavigation();
+  const { selectedServer } = useServer();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -21,7 +23,7 @@ function AppContent() {
       
       <main className="flex-grow">
         {activeView === 'hdv' && <HdvPrices />}
-        {activeView === 'crafts' && <CraftProfitability />}
+        {activeView === 'crafts' && <CraftProfitability key={selectedServer} />}
         {activeView === 'forgemagie' && <ForgemagieHelper />}
         {activeView === 'shopping' && <ShoppingList />}
         {activeView === 'profile' && <ProfileSettings />}
