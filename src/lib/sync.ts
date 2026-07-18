@@ -95,11 +95,12 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 };
+    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null };
     if (row.lot === 'x1') prices[id].x1 = row.price;
     else if (row.lot === 'x10') prices[id].x10 = row.price;
     else if (row.lot === 'x100') prices[id].x100 = row.price;
     else if (row.lot === 'x1000') prices[id].x1000 = row.price;
+    if ((row as any).profiles?.pseudo) prices[id].author = (row as any).profiles.pseudo;
   }
 
   for (const id of Object.keys(prices)) {

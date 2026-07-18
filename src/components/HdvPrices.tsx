@@ -222,7 +222,7 @@ export default function HdvPrices() {
             </div>
 
             {/* Price inputs */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-md mb-3">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 max-w-md mb-1">
               <div>
                 <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x1</label>
                 <input
@@ -230,7 +230,7 @@ export default function HdvPrices() {
                   value={activePrices.x1 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x1', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -242,7 +242,7 @@ export default function HdvPrices() {
                   value={activePrices.x10 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x10', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -254,7 +254,7 @@ export default function HdvPrices() {
                   value={activePrices.x100 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x100', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
@@ -266,12 +266,15 @@ export default function HdvPrices() {
                   value={activePrices.x1000 || ''}
                   placeholder="Prix"
                   disabled={!user}
-                  title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
+                  title={activePrices.author ? `Modifié par ${activePrices.author}` : (!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : '')}
                   onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
                   className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
+            {activePrices.author && (
+              <p className="text-[9px] text-slate-600 mb-3">Modifié par {activePrices.author}</p>
+            )}
 
             {/* Optimisation & Unit average */}
             <div className="flex flex-col md:flex-row gap-4 border-t border-white/5 pt-3">

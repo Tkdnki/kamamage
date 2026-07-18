@@ -12,6 +12,7 @@ export interface PriceData {
   x100: number;
   x1000: number;
   unitAverage: number;
+  author?: string | null;
 }
 
 export interface HdvPrices {
