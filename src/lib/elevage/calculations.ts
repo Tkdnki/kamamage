@@ -80,5 +80,12 @@ export function findOptimalLevel(rows: ElevageRow[]): ElevageRow | null {
 
   candidats.sort((a, b) => a.level - b.level);
 
-  return candidats[0] ?? null;
+  const selected = candidats[0] ?? null;
+
+  if (candidats.length >= 2) {
+    console.log('[findOptimalLevel] Égalité détectée sur %', candidats.map(c => `niv.${c.level}=${(c.benefitPercent * 100).toFixed(4)}%`).join(', '));
+  }
+  console.log('[findOptimalLevel] Max % =', (maxPourcentage * 100).toFixed(4) + '%', '→ niveau retenu :', selected?.level);
+
+  return selected;
 }

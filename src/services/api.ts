@@ -147,7 +147,7 @@ const JOB_ID_MAP: Record<string, number> = {
   Tailleur: 27,
 };
 
-const CRAFTS_PER_PAGE = 100;
+const CRAFTS_PER_PAGE = 200;
 
 /**
  * Récupère tous les crafts d'un métier depuis DofusDB.
@@ -156,7 +156,6 @@ const CRAFTS_PER_PAGE = 100;
  */
 export async function fetchCraftsByJob(
   jobName: string,
-  page: number = 1,
 ): Promise<CraftItem[]> {
   const jobId = JOB_ID_MAP[jobName];
   if (!jobId) {
@@ -164,35 +163,55 @@ export async function fetchCraftsByJob(
     return [];
   }
 
-  const skip = (page - 1) * CRAFTS_PER_PAGE;
-  const path = `/recipes?jobId=${jobId}&$limit=${CRAFTS_PER_PAGE}&$skip=${skip}`;
+  const seenByItemId = new Map<string, CraftItem>();
+  const seenByRecipeId = new Set<number>();
+  let allItems: CraftItem[] = [];
+  let skip = 0;
 
   try {
-    const data =
-      await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+    while (true) {
+      const path = `/recipes?jobId=${jobId}&$limit=${CRAFTS_PER_PAGE}&$skip=${skip}`;
+      const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+      const batch = data.data ?? [];
 
-    return (data.data ?? []).map((recipe) => ({
-      _id: String(recipe.result.id),
-      name: recipe.result.name.fr,
-      type: recipe.result.type?.name?.fr ?? String(recipe.result.typeId),
-      level: recipe.result.level,
-      imgUrl: recipe.result.img,
-      dofusdbId: recipe.result.id,
-      ingredients: recipe.ingredients.map((ing, idx) => ({
-        id: String(ing.id),
-        name: ing.name.fr,
-        quantity: recipe.quantities[idx] ?? 1,
-        imgUrl: ing.img,
-        type: ing.type?.name?.fr ?? String(ing.typeId),
-        level: ing.level,
-      })),
-    }));
+      if (batch.length === 0) break;
+
+      for (const recipe of batch) {
+        if (seenByRecipeId.has(recipe.id)) continue;
+        seenByRecipeId.add(recipe.id);
+
+        const itemId = String(recipe.result.id);
+        if (seenByItemId.has(itemId)) continue;
+
+        seenByItemId.set(itemId, {
+          _id: itemId,
+          name: recipe.result.name.fr,
+          type: recipe.result.type?.name?.fr ?? String(recipe.result.typeId),
+          level: recipe.result.level,
+          imgUrl: recipe.result.img,
+          dofusdbId: recipe.result.id,
+          ingredients: recipe.ingredients.map((ing, idx) => ({
+            id: String(ing.id),
+            name: ing.name.fr,
+            quantity: recipe.quantities[idx] ?? 1,
+            imgUrl: ing.img,
+            type: ing.type?.name?.fr ?? String(ing.typeId),
+            level: ing.level,
+          })),
+        });
+      }
+
+      skip += batch.length;
+    }
+
+    allItems = Array.from(seenByItemId.values());
+    return allItems;
   } catch (err) {
     console.warn(
       `[KamaMage] fetchCraftsByJob(${jobName}) — DofusDB inaccessible :`,
       err,
     );
-    return [];
+    return allItems.length > 0 ? allItems : [];
   }
 }
 

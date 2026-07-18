@@ -36,6 +36,13 @@ export default function CraftProfitability() {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc'>('level-asc');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const ITEMS_PER_PAGE = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [craftItems, searchQuery, sortBy]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -43,6 +50,7 @@ export default function CraftProfitability() {
     setSelectedItemId(null);
     setEditingIngredientId(null);
     setSearchQuery('');
+    setCurrentPage(1);
     setIsLoadingItems(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     fetchCraftsByJob(activeJob)
@@ -72,6 +80,13 @@ export default function CraftProfitability() {
     });
     return list;
   }, [craftItems, searchQuery, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const displayedItems = useMemo(
+    () => filteredItems.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
+    [filteredItems, safePage],
+  );
 
   const selectedItem = selectedItemId
     ? craftItems.find(item => item._id === selectedItemId) ?? craftItems[0] ?? null
@@ -217,8 +232,9 @@ export default function CraftProfitability() {
                   : 'Aucun objet craftable trouvé pour ce métier.'}
               </div>
             ) : (
+              <>
               <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto pr-1">
-                {filteredItems.map(item => {
+                {displayedItems.map(item => {
                   const isSelected = selectedItem?._id === item._id;
                   const itemStats = getCraftStats(item, item.ingredients);
 
@@ -279,6 +295,46 @@ export default function CraftProfitability() {
                   );
                 })}
               </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-2">
+                  <span className="text-[10px] text-slate-500">{filteredItems.length} objets — page {safePage}/{totalPages}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      className="px-2 py-1 text-[11px] font-bold rounded bg-[#0c101d] border border-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ←
+                    </button>
+                    {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                      const start = Math.max(1, Math.min(safePage - 3, totalPages - 6));
+                      const pageNum = start + i;
+                      if (pageNum > totalPages) return null;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-7 h-7 text-[11px] font-bold rounded transition-colors ${
+                            pageNum === safePage
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-[#0c101d] border border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                      className="px-2 py-1 text-[11px] font-bold rounded bg-[#0c101d] border border-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
             )}
           </div>
         </div>
