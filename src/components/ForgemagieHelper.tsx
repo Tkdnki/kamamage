@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { pushRunePricesToServer, fetchRunePricesFromServer } from '../lib/sync';
+import PendingSubmissions from './PendingSubmissions';
 import { createPortal } from 'react-dom';
 import { searchItems } from '../services/api';
 import type { DofusItem } from '../data/mockData';
@@ -1387,6 +1388,10 @@ export default function ForgemagieHelper() {
             </div>
           )}
 
+          {/* PANEL DES SOUMISSIONS EN ATTENTE */}
+          <div className="glass-panel rounded-xl p-4 border border-white/5 shadow-xl">
+            <PendingSubmissions />
+          </div>
         </div>
 
         {/* ─── RIGHT PANEL: FM Assistant ─── */}
