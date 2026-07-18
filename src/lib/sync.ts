@@ -27,7 +27,7 @@ export async function pushRunePricesToServer(server: string, data: Record<string
 export async function fetchRunePricesFromServer(server: string): Promise<Record<string, number> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, updated_by, profiles!left(pseudo)')
+    .select('item_key, price, updated_by, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'rune');
 
@@ -46,7 +46,7 @@ export async function fetchRunePricesFromServer(server: string): Promise<Record<
 export async function fetchRunePricesWithAuthor(server: string): Promise<Record<string, { price: number; author: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, profiles!left(pseudo)')
+    .select('item_key, price, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'rune');
 
@@ -83,7 +83,7 @@ export async function pushHdvPricesToServer(server: string, data: Record<string,
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, profiles!left(pseudo)')
+    .select('item_key, price, lot, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -118,7 +118,7 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
 export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, profiles!left(pseudo)')
+    .select('item_key, price, lot, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
