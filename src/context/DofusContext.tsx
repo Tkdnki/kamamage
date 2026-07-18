@@ -83,6 +83,16 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   // Récupération HDV distante au montage / changement serveur
   useEffect(() => {
     let cancelled = false;
+
+    // Clear local prices for the new server to prevent stale data
+    setHdvPricesByServer(prev => {
+      const current = prev[selectedServer];
+      if (current && Object.keys(current).length > 0) {
+        return { ...prev, [selectedServer]: {} };
+      }
+      return prev;
+    });
+
     fetchHdvPricesFromServer(selectedServer).then(remote => {
       if (cancelled || !remote || Object.keys(remote).length === 0) return;
       setHdvPricesByServer(prev => {
