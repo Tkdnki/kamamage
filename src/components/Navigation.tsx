@@ -1,4 +1,4 @@
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +34,14 @@ export default function Navigation() {
       description: 'Calculateur de puits',
       color: 'from-purple-500 to-indigo-500',
       activeColor: 'text-purple-400 border-purple-500',
+    },
+    {
+      id: 'elevage' as ViewType,
+      label: 'Élevage',
+      icon: Beef,
+      description: 'Rentabilité montures',
+      color: 'from-orange-500 to-amber-500',
+      activeColor: 'text-orange-400 border-orange-500',
     },
     {
       id: 'shopping' as ViewType,
