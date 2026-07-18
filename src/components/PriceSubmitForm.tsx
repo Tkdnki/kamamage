@@ -104,7 +104,12 @@ export default function PriceSubmitForm({ itemKey, category, lot, currentPrice, 
             type="number"
             min={0}
             value={price}
-            onChange={e => { setPrice(e.target.value); setError(''); setSuccess(false); }}
+            onChange={e => {
+              const raw = e.target.value;
+              setPrice(raw === '' ? '' : String(parseInt(raw, 10) || 0));
+              setError('');
+              setSuccess(false);
+            }}
             placeholder="Prix"
             className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-purple-500/40 [appearance:textfield]"
           />
