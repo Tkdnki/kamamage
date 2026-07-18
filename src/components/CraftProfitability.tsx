@@ -269,11 +269,11 @@ export default function CraftProfitability() {
                       </div>
 
                       <QuickPriceInput
-                        currentPrice={hdvPrices[item._id]?.x1}
-                        onSetPrice={(val) => {
-                          const current = hdvPrices[item._id];
-                          setHdvPrice(item._id, val, current?.x10 ?? 0, current?.x100 ?? 0, current?.x1000 ?? 0);
-                        }}
+                        x1={hdvPrices[item._id]?.x1}
+                        x10={hdvPrices[item._id]?.x10}
+                        x100={hdvPrices[item._id]?.x100}
+                        x1000={hdvPrices[item._id]?.x1000}
+                        onSetPrices={(a, b, c, d) => setHdvPrice(item._id, a, b, c, d)}
                       />
                     </div>
                   );

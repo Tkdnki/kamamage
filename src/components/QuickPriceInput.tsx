@@ -2,74 +2,70 @@ import { memo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 import { Check } from 'lucide-react';
 
-const LOT_FACTORS = { x1: 1, x10: 10, x100: 100, x1000: 1000 } as const;
-
 interface QuickPriceInputProps {
-  currentPrice?: number | null;
-  onSetPrice: (value: number) => void;
+  x1?: number | null;
+  x10?: number | null;
+  x100?: number | null;
+  x1000?: number | null;
+  onSetPrices: (x1: number, x10: number, x100: number, x1000: number) => void;
 }
 
-const QuickPriceInput: FC<QuickPriceInputProps> = ({ currentPrice, onSetPrice }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSetPrices }) => {
+  const x1Ref = useRef<HTMLInputElement>(null);
+  const x10Ref = useRef<HTMLInputElement>(null);
+  const x100Ref = useRef<HTMLInputElement>(null);
+  const x1000Ref = useRef<HTMLInputElement>(null);
 
-  const getInputValue = useCallback((): number => {
-    const input = inputRef.current;
-    if (!input) return 0;
-    return parseInt(input.value, 10) || 0;
-  }, []);
-
-  const handleLotClick = useCallback((lot: keyof typeof LOT_FACTORS) => {
-    const input = inputRef.current;
-    if (!input) return;
-    const currentValue = parseInt(input.value, 10) || 0;
-    input.value = String(currentValue + LOT_FACTORS[lot]);
-  }, []);
+  const collectAndSave = useCallback(() => {
+    const p1 = parseInt(x1Ref.current?.value ?? '', 10) || 0;
+    const p10 = parseInt(x10Ref.current?.value ?? '', 10) || 0;
+    const p100 = parseInt(x100Ref.current?.value ?? '', 10) || 0;
+    const p1000 = parseInt(x1000Ref.current?.value ?? '', 10) || 0;
+    if (p1 || p10 || p100 || p1000) {
+      onSetPrices(p1, p10, p100, p1000);
+    }
+  }, [onSetPrices]);
 
   const handleSave = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    const val = getInputValue();
-    if (val > 0) onSetPrice(val);
-  }, [getInputValue, onSetPrice]);
+    collectAndSave();
+  }, [collectAndSave]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === 'Enter') {
       e.preventDefault();
-      const val = getInputValue();
-      if (val > 0) onSetPrice(val);
+      collectAndSave();
     }
-  }, [getInputValue, onSetPrice]);
+  }, [collectAndSave]);
+
+  const lotTypes = ['x1', 'x10', 'x100', 'x1000'] as const;
+  const refs = { x1: x1Ref, x10: x10Ref, x100: x100Ref, x1000: x1000Ref };
+  const defaults = { x1, x10, x100, x1000 };
 
   return (
-    <div className="flex items-center gap-1 mt-1.5" onClick={e => e.stopPropagation()}>
-      <div className="flex gap-0.5">
-        {(Object.keys(LOT_FACTORS) as Array<keyof typeof LOT_FACTORS>).map(lot => (
-          <button
-            key={lot}
-            type="button"
-            onClick={e => { e.stopPropagation(); e.preventDefault(); handleLotClick(lot); }}
-            className="px-1.5 py-0.5 text-[9px] font-bold bg-[#151f32] border border-white/10 rounded hover:border-amber-500/30 hover:bg-amber-500/5 text-slate-400 hover:text-amber-400 transition-colors"
-          >
-            {lot.replace('x', '×')}
-          </button>
-        ))}
-      </div>
-      <input
-        ref={inputRef}
-        type="number"
-        defaultValue={currentPrice ? String(currentPrice) : ''}
-        placeholder="Px"
-        onKeyDown={handleKeyDown}
-        onClick={e => e.stopPropagation()}
-        className="w-16 bg-[#070a12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-      />
+    <div className="flex items-end gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+      {lotTypes.map(lot => (
+        <div key={lot} className="flex flex-col items-center">
+          <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
+          <input
+            ref={refs[lot]}
+            type="number"
+            min="0"
+            defaultValue={defaults[lot] ? String(defaults[lot]) : '0'}
+            onClick={e => e.stopPropagation()}
+            onKeyDown={handleKeyDown}
+            className="w-14 bg-[#070a12] border border-white/10 rounded px-1 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+      ))}
       <button
         type="button"
         onClick={handleSave}
-        className="h-5 w-5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0"
+        className="h-7 w-7 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0"
       >
-        <Check className="h-3 w-3 text-emerald-400" />
+        <Check className="h-3.5 w-3.5 text-emerald-400" />
       </button>
     </div>
   );
