@@ -1,8 +1,14 @@
 const DOFUSDB_IMG_BASE = 'https://api.dofusdb.fr/img/items/';
 
+function cleanAnkamaUrl(url: string): string {
+  const m = url.match(/https?:\/\/(?:s\.ankama\.com\/www\/)?static\.ankama\.com(\/.*)/);
+  if (m) return `https://static.ankama.com${m[1]}`;
+  return url;
+}
+
 export function getItemImageUrl(item: { imgUrl?: string; dofusdbId?: number; _id?: string }): string {
   if (item.imgUrl) {
-    if (item.imgUrl.startsWith('http')) return item.imgUrl;
+    if (item.imgUrl.startsWith('http')) return cleanAnkamaUrl(item.imgUrl);
     if (item.imgUrl.startsWith('items/')) return `${DOFUSDB_IMG_BASE}${item.imgUrl.replace('items/', '')}`;
     return `${DOFUSDB_IMG_BASE}${item.imgUrl}`;
   }

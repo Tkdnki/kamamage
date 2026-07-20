@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/react';
 import Navigation from './components/Navigation';
 import HdvPrices from './components/HdvPrices';
 import CraftProfitability from './components/CraftProfitability';
+import LevelingAdvisor from './components/LevelingAdvisor';
 import ElevageCalculator from './components/ElevageCalculator';
 import ForgemagieHelper from './components/ForgemagieHelper';
 import ShoppingList from './components/ShoppingList';
@@ -25,6 +26,7 @@ function AppContent() {
       <main className="flex-grow">
         {activeView === 'hdv' && <HdvPrices />}
         {activeView === 'crafts' && <CraftProfitability key={selectedServer} />}
+        {activeView === 'leveling' && <LevelingAdvisor key={selectedServer} />}
         {activeView === 'forgemagie' && <ForgemagieHelper />}
         {activeView === 'elevage' && <ElevageCalculator />}
         {activeView === 'shopping' && <ShoppingList />}

@@ -1,4 +1,4 @@
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +28,14 @@ export default function Navigation() {
       activeColor: 'text-emerald-400 border-emerald-500',
     },
     {
+      id: 'leveling' as ViewType,
+      label: 'Conseiller XP métier',
+      icon: GraduationCap,
+      description: 'Leveling opti',
+      color: 'from-sky-500 to-cyan-500',
+      activeColor: 'text-sky-400 border-sky-500',
+    },
+    {
       id: 'forgemagie' as ViewType,
       label: 'Forgemagie',
       icon: Wand2,
@@ -37,7 +45,7 @@ export default function Navigation() {
     },
     {
       id: 'elevage' as ViewType,
-      label: 'Élevage',
+      label: 'Élevage/ brisage muldo et volkorne GEN1',
       icon: Beef,
       description: 'Rentabilité montures',
       color: 'from-orange-500 to-amber-500',

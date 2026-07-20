@@ -66,6 +66,7 @@ export interface DofusDbRecipe {
   result: DofusDbItem;
   job: DofusDbJob;
   resultType?: DofusDbItemType;
+  experience?: number;
 }
 
 /** Réponse paginée retournée par les endpoints DofusDB (ex: /items, /recipes) */

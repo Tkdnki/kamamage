@@ -126,7 +126,12 @@ export interface CraftItem {
   level: number;
   imgUrl: string;
   dofusdbId: number;
+  baseXp: number;
   ingredients: NormalizedRecipeIngredient[];
+  /** Nombre d'ingrédients requis (calculé) */
+  ingredientCount: number;
+  /** Somme des niveaux de tous les ingrédients (calculé) */
+  totalIngredientLevel: number;
 }
 
 /** Mapping nom de métier → jobId DofusDB (source : /jobs) */
@@ -183,6 +188,19 @@ export async function fetchCraftsByJob(
         const itemId = String(recipe.result.id);
         if (seenByItemId.has(itemId)) continue;
 
+        const normalizedIngredients = recipe.ingredients.map((ing, idx) => ({
+          id: String(ing.id),
+          name: ing.name.fr,
+          quantity: recipe.quantities[idx] ?? 1,
+          imgUrl: ing.img,
+          type: ing.type?.name?.fr ?? String(ing.typeId),
+          level: ing.level,
+        }));
+
+        const totalIngredientLevel = normalizedIngredients.reduce(
+          (sum, ing) => sum + ing.level * ing.quantity, 0,
+        );
+
         seenByItemId.set(itemId, {
           _id: itemId,
           name: recipe.result.name.fr,
@@ -190,14 +208,10 @@ export async function fetchCraftsByJob(
           level: recipe.result.level,
           imgUrl: recipe.result.img,
           dofusdbId: recipe.result.id,
-          ingredients: recipe.ingredients.map((ing, idx) => ({
-            id: String(ing.id),
-            name: ing.name.fr,
-            quantity: recipe.quantities[idx] ?? 1,
-            imgUrl: ing.img,
-            type: ing.type?.name?.fr ?? String(ing.typeId),
-            level: ing.level,
-          })),
+          baseXp: recipe.experience ?? recipe.result.level * 100,
+          ingredients: normalizedIngredients,
+          ingredientCount: normalizedIngredients.length,
+          totalIngredientLevel,
         });
       }
 
