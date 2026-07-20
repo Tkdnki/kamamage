@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useMemo, useReducer, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
@@ -32,6 +32,19 @@ interface DofusContextType {
 
 const DofusContext = createContext<DofusContextType | undefined>(undefined);
 
+function loadCache(storageKey: string): HdvPrices {
+  try {
+    const item = window.localStorage.getItem(storageKey);
+    return item ? JSON.parse(item) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCache(storageKey: string, prices: HdvPrices) {
+  window.localStorage.setItem(storageKey, JSON.stringify(prices));
+}
+
 export function DofusProvider({ children }: { children: ReactNode }) {
   const { selectedServer } = useServer();
   const storageKey = `hdvPrices_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
@@ -41,65 +54,28 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   ]);
   const [customItems, setCustomItems] = useLocalStorage<DofusItem[]>('kamamage_custom_items', []);
 
-  const [renderTick, forceUpdate] = useReducer(x => x + 1, 0);
+  // hdvPrices est un état local, initialisé depuis le cache localStorage
+  const [hdvPrices, setHdvPrices] = useState<HdvPrices>(() => loadCache(storageKey));
 
-  const hdvPrices = useMemo<HdvPrices>(() => {
-    try {
-      const item = window.localStorage.getItem(storageKey);
-      return item ? JSON.parse(item) : {};
-    } catch {
-      return {};
-    }
-  }, [storageKey, renderTick]);
-
-  const setHdvPrices = useCallback((value: HdvPrices | ((prev: HdvPrices) => HdvPrices)) => {
-    let current: HdvPrices = {};
-    try {
-      const item = window.localStorage.getItem(storageKey);
-      current = item ? JSON.parse(item) : {};
-    } catch {}
-    const next = typeof value === 'function' ? value(current) : value;
-    if (JSON.stringify(next) !== JSON.stringify(current)) {
-      window.localStorage.setItem(storageKey, JSON.stringify(next));
-      forceUpdate();
-    }
-  }, [storageKey]);
-
-  const setHdvPrice = (itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
-    let sum = 0;
-    let count = 0;
-    if (x1 > 0) { sum += x1; count++; }
-    if (x10 > 0) { sum += x10 / 10; count++; }
-    if (x100 > 0) { sum += x100 / 100; count++; }
-    if (x1000 > 0) { sum += x1000 / 1000; count++; }
-    const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
-    setHdvPrices(prev => ({ ...prev, [itemId]: { x1, x10, x100, x1000, unitAverage } }));
-  };
-
-  // Debounce synchronisation HDV
-  const hdvSyncRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const hdvPricesForSync = hdvPrices;
+  // Persiste dans localStorage à chaque changement
+  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (hdvSyncRef.current) clearTimeout(hdvSyncRef.current);
-    hdvSyncRef.current = setTimeout(() => {
-      const entries = Object.entries(hdvPricesForSync);
-      if (entries.length > 0) {
-        pushHdvPricesToServer(selectedServer, Object.fromEntries(entries));
-      }
-    }, 2000);
-    return () => { if (hdvSyncRef.current) clearTimeout(hdvSyncRef.current); };
-  }, [hdvPricesForSync, selectedServer]);
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    saveCache(storageKey, hdvPrices);
+  }, [hdvPrices, storageKey]);
 
-  // Récupération HDV distante au montage / changement serveur
+  // Au montage / changement de serveur : on tente de récupérer depuis Supabase
+  // (les données distantes écrasent le cache local — communauté d'abord)
+  const serverRef = useRef(selectedServer);
   useEffect(() => {
+    serverRef.current = selectedServer;
     let cancelled = false;
     fetchHdvPricesFromServer(selectedServer).then(remote => {
       if (cancelled || !remote || Object.keys(remote).length === 0) return;
       setHdvPrices(prev => {
-        const merged = { ...remote };
-        for (const [key, val] of Object.entries(prev)) {
-          merged[key] = { ...merged[key], ...val };
-          if (remote[key]?.author) merged[key].author = remote[key].author;
+        const merged = { ...prev };
+        for (const [key, val] of Object.entries(remote)) {
+          merged[key] = { ...merged[key], ...val, author: val.author ?? merged[key]?.author };
         }
         if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
         return merged;
@@ -108,7 +84,45 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [selectedServer]);
 
-  const trackItem = (item: DofusItem) => {
+  // Sauvegarde : push immédiat à Supabase + update local
+  const pendingPush = useRef<Record<string, PriceData>>({});
+  const pushTimer = useRef<ReturnType<typeof setTimeout>>();
+  const flushPending = useCallback(() => {
+    const data = { ...pendingPush.current };
+    pendingPush.current = {};
+    if (Object.keys(data).length > 0) {
+      pushHdvPricesToServer(selectedServer, data);
+    }
+  }, [selectedServer]);
+
+  const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
+    let sum = 0;
+    let count = 0;
+    if (x1 > 0) { sum += x1; count++; }
+    if (x10 > 0) { sum += x10 / 10; count++; }
+    if (x100 > 0) { sum += x100 / 100; count++; }
+    if (x1000 > 0) { sum += x1000 / 1000; count++; }
+    const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
+    const entry: PriceData = { x1, x10, x100, x1000, unitAverage };
+
+    // Mise à jour locale immédiate
+    setHdvPrices(prev => ({ ...prev, [itemId]: entry }));
+
+    // Push à Supabase (debounced 1s pour grouper les changements rapides)
+    pendingPush.current[itemId] = entry;
+    if (pushTimer.current) clearTimeout(pushTimer.current);
+    pushTimer.current = setTimeout(flushPending, 1000);
+  }, [flushPending]);
+
+  // Ménage du timer au démontage
+  useEffect(() => {
+    return () => {
+      if (pushTimer.current) clearTimeout(pushTimer.current);
+      flushPending();
+    };
+  }, [flushPending]);
+
+  const trackItem = useCallback((item: DofusItem) => {
     if (!trackedItemIds.includes(item._id)) {
       setTrackedItemIds(prev => [...prev, item._id]);
     }
@@ -116,25 +130,25 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     if (!isMock && !customItems.some(cItem => cItem._id === item._id)) {
       setCustomItems(prev => [...prev, item]);
     }
-  };
+  }, [trackedItemIds, customItems]);
 
-  const untrackItem = (itemId: string) => {
+  const untrackItem = useCallback((itemId: string) => {
     setTrackedItemIds(prev => prev.filter(id => id !== itemId));
-  };
+  }, []);
 
-  const getItemById = (itemId: string): DofusItem | undefined => {
+  const getItemById = useCallback((itemId: string): DofusItem | undefined => {
     const mock = DOFUS_MOCK_ITEMS.find(item => item._id === itemId);
     if (mock) return mock;
     return customItems.find(item => item._id === itemId);
-  };
+  }, [customItems]);
 
-  const getItemPriceInfo = (itemId: string) => {
+  const getItemPriceInfo = useCallback((itemId: string) => {
     const priceData = hdvPrices[itemId];
     if (priceData && priceData.unitAverage > 0) {
       return { price: priceData.unitAverage, isMissing: false };
     }
     return { price: 0, isMissing: true };
-  };
+  }, [hdvPrices]);
 
   return (
     <DofusContext.Provider value={{

@@ -115,6 +115,17 @@ export default function LevelingAdvisor() {
     return row.xpGained > 0 ? net / row.xpGained : Infinity;
   };
 
+  const getNetBenefit = (row: LevelRow): number => {
+    const priceData = hdvPrices[row.item._id];
+    const resale = priceData?.unitAverage ?? 0;
+    return resale - row.craftCost;
+  };
+
+  const formatKamas = (n: number): string => {
+    const sign = n >= 0 ? '+' : '';
+    return `${sign}${Math.round(n).toLocaleString()} K`;
+  };
+
   const formatScore = (score: number): string => {
     if (score === Infinity) return '∞';
     if (score === -Infinity) return '-∞';
@@ -297,11 +308,13 @@ export default function LevelingAdvisor() {
                         </div>
                         <div className="text-right shrink-0">
                           <div className={`text-[11px] font-bold font-mono ${
-                            score < 0 ? 'text-emerald-400' : 'text-slate-300'
+                            score < 0 ? 'text-emerald-400' : 'text-rose-400'
                           }`}>
-                            {formatScore(score)}
+                            {formatKamas(-score * row.xpGained)}
                           </div>
-                          <div className="text-[9px] text-slate-500">K/XP</div>
+                          <div className={`text-[9px] ${score < 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
+                            {score < 0 ? 'bénéfice' : 'perte'}
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -406,27 +419,46 @@ export default function LevelingAdvisor() {
                   </div>
                 </div>
 
-                {/* Score display */}
-                {!isCostUnknown(selectedRow) && (
-                  <div className="flex items-center gap-4 px-4 py-3 rounded-lg bg-sky-500/5 border border-sky-500/20">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Score K/XP</div>
-                      <div className={`text-lg font-bold font-mono mt-0.5 ${
-                        getScore(selectedRow) < 0 ? 'text-emerald-400' : 'text-slate-200'
-                      }`}>
-                        {formatScore(getScore(selectedRow))}
-                        <span className="text-xs text-slate-500 ml-1">K/XP</span>
+                {/* Bilan financier */}
+                {!isCostUnknown(selectedRow) && (() => {
+                  const benefit = getNetBenefit(selectedRow);
+                  const isProfit = benefit >= 0;
+                  const craftCost = selectedRow.craftCost;
+                  const resale = hdvPrices[selectedRow.item._id]?.unitAverage ?? 0;
+                  const absCost = Math.abs(craftCost - resale);
+                  const kamasPerXp = selectedRow.xpGained > 0 ? absCost / selectedRow.xpGained : 0;
+                  return (
+                    <div className={`px-4 py-3 rounded-lg border ${isProfit ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                      {/* Ligne 1 : détail coût / revente */}
+                      <div className="flex items-center justify-between gap-4 text-xs">
+                        <div className="text-slate-400">
+                          Coût : <strong className="text-slate-200">{Math.round(craftCost).toLocaleString()} K</strong>
+                        </div>
+                        <div className="text-slate-600">−</div>
+                        <div className="text-slate-400 text-right">
+                          Revente : <strong className="text-slate-200">{Math.round(resale).toLocaleString()} K</strong>
+                        </div>
+                      </div>
+                      {/* Ligne 2 : résultat net */}
+                      <div className={`mt-1.5 pt-1.5 border-t ${isProfit ? 'border-emerald-500/20' : 'border-rose-500/20'} flex items-center justify-between`}>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? 'Bénéfice net' : 'Perte nette'}
+                        </span>
+                        <span className={`text-base font-bold font-mono ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : '-'}{Math.round(Math.abs(benefit)).toLocaleString()} K
+                        </span>
+                      </div>
+                      {/* Ligne 3 : ratio K/XP */}
+                      <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-slate-500">
+                        <span>Soit</span>
+                        <span className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {kamasPerXp.toFixed(2)} K
+                        </span>
+                        <span>/ XP {isProfit ? 'gagnés' : 'dépensés'}</span>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-400 leading-relaxed">
-                      {getScore(selectedRow) < 0 ? (
-                        <span className="flex items-center gap-1 text-emerald-400"><TrendingDown className="h-4 w-4" /> Vous <strong>gagnez</strong> de l'argent en craftant</span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-rose-400"><TrendingUp className="h-4 w-4" /> Coût supérieur à la revente</span>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
 
  
