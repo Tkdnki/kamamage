@@ -373,6 +373,7 @@ export default function LevelingAdvisor() {
                       <div className="text-[10px] text-slate-500">Revente</div>
                     </div>
                     <QuickPriceInput
+                      key={selectedItem._id}
                       x1={hdvPrices[selectedItem._id]?.x1 ?? 0}
                       x10={hdvPrices[selectedItem._id]?.x10 ?? 0}
                       x100={hdvPrices[selectedItem._id]?.x100 ?? 0}

@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef } from 'react';
+import { useState, memo, useCallback } from 'react';
 import type { FC } from 'react';
 import { Check } from 'lucide-react';
 
@@ -11,50 +11,53 @@ interface QuickPriceInputProps {
 }
 
 const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSetPrices }) => {
-  const x1Ref = useRef<HTMLInputElement>(null);
-  const x10Ref = useRef<HTMLInputElement>(null);
-  const x100Ref = useRef<HTMLInputElement>(null);
-  const x1000Ref = useRef<HTMLInputElement>(null);
+  const [values, setValues] = useState({
+    x1: x1 ?? 0,
+    x10: x10 ?? 0,
+    x100: x100 ?? 0,
+    x1000: x1000 ?? 0,
+  });
 
-  const collectAndSave = useCallback(() => {
-    const p1 = parseInt(x1Ref.current?.value ?? '', 10) || 0;
-    const p10 = parseInt(x10Ref.current?.value ?? '', 10) || 0;
-    const p100 = parseInt(x100Ref.current?.value ?? '', 10) || 0;
-    const p1000 = parseInt(x1000Ref.current?.value ?? '', 10) || 0;
+  const doSave = useCallback(() => {
+    const { x1: p1, x10: p10, x100: p100, x1000: p1000 } = values;
     if (p1 || p10 || p100 || p1000) {
       onSetPrices(p1, p10, p100, p1000);
     }
-  }, [onSetPrices]);
+  }, [values, onSetPrices]);
 
-  const handleSave = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
+  const handleSave = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    e.preventDefault();
-    collectAndSave();
-  }, [collectAndSave]);
+    doSave();
+  }, [doSave]);
+
+  const handleBlur = useCallback(() => {
+    doSave();
+  }, [doSave]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === 'Enter') {
       e.preventDefault();
-      collectAndSave();
+      doSave();
     }
-  }, [collectAndSave]);
+  }, [doSave]);
 
   const lotTypes = ['x1', 'x10', 'x100', 'x1000'] as const;
-  const refs = { x1: x1Ref, x10: x10Ref, x100: x100Ref, x1000: x1000Ref };
-  const defaults = { x1, x10, x100, x1000 };
 
   return (
-    <div className="flex items-end gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+    <div className="flex items-end gap-1.5 mt-1.5">
       {lotTypes.map(lot => (
         <div key={lot} className="flex flex-col items-center">
           <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
           <input
-            ref={refs[lot]}
             type="number"
             min="0"
-            defaultValue={defaults[lot] ? String(defaults[lot]) : '0'}
-            onClick={e => e.stopPropagation()}
+            value={values[lot]}
+            onChange={e => {
+              const v = e.target.valueAsNumber;
+              if (!isNaN(v) && v >= 0) setValues(prev => ({ ...prev, [lot]: v }));
+            }}
+            onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className="w-14 bg-[#070a12] border border-white/10 rounded px-1 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
