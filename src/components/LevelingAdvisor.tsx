@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import type { ComponentType } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import type { ComponentType, FC } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import { DOFUS_JOBS } from '../data/mockData';
@@ -9,7 +9,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   Loader2, TrendingUp, TrendingDown, AlertTriangle, Search,
-  GraduationCap, Info
+  GraduationCap, Info, Copy, Check
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -21,6 +21,29 @@ const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Éleveur': Heart, 'Façonneur': Shield, 'Forgeron': Flame,
   'Mineur': Pickaxe, 'Paysan': Wheat, 'Pêcheur': Fish,
   'Sculpteur': Wand2, 'Tailleur': Scissors
+};
+
+const CopyButton: FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="h-4 w-4 opacity-40 hover:opacity-100 transition-opacity shrink-0"
+    >
+      {copied ? <Check className="h-full w-full text-emerald-400" /> : <Copy className="h-full w-full" />}
+    </button>
+  );
 };
 
 interface LevelRow {
@@ -369,7 +392,7 @@ export default function LevelingAdvisor() {
                       className="h-9 w-9 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-slate-200 truncate">{selectedItem.name}</div>
+                      <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">{selectedItem.name} <CopyButton text={selectedItem.name} /></div>
                       <div className="text-[10px] text-slate-500">Revente</div>
                     </div>
                     <QuickPriceInput
@@ -430,7 +453,7 @@ export default function LevelingAdvisor() {
                             className="h-9 w-9 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-slate-200 truncate">{ing.name}</div>
+                            <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">{ing.name} <CopyButton text={ing.name} /></div>
                             <div className="text-[10px] text-slate-500">x{ing.quantity}</div>
                           </div>
                           <QuickPriceInput

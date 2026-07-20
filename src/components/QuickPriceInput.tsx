@@ -1,4 +1,4 @@
-import { useState, memo, useCallback } from 'react';
+import { useState, memo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 import { Check } from 'lucide-react';
 
@@ -17,12 +17,17 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
     x100: x100 ?? 0,
     x1000: x1000 ?? 0,
   });
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const doSave = useCallback(() => {
     const { x1: p1, x10: p10, x100: p100, x1000: p1000 } = values;
     if (p1 || p10 || p100 || p1000) {
       onSetPrices(p1, p10, p100, p1000);
     }
+    setSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 1200);
   }, [values, onSetPrices]);
 
   const handleSave = useCallback((e: React.MouseEvent) => {
@@ -66,9 +71,13 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
       <button
         type="button"
         onClick={handleSave}
-        className="h-7 w-7 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0"
+        className={`h-7 w-7 rounded flex items-center justify-center transition-all duration-300 shrink-0 border ${
+          saved
+            ? 'bg-emerald-500/30 border-emerald-400/60 scale-110'
+            : 'bg-emerald-500/10 hover:bg-emerald-500/25 border-emerald-500/30 hover:scale-105'
+        }`}
       >
-        <Check className="h-3.5 w-3.5 text-emerald-400" />
+        <Check className={`h-3.5 w-3.5 transition-colors duration-300 ${saved ? 'text-emerald-300 drop-shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'text-emerald-400'}`} />
       </button>
     </div>
   );
