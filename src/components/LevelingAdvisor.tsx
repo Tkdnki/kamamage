@@ -121,7 +121,13 @@ export default function LevelingAdvisor() {
     });
   }, [filteredItems, jobLevel, hdvPrices]);
 
-  const isCostUnknown = (row: LevelRow): boolean => row.missingIngredients || row.craftCost <= 0;
+  const hasResalePrice = (itemId: string): boolean => {
+    const p = hdvPrices[itemId];
+    return !!p && (p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0);
+  };
+
+  const isCostUnknown = (row: LevelRow): boolean =>
+    row.missingIngredients || row.craftCost <= 0 || !hasResalePrice(row.item._id);
 
   const getScore = (row: LevelRow): number => {
     if (isCostUnknown(row)) return Infinity;
@@ -348,6 +354,7 @@ export default function LevelingAdvisor() {
                 </h3>
                 {sortedUnknown.map(row => {
                   const isSelected = selectedItemId === row.item._id;
+                  const missingResale = !row.missingIngredients && row.craftCost > 0 && !hasResalePrice(row.item._id);
                   return (
                     <button
                       key={row.item._id}
@@ -367,9 +374,15 @@ export default function LevelingAdvisor() {
                             <span className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
                               {row.item.name}
                             </span>
-                            <span className="shrink-0 text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                              <AlertTriangle className="h-2.5 w-2.5" /> Prix à renseigner
-                            </span>
+                            {missingResale ? (
+                              <span className="shrink-0 text-[9px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                Revente manquante
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <AlertTriangle className="h-2.5 w-2.5" /> Prix à renseigner
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[10px] text-slate-500">Niv.{row.item.level}</span>
@@ -401,7 +414,7 @@ export default function LevelingAdvisor() {
                       <span className="flex items-center gap-1">
                         XP : <strong className="text-sky-400">{selectedRow.xpGained.toLocaleString()}</strong>
                       </span>
-                      {!isCostUnknown(selectedRow) && (
+                      {!selectedRow.missingIngredients && selectedRow.craftCost > 0 && (
                         <span>
                           Coût : <strong className="text-slate-200">{Math.round(selectedRow.craftCost).toLocaleString()} K</strong>
                         </span>
