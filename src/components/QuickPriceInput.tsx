@@ -21,10 +21,7 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const doSave = useCallback(() => {
-    const { x1: p1, x10: p10, x100: p100, x1000: p1000 } = values;
-    if (p1 || p10 || p100 || p1000) {
-      onSetPrices(p1, p10, p100, p1000);
-    }
+    onSetPrices(values.x1, values.x10, values.x100, values.x1000);
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 1200);
@@ -47,6 +44,16 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
     }
   }, [doSave]);
 
+  const handleChange = useCallback((lot: 'x1' | 'x10' | 'x100' | 'x1000') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      setValues(prev => ({ ...prev, [lot]: 0 }));
+    } else {
+      const v = e.target.valueAsNumber;
+      if (!isNaN(v) && v >= 0) setValues(prev => ({ ...prev, [lot]: v }));
+    }
+  }, []);
+
   const lotTypes = ['x1', 'x10', 'x100', 'x1000'] as const;
 
   return (
@@ -58,10 +65,7 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
             type="number"
             min="0"
             value={values[lot]}
-            onChange={e => {
-              const v = e.target.valueAsNumber;
-              if (!isNaN(v) && v >= 0) setValues(prev => ({ ...prev, [lot]: v }));
-            }}
+            onChange={handleChange(lot)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className="w-14 bg-[#070a12] border border-white/10 rounded px-1 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

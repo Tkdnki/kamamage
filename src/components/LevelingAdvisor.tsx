@@ -14,6 +14,7 @@ import {
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
 import { getCalculatedXp } from '../lib/leveling/xp';
+import { getOptimalCost } from '../lib/pricing';
 
 const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Alchimiste': Droplets, 'Bijoutier': Gem, 'Bricoleur': Wrench,
@@ -55,7 +56,7 @@ interface LevelRow {
 
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
-  const { navigateToHdvItem } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -72,6 +73,23 @@ export default function LevelingAdvisor() {
       .then(items => setCraftItems(items))
       .finally(() => setIsLoadingItems(false));
   }, [activeJob]);
+
+  useEffect(() => {
+    if (previousJob && previousJob !== activeJob) {
+      setActiveJob(previousJob);
+    }
+    if (previousJobLevel !== null && previousJobLevel !== jobLevel) {
+      setJobLevel(previousJobLevel);
+    }
+  }, [previousJob, previousJobLevel, activeJob, jobLevel]);
+
+  useEffect(() => {
+    if (previousItemId && craftItems.length > 0) {
+      const exists = craftItems.find(item => item._id === previousItemId);
+      if (exists) setSelectedItemId(previousItemId);
+      clearPreviousNavigation();
+    }
+  }, [previousItemId, craftItems, clearPreviousNavigation]);
 
   const minLevel = Math.max(1, jobLevel - 20);
 
@@ -91,14 +109,12 @@ export default function LevelingAdvisor() {
       let craftCost = 0;
       let missingIngredients = false;
       for (const ing of item.ingredients) {
-        const priceData = hdvPrices[ing.id];
-        let unitPrice = 0;
-        if (priceData && priceData.unitAverage > 0) {
-          unitPrice = priceData.unitAverage;
+        const cost = getOptimalCost(hdvPrices[ing.id], ing.quantity);
+        if (cost !== null) {
+          craftCost += cost;
         } else {
           missingIngredients = true;
         }
-        craftCost += unitPrice * ing.quantity;
       }
 
       return { item, xpGained, craftCost, missingIngredients };
@@ -405,7 +421,10 @@ export default function LevelingAdvisor() {
                       className="h-9 w-9 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">{selectedItem.name} <CopyButton text={selectedItem.name} /></div>
+                      <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">
+                        <button type="button" onClick={e => { e.stopPropagation(); navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl }, selectedItem._id, activeJob, jobLevel); }} className="hover:text-sky-400 transition-colors text-left truncate">{selectedItem.name}</button>
+                        <CopyButton text={selectedItem.name} />
+                      </div>
                       <div className="text-[10px] text-slate-500">Revente</div>
                     </div>
                     <QuickPriceInput
@@ -485,7 +504,10 @@ export default function LevelingAdvisor() {
                             className="h-9 w-9 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">{ing.name} <CopyButton text={ing.name} /></div>
+                            <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">
+                              <button type="button" onClick={() => navigateToHdvItem({ _id: ing.id, name: ing.name, type: ing.type, level: ing.level, imgUrl: ing.imgUrl }, selectedItemId ?? undefined, activeJob, jobLevel)} className="hover:text-sky-400 transition-colors text-left truncate">{ing.name}</button>
+                              <CopyButton text={ing.name} />
+                            </div>
                             <div className="text-[10px] text-slate-500">x{ing.quantity}</div>
                           </div>
                           <QuickPriceInput

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
+import { getOptimalCost } from '../lib/pricing';
 
 const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Alchimiste': Droplets, 'Bijoutier': Gem, 'Bricoleur': Wrench,
@@ -26,7 +27,7 @@ const JOB_ICONS: { [key: string]: ComponentType<any> } = {
 export default function CraftProfitability() {
   const { user } = useAuth();
   const { hdvPrices, setHdvPrice, trackItem } = useDofus();
-  const { navigateToHdvItem, addIngredientsToCart } = useNavigation();
+  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -62,6 +63,20 @@ export default function CraftProfitability() {
       })
       .finally(() => setIsLoadingItems(false));
   }, [activeJob]);
+
+  useEffect(() => {
+    if (previousJob && previousJob !== activeJob) {
+      setActiveJob(previousJob);
+    }
+  }, [previousJob, activeJob]);
+
+  useEffect(() => {
+    if (previousItemId && craftItems.length > 0) {
+      const exists = craftItems.find(item => item._id === previousItemId);
+      if (exists) setSelectedItemId(previousItemId);
+      clearPreviousNavigation();
+    }
+  }, [previousItemId, craftItems, clearPreviousNavigation]);
 
   const filteredItems = useMemo(() => {
     let list = craftItems;
@@ -138,11 +153,13 @@ export default function CraftProfitability() {
     let hasMissingPrices = false;
 
     const enriched: EnrichedIngredient[] = ingredients.map(ing => {
-      const { price, isMissing, source } = getBestUnitPrice(ing.id);
+      const cost = getOptimalCost(hdvPrices[ing.id], ing.quantity);
+      const isMissing = cost === null;
       if (isMissing) hasMissingPrices = true;
-      const totalPrice = price * ing.quantity;
+      const totalPrice = cost ?? 0;
+      const unitPrice = ing.quantity > 0 ? totalPrice / ing.quantity : 0;
       totalCost += totalPrice;
-      return { ...ing, unitPrice: price, totalPrice, isMissing, bestSource: source };
+      return { ...ing, unitPrice, totalPrice, isMissing, bestSource: '' };
     });
 
     const { price: sellPrice, isMissing: isSellPriceMissing } = getBestUnitPrice(item._id);
@@ -357,7 +374,7 @@ export default function CraftProfitability() {
                   <div>
                     <h3
                       className="text-xl font-bold text-white leading-tight cursor-pointer hover:text-amber-400 transition-colors"
-                      onClick={() => navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl })}
+                      onClick={() => navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl }, selectedItem._id, activeJob)}
                     >
                       {selectedItem.name}
                     </h3>
@@ -408,7 +425,7 @@ export default function CraftProfitability() {
                           ing.isMissing ? 'bg-amber-500/5 border-amber-500/20' : 'bg-[#090d16]/30 border-white/5'
                         }`}
                       >
-                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateToHdvItem({ _id: ing.id, name: ing.name, type: ing.type, level: ing.level, imgUrl: ing.imgUrl })}>
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateToHdvItem({ _id: ing.id, name: ing.name, type: ing.type, level: ing.level, imgUrl: ing.imgUrl }, selectedItemId ?? undefined, activeJob)}>
                           <ItemImage item={ing} className="h-10 w-10 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0" />
                           <div>
                             <p className="text-sm font-semibold text-white leading-tight hover:text-amber-400 transition-colors">{ing.name}</p>

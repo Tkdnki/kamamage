@@ -17,8 +17,14 @@ interface NavigationContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
   pendingHdvItem: Partial<DofusItem> | null;
-  navigateToHdvItem: (item: Partial<DofusItem>) => void;
+  navigateToHdvItem: (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => void;
   clearPendingHdvItem: () => void;
+  previousView: ViewType | null;
+  clearPreviousView: () => void;
+  previousItemId: string | null;
+  previousJob: string | null;
+  previousJobLevel: number | null;
+  clearPreviousNavigation: () => void;
   shoppingCart: ShoppingCart;
   addIngredientsToCart: (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => void;
   updateCartGathered: (id: string, gathered: number) => void;
@@ -30,14 +36,28 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [activeView, setActiveView] = useState<ViewType>('hdv');
   const [pendingHdvItem, setPendingHdvItem] = useState<Partial<DofusItem> | null>(null);
+  const [previousView, setPreviousView] = useState<ViewType | null>(null);
+  const [previousItemId, setPreviousItemId] = useState<string | null>(null);
+  const [previousJob, setPreviousJob] = useState<string | null>(null);
+  const [previousJobLevel, setPreviousJobLevel] = useState<number | null>(null);
   const [shoppingCart, setShoppingCart] = useLocalStorage<ShoppingCart>('kamamage_shopping_cart', {});
 
-  const navigateToHdvItem = (item: Partial<DofusItem>) => {
+  const navigateToHdvItem = (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => {
+    setPreviousView(activeView);
+    if (itemId) setPreviousItemId(itemId);
+    if (job) setPreviousJob(job);
+    if (jobLevel !== undefined) setPreviousJobLevel(jobLevel);
     setPendingHdvItem(item);
     setActiveView('hdv');
   };
 
   const clearPendingHdvItem = () => setPendingHdvItem(null);
+  const clearPreviousView = () => setPreviousView(null);
+  const clearPreviousNavigation = () => {
+    setPreviousItemId(null);
+    setPreviousJob(null);
+    setPreviousJobLevel(null);
+  };
 
   const addIngredientsToCart = (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => {
     setShoppingCart(prev => {
@@ -73,6 +93,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     <NavigationContext.Provider value={{
       activeView, setActiveView,
       pendingHdvItem, navigateToHdvItem, clearPendingHdvItem,
+      previousView, clearPreviousView,
+      previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,
       shoppingCart, addIngredientsToCart, updateCartGathered, resetCart,
     }}>
       {children}

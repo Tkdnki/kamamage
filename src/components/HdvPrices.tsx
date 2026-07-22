@@ -20,7 +20,7 @@ export default function HdvPrices() {
     getItemById, 
     setHdvPrice 
   } = useDofus();
-  const { pendingHdvItem, clearPendingHdvItem } = useNavigation();
+  const { pendingHdvItem, clearPendingHdvItem, previousView, clearPreviousView, setActiveView } = useNavigation();
   const { selectedServer: server } = useServer();
 
   const [activeHdvItem, setActiveHdvItem] = useState<DofusItem | null>(null);
@@ -102,8 +102,28 @@ export default function HdvPrices() {
     return { analyzed, best };
   }, [activePrices.x1, activePrices.x10, activePrices.x100, activePrices.x1000]);
 
+  const viewLabels: Record<string, string> = {
+    leveling: 'Conseiller XP',
+    crafts: 'Rentabilité',
+    forgemagie: 'Forgemagie',
+    elevage: 'Élevage',
+    shopping: 'Liste de courses',
+    profile: 'Profil',
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="flex flex-col gap-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {previousView && (
+        <button
+          type="button"
+          onClick={() => { clearPreviousView(); setActiveView(previousView); }}
+          className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors w-fit"
+        >
+          <span className="text-base">⬅</span>
+          Retour au {viewLabels[previousView] ?? previousView}
+        </button>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* LEFT PANEL: SEARCH & DISCOVERY (4 cols) */}
       <div className="lg:col-span-4 flex flex-col gap-4">
         <div className="glass-panel rounded-xl p-5 border border-white/5 shadow-xl relative overflow-hidden">
@@ -442,6 +462,7 @@ export default function HdvPrices() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

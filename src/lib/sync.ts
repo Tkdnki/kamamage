@@ -75,9 +75,28 @@ export async function pushHdvPricesToServer(server: string, data: Record<string,
       if (pd.x10 > 0) lots.push({ lot: 'x10', price: pd.x10 });
       if (pd.x100 > 0) lots.push({ lot: 'x100', price: pd.x100 });
       if (pd.x1000 > 0) lots.push({ lot: 'x1000', price: pd.x1000 });
-      return lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price));
+      // Lots mis à 0 : supprimer l'entrée côté serveur
+      const zeroLots: { lot: string }[] = [];
+      if (pd.x1 === 0) zeroLots.push({ lot: 'x1' });
+      if (pd.x10 === 0) zeroLots.push({ lot: 'x10' });
+      if (pd.x100 === 0) zeroLots.push({ lot: 'x100' });
+      if (pd.x1000 === 0) zeroLots.push({ lot: 'x1000' });
+      const deletes = zeroLots.map(l => deletePrice(server, 'hdv', itemId, l.lot));
+      return [...lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price)), ...deletes];
     })
   );
+}
+
+async function deletePrice(server: string, category: string, itemKey: string, lot: string | null) {
+  let query = supabase
+    .from('consolidated_prices')
+    .delete()
+    .eq('server_name', server)
+    .eq('category', category)
+    .eq('item_key', itemKey);
+  if (lot !== null) query = query.eq('lot', lot);
+  const { error } = await query;
+  if (error) console.warn(`[Sync] deletePrice error:`, error.message);
 }
 
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
