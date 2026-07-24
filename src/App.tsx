@@ -34,7 +34,7 @@ function AppContent() {
       </main>
 
       <PseudoSetupModal />
-      <footer className="border-t border-white/5 py-6 text-center text-xs text-slate-500 bg-[#070a12]/40">
+      <footer className="border-t border-slate-700/50 py-6 text-center text-xs text-slate-500 bg-slate-900/40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="mb-1">
             &copy; {new Date().getFullYear()} <strong>KamaMage</strong> &bull; Conçu avec passion pour les artisans et forgemages de Dofus.

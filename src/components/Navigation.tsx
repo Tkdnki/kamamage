@@ -62,7 +62,7 @@ export default function Navigation() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#070a12]/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 w-full bg-slate-900/60 backdrop-blur-lg border-b border-slate-700/50">
       <div className="mx-auto flex max-w-7xl h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveView('hdv')}>
