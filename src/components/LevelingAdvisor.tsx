@@ -129,18 +129,20 @@ export default function LevelingAdvisor() {
   const isCostUnknown = (row: LevelRow): boolean =>
     row.missingIngredients || row.craftCost <= 0 || !hasResalePrice(row.item._id);
 
-  const getScore = (row: LevelRow): number => {
-    if (isCostUnknown(row)) return Infinity;
-    const priceData = hdvPrices[row.item._id];
-    const resale = priceData?.unitAverage ?? 0;
-    const net = row.craftCost - resale;
-    return row.xpGained > 0 ? net / row.xpGained : Infinity;
-  };
-
   const getNetBenefit = (row: LevelRow): number => {
     const priceData = hdvPrices[row.item._id];
     const resale = priceData?.unitAverage ?? 0;
     return resale - row.craftCost;
+  };
+
+  const getROI = (row: LevelRow): number => {
+    if (row.craftCost <= 0) return 0;
+    const benefit = getNetBenefit(row);
+    return (benefit / row.craftCost) * 100;
+  };
+
+  const getEfficiencyScore = (row: LevelRow): number => {
+    return getROI(row) * row.xpGained;
   };
 
   const formatKamas = (n: number): string => {
@@ -148,20 +150,14 @@ export default function LevelingAdvisor() {
     return `${sign}${Math.round(n).toLocaleString()} K`;
   };
 
-  const formatScore = (score: number): string => {
-    if (score === Infinity) return '∞';
-    if (score === -Infinity) return '-∞';
-    return score.toFixed(2);
-  };
-
   // -- Split rows into known (scored) and unknown (missing prices) --
   const sortedKnown = useMemo(() => {
     return [...rows]
       .filter(r => !isCostUnknown(r))
       .sort((a, b) => {
-        const scoreA = getScore(a);
-        const scoreB = getScore(b);
-        return scoreA - scoreB;
+        const scoreA = getEfficiencyScore(a);
+        const scoreB = getEfficiencyScore(b);
+        return scoreB - scoreA;
       });
   }, [rows, hdvPrices]);
 
@@ -288,7 +284,9 @@ export default function LevelingAdvisor() {
                   Items renseignés ({sortedKnown.length})
                 </h3>
                 {sortedKnown.map((row, index) => {
-                  const score = getScore(row);
+                  const benefit = getNetBenefit(row);
+                  const roi = getROI(row);
+                  const isProfit = benefit >= 0;
                   const isSelected = selectedItemId === row.item._id;
                   const isTop3 = index < 3;
                   return (
@@ -328,14 +326,19 @@ export default function LevelingAdvisor() {
                             <span className="text-[10px] font-mono text-sky-400">{row.xpGained.toLocaleString()} XP</span>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
+                        <div className="text-right shrink-0 min-w-0">
                           <div className={`text-[11px] font-bold font-mono ${
-                            score < 0 ? 'text-emerald-400' : 'text-rose-400'
+                            isProfit ? 'text-emerald-400' : 'text-rose-400'
                           }`}>
-                            {formatKamas(-score * row.xpGained)}
+                            {formatKamas(benefit)}
                           </div>
-                          <div className={`text-[9px] ${score < 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
-                            {score < 0 ? 'bénéfice' : 'perte'}
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className={`text-[9px] font-medium ${isProfit ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
+                              ROI
+                            </span>
+                            <span className={`text-[9px] font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {isProfit ? '+' : ''}{roi.toFixed(0)}%
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -454,6 +457,7 @@ export default function LevelingAdvisor() {
                 {/* Bilan financier */}
                 {!isCostUnknown(selectedRow) && (() => {
                   const benefit = getNetBenefit(selectedRow);
+                  const roi = getROI(selectedRow);
                   const isProfit = benefit >= 0;
                   const craftCost = selectedRow.craftCost;
                   const resale = hdvPrices[selectedRow.item._id]?.unitAverage ?? 0;
@@ -480,8 +484,15 @@ export default function LevelingAdvisor() {
                           {isProfit ? '+' : '-'}{Math.round(Math.abs(benefit)).toLocaleString()} K
                         </span>
                       </div>
-                      {/* Ligne 3 : ratio K/XP */}
-                      <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-slate-500">
+                      {/* Ligne 3 : ROI */}
+                      <div className="mt-1 flex items-center justify-between gap-1 text-[10px] text-slate-500">
+                        <span>ROI</span>
+                        <span className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : ''}{roi.toFixed(1)}%
+                        </span>
+                      </div>
+                      {/* Ligne 4 : ratio K/XP */}
+                      <div className="flex items-center justify-end gap-1 text-[10px] text-slate-500">
                         <span>Soit</span>
                         <span className={`font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {kamasPerXp.toFixed(2)} K
