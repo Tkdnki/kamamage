@@ -127,19 +127,13 @@ export default function ProfileBadges() {
             return (
               <div
                 key={badge.id}
-                className={`relative rounded-lg border p-4 transition-all ${
+                className={`rounded-lg border p-4 transition-all ${
                   unlocked
                     ? 'bg-[#0c101d]/60 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.08)]'
                     : 'bg-[#0c101d]/30 border-white/5 opacity-50'
                 }`}
               >
-                {unlocked && (
-                  <span className="absolute top-2 right-2 text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                    <CheckCircle className="h-3 w-3" /> Débloqué
-                  </span>
-                )}
-
-                <div className="flex items-start gap-3">
+                <div className="flex items-center justify-between gap-2 mb-3">
                   <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
                     unlocked
                       ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
@@ -147,11 +141,17 @@ export default function ProfileBadges() {
                   }`}>
                     {unlocked ? <Icon className="h-4.5 w-4.5" /> : <Lock className="h-4 w-4" />}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-bold ${unlocked ? 'text-white' : 'text-slate-400'}`}>
-                      {badge.title}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">{badge.description}</p>
+                  {unlocked && (
+                    <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5 shrink-0">
+                      <CheckCircle className="h-3 w-3" /> Débloqué
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h4 className={`text-sm font-bold ${unlocked ? 'text-white' : 'text-slate-400'}`}>
+                    {badge.title}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{badge.description}</p>
 
                     {!unlocked && (
                       <div className="mt-2">
@@ -168,7 +168,6 @@ export default function ProfileBadges() {
                       </div>
                     )}
                   </div>
-                </div>
               </div>
             );
           })}
