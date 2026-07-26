@@ -311,7 +311,7 @@ export default function HdvPrices() {
             {displayAuthor && (
               <div className="flex items-center gap-2 mb-3">
                 <p className="text-[9px] text-slate-600">Modifié par {displayAuthor}</p>
-                {activeHdvItem && <VoteControls itemKey={activeHdvItem._id} author={displayAuthor} />}
+                {activeHdvItem && <VoteControls itemKey={activeHdvItem._id} authorId={activePrices.authorId} />}
               </div>
             )}
 

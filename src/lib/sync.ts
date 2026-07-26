@@ -102,7 +102,7 @@ async function deletePrice(server: string, category: string, itemKey: string, lo
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, profiles!author_id(pseudo)')
+    .select('item_key, price, lot, author_id, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -114,12 +114,13 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null };
+    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null };
     if (row.lot === 'x1') prices[id].x1 = row.price;
     else if (row.lot === 'x10') prices[id].x10 = row.price;
     else if (row.lot === 'x100') prices[id].x100 = row.price;
     else if (row.lot === 'x1000') prices[id].x1000 = row.price;
     if ((row as any).profiles?.pseudo) prices[id].author = (row as any).profiles.pseudo;
+    if (row.author_id) prices[id].authorId = row.author_id;
   }
 
   for (const id of Object.keys(prices)) {
@@ -210,10 +211,10 @@ export async function fetchUserStats(userId: string): Promise<UserStats | null> 
   return { pricesCount: Number(data[0].prices_count), votesCount: Number(data[0].votes_count) };
 }
 
-export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null }>> {
+export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null; authorId: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, profiles!author_id(pseudo)')
+    .select('item_key, price, lot, author_id, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -225,12 +226,13 @@ export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<s
   const result: Record<string, any> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!result[id]) result[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null };
+    if (!result[id]) result[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null };
     if (row.lot === 'x1') result[id].x1 = row.price;
     else if (row.lot === 'x10') result[id].x10 = row.price;
     else if (row.lot === 'x100') result[id].x100 = row.price;
     else if (row.lot === 'x1000') result[id].x1000 = row.price;
     if ((row as any).profiles?.pseudo) result[id].author = (row as any).profiles.pseudo;
+    if (row.author_id) result[id].authorId = row.author_id;
   }
 
   for (const id of Object.keys(result)) {

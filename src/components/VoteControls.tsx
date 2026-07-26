@@ -4,11 +4,11 @@ import { ThumbsUp, ThumbsDown, LogIn, AlertTriangle } from 'lucide-react';
 
 interface VoteControlsProps {
   itemKey: string;
-  author?: string | null;
+  authorId?: string | null;
 }
 
-export default function VoteControls({ itemKey, author }: VoteControlsProps) {
-  const { user, profile, signInWithDiscord } = useAuth();
+export default function VoteControls({ itemKey, authorId }: VoteControlsProps) {
+  const { user, signInWithDiscord } = useAuth();
   const { votes, toggleVote } = useDofus();
 
   const voteData = votes[itemKey];
@@ -19,10 +19,10 @@ export default function VoteControls({ itemKey, author }: VoteControlsProps) {
   const needsAlert = score <= -3;
 
   // Ne pas pouvoir voter sur ses propres prix
-  if (user && author && profile?.pseudo && author === profile.pseudo) {
+  if (user && authorId && authorId === user.id) {
     return (
       <span className="text-[9px] text-slate-600 italic" title="Vous ne pouvez pas voter sur vos propres prix">
-        Vote non autorisé
+        Votre prix
       </span>
     );
   }

@@ -618,7 +618,7 @@ export default function CraftProfitability() {
                         {hdvPrices[ing.id]?.author && (
                           <div className="flex items-center justify-end gap-2 mt-1.5">
                             <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[ing.id].author}</p>
-                            <VoteControls itemKey={ing.id} author={hdvPrices[ing.id].author} />
+                            <VoteControls itemKey={ing.id} authorId={hdvPrices[ing.id].authorId} />
                           </div>
                         )}
                       </div>
@@ -680,7 +680,7 @@ export default function CraftProfitability() {
                     {hdvPrices[selectedItem._id]?.author && (
                       <div className="flex items-center gap-2 mt-1.5">
                         <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[selectedItem._id].author}</p>
-                        <VoteControls itemKey={selectedItem._id} author={hdvPrices[selectedItem._id].author} />
+                        <VoteControls itemKey={selectedItem._id} authorId={hdvPrices[selectedItem._id].authorId} />
                       </div>
                     )}
                   </div>

@@ -15,6 +15,7 @@ export interface PriceData {
   x1000: number;
   unitAverage: number;
   author?: string | null;
+  authorId?: string | null;
   monthlySalesVolume?: number;
 }
 

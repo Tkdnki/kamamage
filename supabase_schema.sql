@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS consolidated_prices (
   item_key      TEXT NOT NULL,
   lot           TEXT DEFAULT NULL,
   price         INTEGER NOT NULL,
-  updated_by    UUID REFERENCES profiles(id),
+  author_id     UUID REFERENCES profiles(id),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (server_name, category, item_key, lot)
 );
@@ -148,10 +148,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = ''
 AS $$
 BEGIN
-  INSERT INTO public.consolidated_prices (server_name, category, item_key, lot, price, updated_by, updated_at)
+  INSERT INTO public.consolidated_prices (server_name, category, item_key, lot, price, author_id, updated_at)
   VALUES (p_server_name, p_category, p_item_key, p_lot, p_price, auth.uid(), now())
   ON CONFLICT (server_name, category, item_key, lot)
-  DO UPDATE SET price = p_price, updated_by = auth.uid(), updated_at = now();
+  DO UPDATE SET price = p_price, author_id = auth.uid(), updated_at = now();
 END;
 $$;
 
@@ -397,7 +397,7 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    (SELECT COUNT(*)::BIGINT FROM public.consolidated_prices WHERE updated_by = p_user_id) AS prices_count,
+    (SELECT COUNT(*)::BIGINT FROM public.consolidated_prices WHERE author_id = p_user_id) AS prices_count,
     (SELECT COUNT(*)::BIGINT FROM public.price_consolidated_votes WHERE user_id = p_user_id) AS votes_count;
 END;
 $$;
