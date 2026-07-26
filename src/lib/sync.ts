@@ -195,21 +195,57 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
     console.error('[Sync] Cannot vote: no authenticated session');
     throw new Error('No authenticated session');
   }
-  const { error } = await supabase.rpc('toggle_consolidated_vote', {
-    p_item_key: itemKey,
-    p_server_name: server,
-    p_user_id: userId,
-    p_vote: vote,
-  });
-  if (error) {
-    console.error('[Sync] toggleConsolidatedVote failed', {
-      params: { itemKey, server, vote, userId },
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+
+  // Lire le vote existant via REST (les RLS gèrent auth.uid() correctement)
+  const { data: existing, error: readErr } = await supabase
+    .from('price_consolidated_votes')
+    .select('vote')
+    .eq('item_key', itemKey)
+    .eq('server_name', server)
+    .maybeSingle();
+
+  if (readErr) {
+    console.error('[Sync] toggleConsolidatedVote read error', {
+      code: readErr.code, message: readErr.message, details: readErr.details, hint: readErr.hint,
     });
-    throw error;
+    throw readErr;
+  }
+
+  if (!existing) {
+    const { error: insErr } = await supabase
+      .from('price_consolidated_votes')
+      .insert({ item_key: itemKey, server_name: server, user_id: userId, vote });
+    if (insErr) {
+      console.error('[Sync] toggleConsolidatedVote insert error', {
+        params: { itemKey, server, vote, userId },
+        code: insErr.code, message: insErr.message, details: insErr.details, hint: insErr.hint,
+      });
+      throw insErr;
+    }
+  } else if (existing.vote === vote) {
+    const { error: delErr } = await supabase
+      .from('price_consolidated_votes')
+      .delete()
+      .eq('item_key', itemKey)
+      .eq('server_name', server);
+    if (delErr) {
+      console.error('[Sync] toggleConsolidatedVote delete error', {
+        code: delErr.code, message: delErr.message, details: delErr.details, hint: delErr.hint,
+      });
+      throw delErr;
+    }
+  } else {
+    const { error: updErr } = await supabase
+      .from('price_consolidated_votes')
+      .update({ vote })
+      .eq('item_key', itemKey)
+      .eq('server_name', server);
+    if (updErr) {
+      console.error('[Sync] toggleConsolidatedVote update error', {
+        code: updErr.code, message: updErr.message, details: updErr.details, hint: updErr.hint,
+      });
+      throw updErr;
+    }
   }
 }
 

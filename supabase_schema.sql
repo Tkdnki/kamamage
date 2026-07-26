@@ -334,37 +334,8 @@ CREATE POLICY "votes_consolidated_delete_own" ON price_consolidated_votes
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RPC: vote ou toggle (si même type => supprime, sinon upsert)
-CREATE OR REPLACE FUNCTION toggle_consolidated_vote(
-  p_item_key    TEXT,
-  p_server_name TEXT,
-  p_user_id     UUID,
-  p_vote        TEXT
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = ''
-AS $$
-DECLARE
-  v_existing TEXT;
-  v_effective_user_id UUID := COALESCE(auth.uid(), p_user_id);
-BEGIN
-  SELECT vote INTO v_existing
-  FROM public.price_consolidated_votes
-  WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = v_effective_user_id;
-
-  IF v_existing IS NULL THEN
-    INSERT INTO public.price_consolidated_votes (item_key, server_name, user_id, vote)
-    VALUES (p_item_key, p_server_name, v_effective_user_id, p_vote);
-  ELSIF v_existing = p_vote THEN
-    DELETE FROM public.price_consolidated_votes
-    WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = v_effective_user_id;
-  ELSE
-    UPDATE public.price_consolidated_votes
-    SET vote = p_vote, created_at = now()
-    WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = v_effective_user_id;
-  END IF;
-END;
-$$;
+-- NOTÉ : le toggle se fait côté frontend via REST + RLS.
+-- Cette RPC reste disponible comme alternative mais n'est plus appelée par le client.
 
 -- RPC: obtenir les comptes de votes pour un serveur (avec mon vote)
 CREATE OR REPLACE FUNCTION get_consolidated_vote_counts(p_server_name TEXT)
