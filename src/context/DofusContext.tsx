@@ -145,7 +145,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingPush.current[itemId] = entry;
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(flushPending, 1000);
-  }, [flushPending]);
+  }, [user, flushPending]);
 
   // Volume de ventes mensuel — même pattern debounced
   const pendingVolumePush = useRef<Record<string, number>>({});
@@ -172,7 +172,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingVolumePush.current[itemId] = volume;
     if (volumePushTimer.current) clearTimeout(volumePushTimer.current);
     volumePushTimer.current = setTimeout(flushVolumePending, 1000);
-  }, [flushVolumePending]);
+  }, [user, flushVolumePending]);
 
   // Ménage des timers au démontage
   useEffect(() => {

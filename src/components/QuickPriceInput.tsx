@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useRef } from 'react';
+import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 import { Check } from 'lucide-react';
 
@@ -18,6 +18,16 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
     x100: x100 ?? 0,
     x1000: x1000 ?? 0,
   });
+
+  // Synchronisation quand les prix externes changent (ex : données serveur chargées après montage)
+  useEffect(() => {
+    setValues(prev => {
+      const next = { x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 };
+      // Évite de perdre un brouillon si les valeurs externes n'ont pas changé
+      if (prev.x1 === next.x1 && prev.x10 === next.x10 && prev.x100 === next.x100 && prev.x1000 === next.x1000) return prev;
+      return next;
+    });
+  }, [x1, x10, x100, x1000]);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
 

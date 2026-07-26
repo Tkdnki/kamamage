@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ComponentType, FC } from 'react';
 import { useDofus } from '../context/DofusContext';
+import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
@@ -57,6 +58,7 @@ interface LevelRow {
 
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
+  const { user } = useAuth();
   const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
@@ -539,6 +541,7 @@ export default function LevelingAdvisor() {
                       x100={hdvPrices[selectedItem._id]?.x100 ?? 0}
                       x1000={hdvPrices[selectedItem._id]?.x1000 ?? 0}
                       onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d)}
+                      disabled={!user}
                     />
                   </div>
                 </div>
@@ -667,6 +670,7 @@ export default function LevelingAdvisor() {
                             x100={currentX100}
                             x1000={currentX1000}
                             onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d)}
+                            disabled={!user}
                           />
                         </div>
                       );
