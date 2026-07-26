@@ -126,6 +126,16 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   const { user, refreshUserStats } = useAuth();
 
+  // Re-fetch les votes une fois l'auth prête (pour obtenir myVote correct)
+  useEffect(() => {
+    if (!user) return;
+    fetchVoteCounts(selectedServer).then(remoteVotes => {
+      if (remoteVotes && Object.keys(remoteVotes).length > 0) {
+        setVotes(remoteVotes);
+      }
+    });
+  }, [user?.id, selectedServer]);
+
   const statsRefreshTimer = useRef<ReturnType<typeof setTimeout>>();
   const debouncedRefreshStats = useCallback(() => {
     if (statsRefreshTimer.current) clearTimeout(statsRefreshTimer.current);
