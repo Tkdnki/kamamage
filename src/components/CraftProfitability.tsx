@@ -10,7 +10,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   TrendingUp, TrendingDown, AlertTriangle, Coins, Sparkles, Loader2, Search,
-  ShoppingCart, Check, Pencil, Copy
+  ShoppingCart, Check, Copy
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -54,17 +54,48 @@ export default function CraftProfitability() {
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
 
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc' | 'volume-desc' | 'volume-asc'>('volume-desc');
+  const [sortBy, setSortBy] = useState<'profit-desc' | 'profit-asc' | 'roi-desc' | 'roi-asc' | 'volume-desc' | 'volume-asc' | 'level-asc' | 'level-desc' | 'name-asc' | 'name-desc'>('profit-desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [hideLowVolume, setHideLowVolume] = useState(false);
   const [minSalesVolume, setMinSalesVolume] = useState(5);
+  const [localPrices, setLocalPrices] = useState<Record<string, [number, number, number, number]>>({});
 
   const ITEMS_PER_PAGE = 50;
+
+  const getPricesFor = useCallback((id: string): [number, number, number, number] => {
+    const p = hdvPrices[id];
+    return localPrices[id] ?? [p?.x1 ?? 0, p?.x10 ?? 0, p?.x100 ?? 0, p?.x1000 ?? 0];
+  }, [localPrices, hdvPrices]);
+
+  const handleLocalPriceChange = useCallback((id: string, index: number, value: number) => {
+    setLocalPrices(prev => {
+      const current = prev[id] ?? [0, 0, 0, 0];
+      const updated = [...current] as [number, number, number, number];
+      updated[index] = value;
+      return { ...prev, [id]: updated };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedItemId) return;
+    const item = craftItems.find(i => i._id === selectedItemId);
+    if (!item) return;
+    const ids = [selectedItemId, ...item.ingredients.map(i => i.id)];
+    setLocalPrices(prev => {
+      const next = { ...prev };
+      for (const id of ids) {
+        if (!next[id]) {
+          const p = hdvPrices[id];
+          next[id] = [p?.x1 ?? 0, p?.x10 ?? 0, p?.x100 ?? 0, p?.x1000 ?? 0];
+        }
+      }
+      return next;
+    });
+  }, [selectedItemId, craftItems, hdvPrices]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -74,7 +105,6 @@ export default function CraftProfitability() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setCraftItems([]);
     setSelectedItemId(null);
-    setEditingIngredientId(null);
     setSearchQuery('');
     setCurrentPage(1);
     setIsLoadingItems(true);
@@ -111,10 +141,26 @@ export default function CraftProfitability() {
     }
     list = [...list].sort((a, b) => {
       switch (sortBy) {
-        case 'level-asc': return a.level - b.level;
-        case 'level-desc': return b.level - a.level;
-        case 'name-asc': return a.name.localeCompare(b.name);
-        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'profit-desc': {
+          const pA = getCraftStats(a, a.ingredients).benefit;
+          const pB = getCraftStats(b, b.ingredients).benefit;
+          return (pB || 0) - (pA || 0);
+        }
+        case 'profit-asc': {
+          const pA = getCraftStats(a, a.ingredients).benefit;
+          const pB = getCraftStats(b, b.ingredients).benefit;
+          return (pA || 0) - (pB || 0);
+        }
+        case 'roi-desc': {
+          const rA = getCraftStats(a, a.ingredients).roi;
+          const rB = getCraftStats(b, b.ingredients).roi;
+          return (rB || 0) - (rA || 0);
+        }
+        case 'roi-asc': {
+          const rA = getCraftStats(a, a.ingredients).roi;
+          const rB = getCraftStats(b, b.ingredients).roi;
+          return (rA || 0) - (rB || 0);
+        }
         case 'volume-desc': {
           const vA = hdvPrices[a._id]?.monthlySalesVolume ?? 0;
           const vB = hdvPrices[b._id]?.monthlySalesVolume ?? 0;
@@ -125,6 +171,10 @@ export default function CraftProfitability() {
           const vB = hdvPrices[b._id]?.monthlySalesVolume ?? 0;
           return vA - vB;
         }
+        case 'level-asc': return a.level - b.level;
+        case 'level-desc': return b.level - a.level;
+        case 'name-asc': return a.name.localeCompare(b.name);
+        case 'name-desc': return b.name.localeCompare(a.name);
         default: return 0;
       }
     });
@@ -156,6 +206,14 @@ export default function CraftProfitability() {
     setActiveJob(jobName);
   };
 
+  const getSaleProbability = (volume: number): { label: string; color: string } => {
+    if (volume >= 1000) return { label: 'Très forte probabilité de vente rapide', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
+    if (volume >= 300) return { label: 'Forte probabilité de vente rapide', color: 'bg-green-500/20 text-green-400 border-green-500/30' };
+    if (volume >= 50) return { label: 'Probabilité de vente moyenne', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' };
+    if (volume >= 1) return { label: 'Faible probabilité de vente (lente)', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' };
+    return { label: 'Probabilité de vente inconnue (hors marché)', color: 'bg-slate-700/50 text-slate-400 border-slate-600/30' };
+  };
+
   // ─── Calcul de la rentabilité ───────────────────────────────────────────────
 
   interface EnrichedIngredient extends NormalizedRecipeIngredient {
@@ -180,16 +238,6 @@ export default function CraftProfitability() {
     const best = candidates.reduce((a, b) => a.price < b.price ? a : b);
     return { price: best.price, isMissing: false, source: best.label };
   }
-
-  const handleQuickLotChange = (ingredientId: string, lotType: 'x1' | 'x10' | 'x100' | 'x1000', value: number) => {
-    const safeValue = isNaN(value) || value < 0 ? 0 : value;
-    const current = hdvPrices[ingredientId];
-    const x1 = lotType === 'x1' ? safeValue : (current?.x1 ?? 0);
-    const x10 = lotType === 'x10' ? safeValue : (current?.x10 ?? 0);
-    const x100 = lotType === 'x100' ? safeValue : (current?.x100 ?? 0);
-    const x1000 = lotType === 'x1000' ? safeValue : (current?.x1000 ?? 0);
-    setHdvPrice(ingredientId, x1, x10, x100, x1000);
-  };
 
   function getCraftStats(item: CraftItem, ingredients: NormalizedRecipeIngredient[]) {
     let totalCost = 0;
@@ -283,6 +331,10 @@ export default function CraftProfitability() {
                 onChange={e => setSortBy(e.target.value as typeof sortBy)}
                 className="flex-1 bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-dofus-accent/40 appearance-none cursor-pointer"
               >
+                <option value="profit-desc">Bénéfice net ↓</option>
+                <option value="profit-asc">Bénéfice net ↑</option>
+                <option value="roi-desc">ROI % ↓</option>
+                <option value="roi-asc">ROI % ↑</option>
                 <option value="volume-desc">Ventes/mois ↓</option>
                 <option value="volume-asc">Ventes/mois ↑</option>
                 <option value="level-asc">Niveau ↑</option>
@@ -320,7 +372,7 @@ export default function CraftProfitability() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 cursor-pointer min-w-0" onClick={() => { setSelectedItemId(item._id); setEditingIngredientId(null); }}>
+                        <div className="flex items-center gap-3 cursor-pointer min-w-0" onClick={() => setSelectedItemId(item._id)}>
                           <div className="relative shrink-0">
                             <ItemImage item={item} className="h-10 w-10 bg-[#151f32]/80 rounded-lg p-1 border border-white/10" />
                             <span className="absolute -bottom-1 -right-1 text-[8px] bg-[#070a12] text-slate-300 font-bold px-1 rounded border border-white/10">
@@ -525,65 +577,39 @@ export default function CraftProfitability() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-4">
-                          {(ing.isMissing || editingIngredientId === ing.id) ? (
-                            <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
-                              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <AlertTriangle className="h-3 w-3" /> {ing.isMissing ? 'Prix manquant' : 'Modification'}
-                              </span>
-                              <div className="flex items-end gap-2">
-                                <div className="grid grid-cols-4 gap-1.5">
-                                  {(['x1', 'x10', 'x100', 'x1000'] as const).map(lot => {
-                                    const currentVal = hdvPrices[ing.id]?.[lot];
-                                    return (
-                                      <div key={lot} className="flex flex-col items-center">
-                                        <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          defaultValue={currentVal ?? ''}
-                                          placeholder="0"
-                                          disabled={!user}
-                                          title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : ''}
-                                          className="w-16 bg-[#070a12] border border-amber-500/30 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
-                                          onBlur={e => {
-                                            const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                                            if (!isNaN(val) && val >= 0) handleQuickLotChange(ing.id, lot, val);
-                                          }}
-                                        />
-                                      </div>
-                                    );
-                                  })}
+                        <div className="flex items-end gap-1.5 shrink-0">
+                          <div className="flex gap-1">
+                            {(['x1', 'x10', 'x100', 'x1000'] as const).map((lot, li) => {
+                              const idx = li;
+                              const prices = getPricesFor(ing.id);
+                              return (
+                                <div key={lot} className="flex flex-col items-center">
+                                  <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={prices[idx]}
+                                    onChange={e => handleLocalPriceChange(ing.id, idx, Math.max(0, Number(e.target.value) || 0))}
+                                    placeholder="0"
+                                    disabled={!user}
+                                    title={!user ? 'Connectez-vous pour modifier' : ''}
+                                    className="w-14 bg-slate-950/50 border border-slate-700/50 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                  />
                                 </div>
-                                <button
-                                  onClick={() => setEditingIngredientId(null)}
-                                  className="h-7 w-7 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0"
-                                >
-                                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-right group cursor-pointer" onClick={() => setEditingIngredientId(ing.id)}>
-                              <div className="flex items-center gap-1.5 mt-0.5 justify-end">
-                                <span className="text-[10px] text-slate-400">
-                                  <span className="font-bold text-slate-300">{ing.unitPrice.toFixed(1)}</span>
-                                  <span className="text-slate-500"> K/u</span>
-                                </span>
-                                <span className="text-[10px] text-slate-500">× {ing.quantity}</span>
-                                <span className="text-xs font-extrabold text-dofus-accent">
-                                  {ing.totalPrice.toLocaleString()}
-                                </span>
-                                <span className="text-[9px] text-slate-400 font-bold">K</span>
-                                <Pencil className="h-3 w-3 text-slate-500 group-hover:text-slate-300 transition-colors ml-0.5" />
-                              </div>
-                              {ing.bestSource && (
-                                <span className="text-[9px] text-slate-500 mt-0.5 block text-right">
-                                  via <span className="text-slate-400 font-semibold">{ing.bestSource}</span>
-                                </span>
-                              )}
-                            </div>
-                          )}
+                              );
+                            })}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const v = getPricesFor(ing.id);
+                              setHdvPrice(ing.id, v[0], v[1], v[2], v[3]);
+                            }}
+                            disabled={!user}
+                            title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
+                            className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -607,25 +633,42 @@ export default function CraftProfitability() {
                     )}
                   </div>
 
-                  {/* Prix de vente auto (plus de champ manuel) */}
+                  {/* Prix de vente (HDV) — inputs directs */}
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prix de vente (HDV)</span>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      {stats.isSellPriceMissing ? (
-                        <p className="text-xs text-amber-400 font-semibold flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" /> Inconnu — cliquez sur le nom de l'objet pour le renseigner
-                        </p>
-                      ) : (
-                        <>
-                          <span className="text-2xl font-extrabold text-dofus-accent">
-                            {Math.round(stats.sellPrice).toLocaleString()}
-                          </span>
-                          <span className="text-xs text-dofus-accent font-bold">K</span>
-                          {stats.isSellPriceMissing === false && (
-                            <span className="text-[9px] text-slate-500 ml-1 font-semibold">(via {getBestUnitPrice(selectedItem._id).source})</span>
-                          )}
-                        </>
-                      )}
+                    <div className="flex items-end gap-1.5 mt-1">
+                      <div className="flex gap-1">
+                        {(['x1', 'x10', 'x100', 'x1000'] as const).map((lot, li) => {
+                          const idx = li;
+                          const prices = getPricesFor(selectedItem._id);
+                          return (
+                            <div key={lot} className="flex flex-col items-center">
+                              <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
+                              <input
+                                type="number"
+                                min={0}
+                                value={prices[idx]}
+                                onChange={e => handleLocalPriceChange(selectedItem._id, idx, Math.max(0, Number(e.target.value) || 0))}
+                                placeholder="0"
+                                disabled={!user}
+                                title={!user ? 'Connectez-vous pour modifier' : ''}
+                                className="w-16 bg-slate-950/50 border border-slate-700/50 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const v = getPricesFor(selectedItem._id);
+                          setHdvPrice(selectedItem._id, v[0], v[1], v[2], v[3]);
+                        }}
+                        disabled={!user}
+                        title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
+                        className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      </button>
                     </div>
                   </div>
 
@@ -644,6 +687,11 @@ export default function CraftProfitability() {
                         className="w-24 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-1.5 text-lg font-extrabold text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="text-xs text-slate-400 font-bold">unités</span>
+                    </div>
+                    <div className="mt-2">
+                      <span className={`inline-block px-3 py-1.5 rounded-md text-xs font-medium border ${getSaleProbability(stats.monthlySalesVolume || 0).color}`}>
+                        {getSaleProbability(stats.monthlySalesVolume || 0).label}
+                      </span>
                     </div>
                   </div>
                 </div>
