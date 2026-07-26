@@ -189,14 +189,21 @@ export async function fetchVoteCounts(server: string): Promise<VoteCounts> {
 }
 
 export async function toggleConsolidatedVote(itemKey: string, server: string, vote: 'up' | 'down'): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+  if (!userId) {
+    console.error('[Sync] Cannot vote: no authenticated session');
+    throw new Error('No authenticated session');
+  }
   const { error } = await supabase.rpc('toggle_consolidated_vote', {
     p_item_key: itemKey,
     p_server_name: server,
+    p_user_id: userId,
     p_vote: vote,
   });
   if (error) {
     console.error('[Sync] toggleConsolidatedVote failed', {
-      params: { itemKey, server, vote },
+      params: { itemKey, server, vote, userId },
       code: error.code,
       message: error.message,
       details: error.details,

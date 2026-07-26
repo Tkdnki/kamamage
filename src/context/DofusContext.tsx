@@ -66,8 +66,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   // Votes sur les prix consolidés
   const [votes, setVotes] = useState<VoteCounts>({});
-  const votesRef = useRef<VoteCounts>({});
-  useEffect(() => { votesRef.current = votes; }, [votes]);
 
   // Persiste dans localStorage à chaque changement
   const isFirstRender = useRef(true);
@@ -156,8 +154,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedServer, debouncedRefreshStats]);
 
-  const toggleVote = useCallback(async (itemKey: string, vote: 'up' | 'down') => {
-    const prevVotes = votesRef.current;
+  const toggleVote = useCallback((itemKey: string, vote: 'up' | 'down') => {
     setVotes(prev => {
       const current = prev[itemKey];
       const myVote = current?.myVote;
@@ -178,13 +175,11 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
       return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: vote } };
     });
-    try {
-      await toggleConsolidatedVote(itemKey, selectedServer, vote);
+    toggleConsolidatedVote(itemKey, selectedServer, vote).then(() => {
       debouncedRefreshStats();
-    } catch (err) {
-      setVotes(prevVotes);
-      console.error('[DofusContext] toggleVote rollback', err);
-    }
+    }).catch(err => {
+      console.error('[DofusContext] toggleVote failed', err);
+    });
   }, [selectedServer, debouncedRefreshStats]);
 
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
