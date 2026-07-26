@@ -9,6 +9,7 @@ import { fetchHdvPricesWithAuthor } from '../lib/sync';
 import type { DofusItem } from '../data/mockData';
 import { Search, Plus, Trash2, X, Coins, TrendingDown, Sparkles, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import ItemImage from './ItemImage';
+import VoteControls from './VoteControls';
 
 export default function HdvPrices() {
   const { user } = useAuth();
@@ -308,7 +309,10 @@ export default function HdvPrices() {
               </div>
             </div>
             {displayAuthor && (
-              <p className="text-[9px] text-slate-600 mb-3">Modifié par {displayAuthor}</p>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[9px] text-slate-600">Modifié par {displayAuthor}</p>
+                {activeHdvItem && <VoteControls itemKey={activeHdvItem._id} author={displayAuthor} />}
+              </div>
             )}
 
             {/* Optimisation & Unit average */}

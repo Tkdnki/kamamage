@@ -167,6 +167,49 @@ export async function fetchMonthlySalesVolumeFromServer(server: string): Promise
   return volumes;
 }
 
+// ─── Votes sur prix consolidés ───────────────────────────────
+
+export type VoteCounts = Record<string, { up: number; down: number; myVote?: 'up' | 'down' | null }>;
+
+export async function fetchVoteCounts(server: string): Promise<VoteCounts> {
+  const { data, error } = await supabase.rpc('get_consolidated_vote_counts', {
+    p_server_name: server,
+  });
+  if (error) { console.warn('[Sync] fetchVoteCounts error:', error.message); return {}; }
+  const result: VoteCounts = {};
+  for (const row of data ?? []) {
+    result[row.item_key] = {
+      up: Number(row.up_count),
+      down: Number(row.down_count),
+      myVote: row.my_vote as 'up' | 'down' | null ?? null,
+    };
+  }
+  return result;
+}
+
+export async function toggleConsolidatedVote(itemKey: string, server: string, vote: 'up' | 'down'): Promise<void> {
+  const { error } = await supabase.rpc('toggle_consolidated_vote', {
+    p_item_key: itemKey,
+    p_server_name: server,
+    p_vote: vote,
+  });
+  if (error) console.warn('[Sync] toggleConsolidatedVote error:', error.message);
+}
+
+// ─── Statistiques utilisateur ────────────────────────────────
+
+export interface UserStats {
+  pricesCount: number;
+  votesCount: number;
+}
+
+export async function fetchUserStats(userId: string): Promise<UserStats | null> {
+  const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId });
+  if (error) { console.warn('[Sync] fetchUserStats error:', error.message); return null; }
+  if (!data || data.length === 0) return { pricesCount: 0, votesCount: 0 };
+  return { pricesCount: Number(data[0].prices_count), votesCount: Number(data[0].votes_count) };
+}
+
 export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')

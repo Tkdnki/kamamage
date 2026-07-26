@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
+import VoteControls from './VoteControls';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
@@ -79,6 +80,11 @@ export default function CraftProfitability() {
       return { ...prev, [id]: updated };
     });
   }, []);
+
+  const handleConfirmPrices = useCallback((id: string) => {
+    const [x1, x10, x100, x1000] = getPricesFor(id);
+    setHdvPrice(id, x1, x10, x100, x1000);
+  }, [getPricesFor, setHdvPrice]);
 
   useEffect(() => {
     if (!selectedItemId) return;
@@ -421,6 +427,7 @@ export default function CraftProfitability() {
                         x100={hdvPrices[item._id]?.x100}
                         x1000={hdvPrices[item._id]?.x1000}
                         onSetPrices={(a, b, c, d) => setHdvPrice(item._id, a, b, c, d)}
+                        disabled={!user}
                       />
                     </div>
                   );
@@ -600,10 +607,7 @@ export default function CraftProfitability() {
                             })}
                           </div>
                           <button
-                            onClick={() => {
-                              const v = getPricesFor(ing.id);
-                              setHdvPrice(ing.id, v[0], v[1], v[2], v[3]);
-                            }}
+                            onClick={() => handleConfirmPrices(ing.id)}
                             disabled={!user}
                             title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
                             className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -611,6 +615,12 @@ export default function CraftProfitability() {
                             <Check className="h-3.5 w-3.5 text-emerald-400" />
                           </button>
                         </div>
+                        {hdvPrices[ing.id]?.author && (
+                          <div className="flex items-center justify-end gap-2 mt-1.5">
+                            <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[ing.id].author}</p>
+                            <VoteControls itemKey={ing.id} author={hdvPrices[ing.id].author} />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -659,10 +669,7 @@ export default function CraftProfitability() {
                         })}
                       </div>
                       <button
-                        onClick={() => {
-                          const v = getPricesFor(selectedItem._id);
-                          setHdvPrice(selectedItem._id, v[0], v[1], v[2], v[3]);
-                        }}
+                        onClick={() => handleConfirmPrices(selectedItem._id)}
                         disabled={!user}
                         title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
                         className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -670,6 +677,12 @@ export default function CraftProfitability() {
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
                       </button>
                     </div>
+                    {hdvPrices[selectedItem._id]?.author && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[selectedItem._id].author}</p>
+                        <VoteControls itemKey={selectedItem._id} author={hdvPrices[selectedItem._id].author} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Volume de ventes mensuel */}

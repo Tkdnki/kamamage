@@ -308,6 +308,101 @@ DROP POLICY IF EXISTS "kama_hdv_no_update" ON kama_hdv_prices;
 CREATE POLICY "kama_hdv_no_update" ON kama_hdv_prices FOR UPDATE USING (false);
 
 -- ============================================================
+-- VOTES SUR PRIX CONSOLIDÉS (upvote/downvote par item)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS price_consolidated_votes (
+  item_key    TEXT NOT NULL,
+  server_name TEXT NOT NULL,
+  user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  vote        TEXT NOT NULL CHECK (vote IN ('up', 'down')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (item_key, server_name, user_id)
+);
+
+ALTER TABLE price_consolidated_votes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "votes_consolidated_select_public" ON price_consolidated_votes
+  FOR SELECT USING (true);
+
+CREATE POLICY "votes_consolidated_insert_own" ON price_consolidated_votes
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "votes_consolidated_update_own" ON price_consolidated_votes
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "votes_consolidated_delete_own" ON price_consolidated_votes
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- RPC: vote ou toggle (si même type => supprime, sinon upsert)
+CREATE OR REPLACE FUNCTION toggle_consolidated_vote(
+  p_item_key    TEXT,
+  p_server_name TEXT,
+  p_vote        TEXT
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  v_existing TEXT;
+BEGIN
+  SELECT vote INTO v_existing
+  FROM public.price_consolidated_votes
+  WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = auth.uid();
+
+  IF v_existing IS NULL THEN
+    INSERT INTO public.price_consolidated_votes (item_key, server_name, user_id, vote)
+    VALUES (p_item_key, p_server_name, auth.uid(), p_vote);
+  ELSIF v_existing = p_vote THEN
+    DELETE FROM public.price_consolidated_votes
+    WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = auth.uid();
+  ELSE
+    UPDATE public.price_consolidated_votes
+    SET vote = p_vote, created_at = now()
+    WHERE item_key = p_item_key AND server_name = p_server_name AND user_id = auth.uid();
+  END IF;
+END;
+$$;
+
+-- RPC: obtenir les comptes de votes pour un serveur (avec mon vote)
+CREATE OR REPLACE FUNCTION get_consolidated_vote_counts(p_server_name TEXT)
+RETURNS TABLE(item_key TEXT, up_count BIGINT, down_count BIGINT, my_vote TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    pcv.item_key,
+    COUNT(*) FILTER (WHERE pcv.vote = 'up')::BIGINT AS up_count,
+    COUNT(*) FILTER (WHERE pcv.vote = 'down')::BIGINT AS down_count,
+    (SELECT pcv2.vote FROM public.price_consolidated_votes pcv2
+     WHERE pcv2.item_key = pcv.item_key AND pcv2.server_name = pcv.server_name AND pcv2.user_id = auth.uid()
+     LIMIT 1) AS my_vote
+  FROM public.price_consolidated_votes pcv
+  WHERE pcv.server_name = p_server_name
+  GROUP BY pcv.item_key;
+END;
+$$;
+
+-- ============================================================
+-- STATISTIQUES UTILISATEUR (pour page profil)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION get_user_stats(p_user_id UUID)
+RETURNS TABLE(prices_count BIGINT, votes_count BIGINT)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    (SELECT COUNT(*)::BIGINT FROM public.consolidated_prices WHERE updated_by = p_user_id) AS prices_count,
+    (SELECT COUNT(*)::BIGINT FROM public.price_consolidated_votes WHERE user_id = p_user_id) AS votes_count;
+END;
+$$;
+
+-- ============================================================
 -- VOLUME DE VENTES MENSUEL (partagé par la communauté)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS item_monthly_sales_volume (

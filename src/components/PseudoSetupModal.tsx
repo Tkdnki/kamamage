@@ -10,12 +10,17 @@ export default function PseudoSetupModal() {
 
   if (!needsPseudo) return null;
 
+  const validate = (value: string): string | null => {
+    if (!value.trim()) return 'Le pseudo ne peut pas être vide.';
+    if (value.trim().length < 3) return 'Le pseudo doit contenir au moins 3 caractères.';
+    if (value.includes('@')) return 'Les adresses e-mail ne sont pas autorisées comme pseudo. Choisissez un pseudo public.';
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pseudo.trim()) {
-      setError('Le pseudo ne peut pas être vide.');
-      return;
-    }
+    const validationError = validate(pseudo);
+    if (validationError) { setError(validationError); return; }
     setSaving(true);
     setError(null);
     const result = await updatePseudo(pseudo);
@@ -24,14 +29,14 @@ export default function PseudoSetupModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md" onContextMenu={e => e.preventDefault()}>
       <div className="bg-[#0c101d] border border-white/10 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
             <User className="h-5 w-5 text-purple-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Bienvenue !</h2>
+            <h2 className="text-base font-bold text-white">Configuration obligatoire</h2>
             <p className="text-[11px] text-slate-400">Choisissez un pseudo public</p>
           </div>
         </div>
@@ -54,16 +59,18 @@ export default function PseudoSetupModal() {
             </div>
           )}
 
-          <p className="text-[10px] text-slate-600">
-            Ce pseudo sera affiché à côté de vos prix (ex: "Modifié par ...").
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            Ce pseudo sera affiché publiquement à côté de vos modifications de prix
+            (ex: "Modifié par Pseudo"). Les adresses e-mail ne sont pas autorisées
+            pour protéger votre confidentialité.
           </p>
 
           <button
             type="submit"
-            disabled={saving || !pseudo.trim()}
+            disabled={saving}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-4 py-2.5 rounded-lg transition-all"
           >
-            {saving ? 'Enregistrement...' : 'Confirmer'}
+            {saving ? 'Enregistrement...' : 'Confirmer le pseudo'}
           </button>
         </form>
       </div>

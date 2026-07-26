@@ -4,7 +4,9 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import type { DofusItem } from '../data/mockData';
 import { useServer } from './ServerContext';
-import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer } from '../lib/sync';
+import { useAuth } from './AuthContext';
+import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer, fetchVoteCounts, toggleConsolidatedVote } from '../lib/sync';
+import type { VoteCounts } from '../lib/sync';
 
 export interface PriceData {
   x1: number;
@@ -26,6 +28,8 @@ interface DofusContextType {
   customItems: DofusItem[];
   setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number) => void;
   setMonthlySalesVolume: (itemId: string, volume: number) => void;
+  votes: VoteCounts;
+  toggleVote: (itemKey: string, vote: 'up' | 'down') => void;
   trackItem: (item: DofusItem) => void;
   untrackItem: (itemId: string) => void;
   getItemById: (itemId: string) => DofusItem | undefined;
@@ -59,6 +63,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   // hdvPrices est un état local, initialisé depuis le cache localStorage
   const [hdvPrices, setHdvPrices] = useState<HdvPrices>(() => loadCache(storageKey));
 
+  // Votes sur les prix consolidés
+  const [votes, setVotes] = useState<VoteCounts>({});
+
   // Persiste dans localStorage à chaque changement
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -74,9 +81,10 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const loadFromServer = async () => {
-      const [remote, remoteVolumes] = await Promise.all([
+      const [remote, remoteVolumes, remoteVotes] = await Promise.all([
         fetchHdvPricesFromServer(selectedServer),
         fetchMonthlySalesVolumeFromServer(selectedServer),
+        fetchVoteCounts(selectedServer),
       ]);
 
       if (cancelled) return;
@@ -105,6 +113,10 @@ export function DofusProvider({ children }: { children: ReactNode }) {
           return changed ? merged : prev;
         });
       }
+
+      if (remoteVotes && Object.keys(remoteVotes).length > 0) {
+        setVotes(remoteVotes);
+      }
     };
 
     loadFromServer();
@@ -122,7 +134,34 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedServer]);
 
+  const { user } = useAuth();
+
+  const toggleVote = useCallback((itemKey: string, vote: 'up' | 'down') => {
+    setVotes(prev => {
+      const current = prev[itemKey];
+      const myVote = current?.myVote;
+      let newUp = current?.up ?? 0;
+      let newDown = current?.down ?? 0;
+
+      if (myVote === vote) {
+        if (vote === 'up') newUp--;
+        else newDown--;
+        return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: null } };
+      }
+
+      if (myVote === 'up') newUp--;
+      else if (myVote === 'down') newDown--;
+
+      if (vote === 'up') newUp++;
+      else newDown++;
+
+      return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: vote } };
+    });
+    toggleConsolidatedVote(itemKey, selectedServer, vote);
+  }, [selectedServer]);
+
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
+    if (!user) return;
     let sum = 0;
     let count = 0;
     if (x1 > 0) { sum += x1; count++; }
@@ -153,6 +192,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   }, [selectedServer]);
 
   const setMonthlySalesVolume = useCallback((itemId: string, volume: number) => {
+    if (!user) return;
     setHdvPrices(prev => {
       const current = prev[itemId];
       const updated: PriceData = current
@@ -212,6 +252,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       customItems,
       setHdvPrice,
       setMonthlySalesVolume,
+      votes,
+      toggleVote,
       trackItem,
       untrackItem,
       getItemById,

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import { Save, ArrowLeft, User, CheckCircle, AlertCircle } from 'lucide-react';
+import ProfileBadges from './ProfileBadges';
 
 export default function ProfileSettings() {
   const { user, profile, updatePseudo } = useAuth();
@@ -96,6 +97,11 @@ export default function ProfileSettings() {
             {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </div>
+      </div>
+
+      {/* Statistiques et Badges */}
+      <div className="glass-panel rounded-xl p-6 border border-white/5 shadow-xl mt-6">
+        <ProfileBadges />
       </div>
     </div>
   );

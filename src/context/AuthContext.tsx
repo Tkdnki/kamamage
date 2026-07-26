@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { fetchUserStats } from '../lib/sync';
 
 interface Profile {
   id: string;
@@ -15,6 +16,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  computedScore: number;
   loading: boolean;
   needsPseudo: boolean;
   signInWithDiscord: () => Promise<void>;
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [computedScore, setComputedScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [needsPseudo, setNeedsPseudo] = useState(false);
 
@@ -60,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data);
       setNeedsPseudo(!data.pseudo || data.pseudo === user?.email);
     }
+    fetchUserStats(userId).then(stats => {
+      if (stats) setComputedScore(stats.pricesCount * 10 + stats.votesCount * 2);
+    });
   }
 
   const updatePseudo = async (pseudo: string): Promise<{ error?: string }> => {
@@ -90,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, profile, loading, needsPseudo,
+      session, user, profile, computedScore, loading, needsPseudo,
       signInWithDiscord, signInWithGoogle, signOut, updatePseudo,
     }}>
       {children}
