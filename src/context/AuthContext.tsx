@@ -21,6 +21,8 @@ interface AuthContextType {
   needsPseudo: boolean;
   signInWithDiscord: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   updatePseudo: (pseudo: string) => Promise<{ error?: string }>;
   refreshUserStats: () => Promise<void>;
@@ -96,6 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signInWithOAuth({ provider: 'google' });
   };
 
+  const signInWithEmail = async (email: string, password: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error?.message };
+  };
+
+  const signUpWithEmail = async (email: string, password: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error: error?.message };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -104,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, user, profile, computedScore, loading, needsPseudo,
-      signInWithDiscord, signInWithGoogle, signOut, updatePseudo, refreshUserStats,
+      signInWithDiscord, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updatePseudo, refreshUserStats,
     }}>
       {children}
     </AuthContext.Provider>

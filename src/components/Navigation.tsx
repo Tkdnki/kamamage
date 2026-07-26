@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
+import AuthPanel from './AuthPanel';
 import type { ViewType } from '../context/NavigationContext';
 
 export type { ViewType } from '../context/NavigationContext';
@@ -131,20 +133,24 @@ export default function Navigation() {
 }
 
 function AuthButton() {
-  const { user, profile, computedScore, loading, signInWithDiscord, signOut } = useAuth();
+  const [showAuthPanel, setShowAuthPanel] = useState(false);
+  const { user, profile, computedScore, loading, signOut } = useAuth();
   const { setActiveView } = useNavigation();
 
   if (loading) return null;
 
   if (!user) {
     return (
-      <button
-        onClick={signInWithDiscord}
-        className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#5865F2] hover:bg-[#4752c4] px-3 py-1.5 rounded-lg transition-all shadow-lg shadow-[#5865F2]/20"
-      >
-        <LogIn className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Connexion</span>
-      </button>
+      <>
+        <button
+          onClick={() => setShowAuthPanel(true)}
+          className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#5865F2] hover:bg-[#4752c4] px-3 py-1.5 rounded-lg transition-all shadow-lg shadow-[#5865F2]/20"
+        >
+          <LogIn className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Connexion</span>
+        </button>
+        {showAuthPanel && <AuthPanel onClose={() => setShowAuthPanel(false)} />}
+      </>
     );
   }
 
