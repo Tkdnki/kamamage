@@ -150,8 +150,10 @@ export default function CraftProfitability() {
     }
 
     const exists = craftItems.find(item => item._id === pendingCraftsItemId);
-    if (exists) setSelectedItemId(pendingCraftsItemId);
-    clearPendingCraftsNavigation();
+    if (exists) {
+      setSelectedItemId(pendingCraftsItemId);
+      clearPendingCraftsNavigation();
+    }
   }, [pendingCraftsItemId, pendingCraftsJob, craftItems, activeJob, clearPendingCraftsNavigation]);
 
   const filteredItems = useMemo(() => {
@@ -566,7 +568,7 @@ export default function CraftProfitability() {
                     Suivre en HDV
                   </button>
                   <button
-                    onClick={() => navigateToLevelingItem(selectedItem._id, activeJob)}
+                    onClick={() => navigateToLevelingItem(selectedItem._id, activeJob, undefined, selectedItem.level)}
                     className="bg-[#151f32] hover:bg-sky-500/10 border border-white/10 hover:border-sky-500/20 text-slate-300 hover:text-sky-400 text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
                   >
                     <GraduationCap className="h-3.5 w-3.5" /> XP

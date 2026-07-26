@@ -59,7 +59,7 @@ interface LevelRow {
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { user } = useAuth();
-  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, clearPendingLevelingNavigation } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -112,14 +112,21 @@ export default function LevelingAdvisor() {
       return;
     }
 
+    // Ajuster le niveau du métier si l'item ciblé est au-dessus du filtre de visibilité
+    if (pendingLevelingItemLevel !== null && pendingLevelingItemLevel > jobLevel) {
+      setJobLevel(pendingLevelingItemLevel);
+    }
+
     if (pendingLevelingJobLevel !== null && pendingLevelingJobLevel !== jobLevel) {
       setJobLevel(pendingLevelingJobLevel);
     }
 
     const exists = craftItems.find(item => item._id === pendingLevelingItemId);
-    if (exists) setSelectedItemId(pendingLevelingItemId);
-    clearPendingLevelingNavigation();
-  }, [pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, craftItems, activeJob, jobLevel, clearPendingLevelingNavigation]);
+    if (exists) {
+      setSelectedItemId(pendingLevelingItemId);
+      clearPendingLevelingNavigation();
+    }
+  }, [pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, craftItems, activeJob, jobLevel, clearPendingLevelingNavigation]);
 
   const minLevel = Math.max(1, jobLevel - 20);
 
