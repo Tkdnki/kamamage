@@ -40,13 +40,18 @@ export default function PseudoSetupModal() {
     if (validationError) { setError(validationError); return; }
     setSaving(true);
     setError(null);
-    const result = await updatePseudo(pseudo);
-    if (result.error) {
-      setError(result.error.includes('duplicate key') || result.error.includes('unique')
-        ? 'Ce pseudo est déjà pris. Veuillez en choisir un autre.'
-        : result.error);
+    try {
+      const result = await updatePseudo(pseudo);
+      if (result.error) {
+        setError(result.error);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[PseudoModal] submit error:', err);
+      setError('Erreur inattendue : ' + msg);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (

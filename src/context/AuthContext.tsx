@@ -78,22 +78,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updatePseudo = async (pseudo: string): Promise<{ error?: string }> => {
-    if (!user) return { error: 'Non connecté' };
-    if (!pseudo.trim()) return { error: 'Le pseudo ne peut pas être vide' };
-    const { error } = await supabase
-      .from('profiles')
-      .update({ pseudo: pseudo.trim() })
-      .eq('id', user.id);
-    if (error) {
-      const msg = error.message;
-      if (msg.includes('duplicate key') || msg.includes('unique')) {
-        return { error: 'Ce pseudo est déjà pris.' };
+    try {
+      if (!user) return { error: 'Non connecté' };
+      if (!pseudo.trim()) return { error: 'Le pseudo ne peut pas être vide' };
+      const { error } = await supabase
+        .from('profiles')
+        .update({ pseudo: pseudo.trim() })
+        .eq('id', user.id);
+      if (error) {
+        const msg = error.message;
+        if (msg.includes('duplicate key') || msg.includes('unique')) {
+          return { error: 'Ce pseudo est déjà pris.' };
+        }
+        console.error('[Auth] updatePseudo error:', msg);
+        return { error: msg };
       }
-      return { error: msg };
+      setProfile(prev => prev ? { ...prev, pseudo: pseudo.trim() } : prev);
+      setNeedsPseudo(false);
+      return {};
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[Auth] updatePseudo exception:', err);
+      return { error: 'Erreur réseau ou serveur. Veuillez réessayer.' };
     }
-    setProfile(prev => prev ? { ...prev, pseudo: pseudo.trim() } : prev);
-    setNeedsPseudo(false);
-    return {};
   };
 
   const signInWithDiscord = async () => {
