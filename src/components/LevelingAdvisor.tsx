@@ -55,7 +55,7 @@ interface LevelRow {
 }
 
 export default function LevelingAdvisor() {
-  const { hdvPrices, setHdvPrice, setMonthlySalesVolume } = useDofus();
+  const { hdvPrices, setHdvPrice } = useDofus();
   const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
@@ -126,12 +126,6 @@ export default function LevelingAdvisor() {
     return !!p && (p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0);
   };
 
-  const getMonthlyVolume = (itemId: string): number =>
-    hdvPrices[itemId]?.monthlySalesVolume ?? 0;
-
-  const isItemDataComplete = (itemId: string): boolean =>
-    hasResalePrice(itemId) && getMonthlyVolume(itemId) > 0;
-
   const isCostUnknown = (row: LevelRow): boolean =>
     row.missingIngredients || row.craftCost <= 0 || !hasResalePrice(row.item._id);
 
@@ -148,9 +142,7 @@ export default function LevelingAdvisor() {
   };
 
   const getEfficiencyScore = (row: LevelRow): number => {
-    const volume = getMonthlyVolume(row.item._id);
-    const volumeFactor = volume > 0 ? Math.log2(1 + volume) : 0;
-    return getROI(row) * row.xpGained * volumeFactor;
+    return getROI(row) * row.xpGained;
   };
 
   const formatKamas = (n: number): string => {
@@ -158,21 +150,15 @@ export default function LevelingAdvisor() {
     return `${sign}${Math.round(n).toLocaleString()} K`;
   };
 
-  // -- Split rows into complete (scored + volume > 0), no-volume, and unknown --
+  // -- Split rows into complete (scored) and unknown --
   const sortedComplete = useMemo(() => {
     return [...rows]
-      .filter(r => !isCostUnknown(r) && isItemDataComplete(r.item._id))
+      .filter(r => !isCostUnknown(r))
       .sort((a, b) => {
         const scoreA = getEfficiencyScore(a);
         const scoreB = getEfficiencyScore(b);
         return scoreB - scoreA;
       });
-  }, [rows, hdvPrices]);
-
-  const sortedNoVolume = useMemo(() => {
-    return [...rows]
-      .filter(r => !isCostUnknown(r) && !isItemDataComplete(r.item._id))
-      .sort((a, b) => b.item.level - a.item.level);
   }, [rows, hdvPrices]);
 
   const sortedUnknown = useMemo(() => {
@@ -282,20 +268,14 @@ export default function LevelingAdvisor() {
 
       {/* Warning banner for incomplete items */}
       {(() => {
-        const ignoredCount = sortedNoVolume.length + sortedUnknown.length;
-        if (ignoredCount === 0) return null;
+        if (sortedUnknown.length === 0) return null;
         return (
           <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-slate-300 relative z-10">
             <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
             <span>
-              <strong className="text-amber-400">{ignoredCount} item{ignoredCount > 1 ? 's' : ''} ignoré{ignoredCount > 1 ? 's' : ''}</strong> du classement —
-              {sortedNoVolume.length > 0 && (
-                <span> {sortedNoVolume.length} sans volume de vente,</span>
-              )}
-              {sortedUnknown.length > 0 && (
-                <span> {sortedUnknown.length} avec prix manquants</span>
-              )}.
-              Renseignez les données dans les sections ci-dessous.
+              <strong className="text-amber-400">{sortedUnknown.length} item{sortedUnknown.length > 1 ? 's' : ''} ignoré{sortedUnknown.length > 1 ? 's' : ''}</strong> du classement —
+              <span> {sortedUnknown.length} avec prix manquants</span>.
+              Renseignez les données dans la section ci-dessous.
             </span>
           </div>
         );
@@ -387,50 +367,6 @@ export default function LevelingAdvisor() {
                             <span className={`text-[9px] font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                               {isProfit ? '+' : ''}{roi.toFixed(0)}%
                             </span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* No-volume items section */}
-            {sortedNoVolume.length > 0 && (
-              <div className="space-y-1.5">
-                <h3 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold px-1 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3 w-3 text-cyan-400" />
-                  Volume à renseigner ({sortedNoVolume.length})
-                </h3>
-                {sortedNoVolume.map(row => {
-                  const isSelected = selectedItemId === row.item._id;
-                  return (
-                    <button
-                      key={row.item._id}
-                      onClick={() => selectItem(row.item._id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
-                        isSelected
-                          ? 'bg-cyan-900/20 border-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.1)]'
-                          : 'border border-slate-700/40 bg-slate-800/20 hover:bg-slate-800/40'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                          <ItemImage item={row.item} className="h-10 w-10 bg-slate-800/30 rounded-lg p-1 border border-slate-700/30" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-sm font-semibold truncate ${isSelected ? 'text-cyan-300' : 'text-slate-200'}`}>
-                              {row.item.name}
-                            </span>
-                            <span className="shrink-0 text-[9px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                              Volume manquant
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-slate-400">Niv.{row.item.level}</span>
-                            <span className="text-[10px] font-mono text-amber-400">{row.xpGained.toLocaleString()} XP</span>
                           </div>
                         </div>
                       </div>
@@ -543,27 +479,6 @@ export default function LevelingAdvisor() {
                       x1000={hdvPrices[selectedItem._id]?.x1000 ?? 0}
                       onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d)}
                     />
-                  </div>
-                </div>
-
-                {/* Volume de ventes mensuel */}
-                <div>
-                  <label className="text-[11px] uppercase tracking-widest text-slate-300 font-bold mb-2 block">
-                    Volume de vente mensuel
-                  </label>
-                  <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/20 border border-slate-700/40">
-                    <input
-                      type="number"
-                      min={0}
-                      value={getMonthlyVolume(selectedRow.item._id) || ''}
-                      onChange={e => {
-                        const v = Math.max(0, Number(e.target.value) || 0);
-                        setMonthlySalesVolume(selectedRow.item._id, v);
-                      }}
-                      placeholder="Ex: 50"
-                      className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-cyan-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="text-xs text-slate-400 font-bold shrink-0">ventes/mois</span>
                   </div>
                 </div>
 
