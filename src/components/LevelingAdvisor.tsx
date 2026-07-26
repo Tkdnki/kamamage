@@ -59,7 +59,7 @@ interface LevelRow {
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { user } = useAuth();
-  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, clearPendingLevelingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -101,6 +101,25 @@ export default function LevelingAdvisor() {
       clearPreviousNavigation();
     }
   }, [previousItemId, craftItems, clearPreviousNavigation]);
+
+  // Navigation entrante depuis Rentabilité Crafts
+  useEffect(() => {
+    if (!pendingLevelingItemId || craftItems.length === 0) return;
+
+    // Si le métier doit encore changer, on attend le prochain chargement des crafts
+    if (pendingLevelingJob && pendingLevelingJob !== activeJob) {
+      setActiveJob(pendingLevelingJob);
+      return;
+    }
+
+    if (pendingLevelingJobLevel !== null && pendingLevelingJobLevel !== jobLevel) {
+      setJobLevel(pendingLevelingJobLevel);
+    }
+
+    const exists = craftItems.find(item => item._id === pendingLevelingItemId);
+    if (exists) setSelectedItemId(pendingLevelingItemId);
+    clearPendingLevelingNavigation();
+  }, [pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, craftItems, activeJob, jobLevel, clearPendingLevelingNavigation]);
 
   const minLevel = Math.max(1, jobLevel - 20);
 
@@ -496,12 +515,12 @@ export default function LevelingAdvisor() {
               <div className="glass-panel rounded-xl p-5 flex flex-col gap-5">
 
                 {/* Item header */}
-                <div className="flex items-center gap-4 border-b border-slate-700/50 pb-4">
-                  <div className="relative">
+                <div className="flex items-start gap-4 border-b border-slate-700/50 pb-4">
+                  <div className="relative shrink-0">
                     <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent rounded-xl blur-sm" />
                     <ItemImage item={selectedItem} className="h-14 w-14 bg-slate-800/30 rounded-xl p-1.5 border border-slate-700/30 relative shadow-lg" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h2 className="text-lg font-bold text-white">{selectedItem.name}</h2>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400 flex-wrap">
                       <span>Niveau <strong className="bg-amber-500 text-slate-950 font-bold px-2 py-1 rounded text-[11px]">{selectedItem.level}</strong></span>
@@ -515,6 +534,15 @@ export default function LevelingAdvisor() {
                       )}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => navigateToCraftsItem(selectedItem._id, activeJob)}
+                    className="shrink-0 flex items-center gap-1.5 bg-[#151f32] hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/20 text-slate-300 hover:text-emerald-400 text-[10px] font-bold py-2 px-2.5 rounded-lg transition-all"
+                    title="Voir dans Rentabilité Crafts"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Rentabilité</span>
+                  </button>
                 </div>
 
                 {/* Resale Price */}

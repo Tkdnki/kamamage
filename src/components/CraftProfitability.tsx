@@ -11,7 +11,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   TrendingUp, TrendingDown, AlertTriangle, Coins, Sparkles, Loader2, Search,
-  ShoppingCart, Check, Copy
+  ShoppingCart, Check, Copy, GraduationCap
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -51,7 +51,7 @@ const CopyButton = ({ text }: { text: string }) => {
 export default function CraftProfitability() {
   const { user } = useAuth();
   const { hdvPrices, setHdvPrice, setMonthlySalesVolume, trackItem } = useDofus();
-  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation } = useNavigation();
+  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -138,6 +138,21 @@ export default function CraftProfitability() {
       clearPreviousNavigation();
     }
   }, [previousItemId, craftItems, clearPreviousNavigation]);
+
+  // Navigation entrante depuis le Conseiller XP métier
+  useEffect(() => {
+    if (!pendingCraftsItemId || craftItems.length === 0) return;
+
+    // Si le métier doit encore changer, on attend le prochain chargement des crafts
+    if (pendingCraftsJob && pendingCraftsJob !== activeJob) {
+      setActiveJob(pendingCraftsJob);
+      return;
+    }
+
+    const exists = craftItems.find(item => item._id === pendingCraftsItemId);
+    if (exists) setSelectedItemId(pendingCraftsItemId);
+    clearPendingCraftsNavigation();
+  }, [pendingCraftsItemId, pendingCraftsJob, craftItems, activeJob, clearPendingCraftsNavigation]);
 
   const filteredItems = useMemo(() => {
     let list = craftItems;
@@ -549,6 +564,12 @@ export default function CraftProfitability() {
                     className="bg-[#151f32] hover:bg-dofus-accent/10 border border-white/10 hover:border-dofus-accent/20 text-slate-300 hover:text-dofus-accent text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
                   >
                     Suivre en HDV
+                  </button>
+                  <button
+                    onClick={() => navigateToLevelingItem(selectedItem._id, activeJob)}
+                    className="bg-[#151f32] hover:bg-sky-500/10 border border-white/10 hover:border-sky-500/20 text-slate-300 hover:text-sky-400 text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" /> XP
                   </button>
                 </div>
               </div>

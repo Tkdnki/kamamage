@@ -25,6 +25,15 @@ interface NavigationContextType {
   previousJob: string | null;
   previousJobLevel: number | null;
   clearPreviousNavigation: () => void;
+  pendingCraftsItemId: string | null;
+  pendingCraftsJob: string | null;
+  navigateToCraftsItem: (itemId: string, job?: string) => void;
+  clearPendingCraftsNavigation: () => void;
+  pendingLevelingItemId: string | null;
+  pendingLevelingJob: string | null;
+  pendingLevelingJobLevel: number | null;
+  navigateToLevelingItem: (itemId: string, job?: string, jobLevel?: number) => void;
+  clearPendingLevelingNavigation: () => void;
   shoppingCart: ShoppingCart;
   addIngredientsToCart: (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => void;
   updateCartGathered: (id: string, gathered: number) => void;
@@ -41,6 +50,11 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [previousJob, setPreviousJob] = useState<string | null>(null);
   const [previousJobLevel, setPreviousJobLevel] = useState<number | null>(null);
   const [shoppingCart, setShoppingCart] = useLocalStorage<ShoppingCart>('kamamage_shopping_cart', {});
+  const [pendingCraftsItemId, setPendingCraftsItemId] = useState<string | null>(null);
+  const [pendingCraftsJob, setPendingCraftsJob] = useState<string | null>(null);
+  const [pendingLevelingItemId, setPendingLevelingItemId] = useState<string | null>(null);
+  const [pendingLevelingJob, setPendingLevelingJob] = useState<string | null>(null);
+  const [pendingLevelingJobLevel, setPendingLevelingJobLevel] = useState<number | null>(null);
 
   const navigateToHdvItem = (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => {
     setPreviousView(activeView);
@@ -57,6 +71,30 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     setPreviousItemId(null);
     setPreviousJob(null);
     setPreviousJobLevel(null);
+  };
+
+  const navigateToCraftsItem = (itemId: string, job?: string) => {
+    setPendingCraftsItemId(itemId);
+    if (job) setPendingCraftsJob(job);
+    setActiveView('crafts');
+  };
+
+  const clearPendingCraftsNavigation = () => {
+    setPendingCraftsItemId(null);
+    setPendingCraftsJob(null);
+  };
+
+  const navigateToLevelingItem = (itemId: string, job?: string, jobLevel?: number) => {
+    setPendingLevelingItemId(itemId);
+    if (job) setPendingLevelingJob(job);
+    if (jobLevel !== undefined) setPendingLevelingJobLevel(jobLevel);
+    setActiveView('leveling');
+  };
+
+  const clearPendingLevelingNavigation = () => {
+    setPendingLevelingItemId(null);
+    setPendingLevelingJob(null);
+    setPendingLevelingJobLevel(null);
   };
 
   const addIngredientsToCart = (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => {
@@ -95,6 +133,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       pendingHdvItem, navigateToHdvItem, clearPendingHdvItem,
       previousView, clearPreviousView,
       previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,
+      pendingCraftsItemId, pendingCraftsJob, navigateToCraftsItem, clearPendingCraftsNavigation,
+      pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, navigateToLevelingItem, clearPendingLevelingNavigation,
       shoppingCart, addIngredientsToCart, updateCartGathered, resetCart,
     }}>
       {children}
