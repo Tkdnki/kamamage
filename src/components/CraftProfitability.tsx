@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ComponentType } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -10,7 +10,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   TrendingUp, TrendingDown, AlertTriangle, Coins, Sparkles, Loader2, Search,
-  ShoppingCart, Check, Pencil
+  ShoppingCart, Check, Pencil, Copy
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -22,6 +22,29 @@ const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Éleveur': Heart, 'Façonneur': Shield, 'Forgeron': Flame,
   'Mineur': Pickaxe, 'Paysan': Wheat, 'Pêcheur': Fish,
   'Sculpteur': Wand2, 'Tailleur': Scissors
+};
+
+const CopyButton = ({ text }: { text: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="h-4 w-4 opacity-40 hover:opacity-100 transition-opacity shrink-0"
+    >
+      {copied ? <Check className="h-full w-full text-emerald-400" /> : <Copy className="h-full w-full" />}
+    </button>
+  );
 };
 
 export default function CraftProfitability() {
@@ -36,7 +59,7 @@ export default function CraftProfitability() {
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc' | 'profit-m-desc' | 'profit-m-asc'>('profit-m-desc');
+  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc' | 'volume-desc' | 'volume-asc'>('volume-desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [hideLowVolume, setHideLowVolume] = useState(false);
   const [minSalesVolume, setMinSalesVolume] = useState(5);
@@ -92,15 +115,15 @@ export default function CraftProfitability() {
         case 'level-desc': return b.level - a.level;
         case 'name-asc': return a.name.localeCompare(b.name);
         case 'name-desc': return b.name.localeCompare(a.name);
-        case 'profit-m-desc': {
-          const sA = getCraftStats(a, a.ingredients);
-          const sB = getCraftStats(b, b.ingredients);
-          return (sB.estimatedMonthlyProfit || 0) - (sA.estimatedMonthlyProfit || 0);
+        case 'volume-desc': {
+          const vA = hdvPrices[a._id]?.monthlySalesVolume ?? 0;
+          const vB = hdvPrices[b._id]?.monthlySalesVolume ?? 0;
+          return vB - vA;
         }
-        case 'profit-m-asc': {
-          const sA = getCraftStats(a, a.ingredients);
-          const sB = getCraftStats(b, b.ingredients);
-          return (sA.estimatedMonthlyProfit || 0) - (sB.estimatedMonthlyProfit || 0);
+        case 'volume-asc': {
+          const vA = hdvPrices[a._id]?.monthlySalesVolume ?? 0;
+          const vB = hdvPrices[b._id]?.monthlySalesVolume ?? 0;
+          return vA - vB;
         }
         default: return 0;
       }
@@ -186,7 +209,6 @@ export default function CraftProfitability() {
     const benefit = sellPrice - totalCost;
     const roi = totalCost > 0 ? Math.round((benefit / totalCost) * 100) : 0;
     const monthlySalesVolume = hdvPrices[item._id]?.monthlySalesVolume ?? 0;
-    const estimatedMonthlyProfit = monthlySalesVolume * benefit;
 
     return {
       enriched,
@@ -197,7 +219,6 @@ export default function CraftProfitability() {
       benefit: isNaN(benefit) ? 0 : benefit,
       roi: isNaN(roi) ? 0 : roi,
       monthlySalesVolume,
-      estimatedMonthlyProfit: isNaN(estimatedMonthlyProfit) ? 0 : estimatedMonthlyProfit,
     };
   }
 
@@ -262,8 +283,8 @@ export default function CraftProfitability() {
                 onChange={e => setSortBy(e.target.value as typeof sortBy)}
                 className="flex-1 bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-dofus-accent/40 appearance-none cursor-pointer"
               >
-                <option value="profit-m-desc">Bénéfice/mois ↓</option>
-                <option value="profit-m-asc">Bénéfice/mois ↑</option>
+                <option value="volume-desc">Ventes/mois ↓</option>
+                <option value="volume-asc">Ventes/mois ↑</option>
                 <option value="level-asc">Niveau ↑</option>
                 <option value="level-desc">Niveau ↓</option>
                 <option value="name-asc">Nom A-Z</option>
@@ -333,12 +354,8 @@ export default function CraftProfitability() {
                                 {itemStats.benefit >= 0 ? '+' : ''}{Math.round(itemStats.benefit).toLocaleString()} K
                               </span>
                               {(itemStats.monthlySalesVolume || 0) > 0 && (
-                                <span className={`text-[9px] font-semibold ${
-                                  (itemStats.estimatedMonthlyProfit || 0) >= 0
-                                    ? 'text-emerald-400/70'
-                                    : 'text-rose-400/70'
-                                }`}>
-                                  ~{Math.round(itemStats.estimatedMonthlyProfit || 0).toLocaleString()} K/mois
+                                <span className="text-[9px] font-semibold text-slate-500">
+                                  {itemStats.monthlySalesVolume} v/m
                                 </span>
                               )}
                             </div>
@@ -438,12 +455,15 @@ export default function CraftProfitability() {
                     </span>
                   </div>
                   <div>
-                    <h3
-                      className="text-xl font-bold text-white leading-tight cursor-pointer hover:text-amber-400 transition-colors"
-                      onClick={() => navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl }, selectedItem._id, activeJob)}
-                    >
-                      {selectedItem.name}
-                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3
+                        className="text-xl font-bold text-white leading-tight cursor-pointer hover:text-amber-400 transition-colors"
+                        onClick={() => navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl }, selectedItem._id, activeJob)}
+                      >
+                        {selectedItem.name}
+                      </h3>
+                      <CopyButton text={selectedItem.name} />
+                    </div>
                     <p className="text-xs text-slate-400 mt-1 capitalize font-medium">
                       {selectedItem.type} &bull; Métier {activeJob}
                     </p>
@@ -494,7 +514,10 @@ export default function CraftProfitability() {
                         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateToHdvItem({ _id: ing.id, name: ing.name, type: ing.type, level: ing.level, imgUrl: ing.imgUrl }, selectedItemId ?? undefined, activeJob)}>
                           <ItemImage item={ing} className="h-10 w-10 bg-[#151f32]/80 rounded-lg p-1 border border-white/10 shrink-0" />
                           <div>
-                            <p className="text-sm font-semibold text-white leading-tight hover:text-amber-400 transition-colors">{ing.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold text-white leading-tight hover:text-amber-400 transition-colors">{ing.name}</p>
+                              <CopyButton text={ing.name} />
+                            </div>
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               Quantité : <span className="text-dofus-accent font-bold">x{ing.quantity}</span>
                               {ing.type && <span className="ml-2 opacity-60 capitalize">{ing.type}</span>}
@@ -666,15 +689,6 @@ export default function CraftProfitability() {
                     </div>
                   )}
 
-                  {/* Bénéfice mensuel estimé */}
-                  {!stats.hasMissingPrices && !stats.isSellPriceMissing && (stats.monthlySalesVolume || 0) > 0 && (
-                    <div className="flex justify-between items-center text-xs font-bold border-t border-white/5 pt-2.5">
-                      <span>Bénéfice estimé / mois :</span>
-                      <span className={`text-sm ${(stats.estimatedMonthlyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {(stats.estimatedMonthlyProfit || 0) >= 0 ? '+' : ''}{Math.round(stats.estimatedMonthlyProfit || 0).toLocaleString()} K
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
