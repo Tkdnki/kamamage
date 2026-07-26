@@ -23,6 +23,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   updatePseudo: (pseudo: string) => Promise<{ error?: string }>;
+  refreshUserStats: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const refreshUserStats = async () => {
+    if (!user) return;
+    const stats = await fetchUserStats(user.id);
+    if (stats) setComputedScore(stats.pricesCount * 10 + stats.votesCount * 2);
+  };
 
   async function fetchProfile(userId: string) {
     const { data } = await supabase
@@ -97,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, user, profile, computedScore, loading, needsPseudo,
-      signInWithDiscord, signInWithGoogle, signOut, updatePseudo,
+      signInWithDiscord, signInWithGoogle, signOut, updatePseudo, refreshUserStats,
     }}>
       {children}
     </AuthContext.Provider>

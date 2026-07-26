@@ -8,7 +8,7 @@ interface VoteControlsProps {
 }
 
 export default function VoteControls({ itemKey, author }: VoteControlsProps) {
-  const { user, signInWithDiscord } = useAuth();
+  const { user, profile, signInWithDiscord } = useAuth();
   const { votes, toggleVote } = useDofus();
 
   const voteData = votes[itemKey];
@@ -17,6 +17,15 @@ export default function VoteControls({ itemKey, author }: VoteControlsProps) {
   const myVote = voteData?.myVote ?? null;
   const score = upCount - downCount;
   const needsAlert = score <= -3;
+
+  // Ne pas pouvoir voter sur ses propres prix
+  if (user && author && profile?.pseudo && author === profile.pseudo) {
+    return (
+      <span className="text-[9px] text-slate-600 italic" title="Vous ne pouvez pas voter sur vos propres prix">
+        Vote non autorisé
+      </span>
+    );
+  }
 
   if (!user) {
     return (

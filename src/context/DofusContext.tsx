@@ -123,6 +123,14 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [selectedServer]);
 
+  const { user, refreshUserStats } = useAuth();
+
+  const statsRefreshTimer = useRef<ReturnType<typeof setTimeout>>();
+  const debouncedRefreshStats = useCallback(() => {
+    if (statsRefreshTimer.current) clearTimeout(statsRefreshTimer.current);
+    statsRefreshTimer.current = setTimeout(() => refreshUserStats(), 2000);
+  }, [refreshUserStats]);
+
   // Sauvegarde : push immédiat à Supabase + update local
   const pendingPush = useRef<Record<string, PriceData>>({});
   const pushTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -131,10 +139,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingPush.current = {};
     if (Object.keys(data).length > 0) {
       pushHdvPricesToServer(selectedServer, data);
+      debouncedRefreshStats();
     }
-  }, [selectedServer]);
-
-  const { user } = useAuth();
+  }, [selectedServer, debouncedRefreshStats]);
 
   const toggleVote = useCallback((itemKey: string, vote: 'up' | 'down') => {
     setVotes(prev => {
@@ -158,7 +165,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: vote } };
     });
     toggleConsolidatedVote(itemKey, selectedServer, vote);
-  }, [selectedServer]);
+    debouncedRefreshStats();
+  }, [selectedServer, debouncedRefreshStats]);
 
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
     if (!user) return;
@@ -188,8 +196,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingVolumePush.current = {};
     if (Object.keys(data).length > 0) {
       pushMonthlySalesVolumeToServer(selectedServer, data);
+      debouncedRefreshStats();
     }
-  }, [selectedServer]);
+  }, [selectedServer, debouncedRefreshStats]);
 
   const setMonthlySalesVolume = useCallback((itemId: string, volume: number) => {
     if (!user) return;
@@ -214,6 +223,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       flushPending();
       if (volumePushTimer.current) clearTimeout(volumePushTimer.current);
       flushVolumePending();
+      if (statsRefreshTimer.current) clearTimeout(statsRefreshTimer.current);
     };
   }, [flushPending, flushVolumePending]);
 
