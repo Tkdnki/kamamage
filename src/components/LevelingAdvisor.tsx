@@ -9,11 +9,12 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   Loader2, TrendingUp, TrendingDown, AlertTriangle, Search,
-  GraduationCap, Info, Copy, Check
+  GraduationCap, Info, Copy, Check, ChevronDown
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
-import { getCalculatedXp } from '../lib/leveling/xp';
+import { getCalculatedXp, calculateCraftsToTarget, JOB_XP_LEVELS } from '../lib/leveling/xp';
+import type { LevelGoalResult } from '../lib/leveling/xp';
 import { getOptimalCost } from '../lib/pricing';
 
 const JOB_ICONS: { [key: string]: ComponentType<any> } = {
@@ -64,6 +65,14 @@ export default function LevelingAdvisor() {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [targetLevel, setTargetLevel] = useState<number>(2);
+  const [currentXp, setCurrentXp] = useState(0);
+
+  // Réinitialiser XP et ajuster la cible quand le niveau change
+  useEffect(() => {
+    setCurrentXp(0);
+    setTargetLevel(prev => Math.max(prev, jobLevel + 1));
+  }, [jobLevel]);
 
 
   useEffect(() => {
@@ -176,6 +185,19 @@ export default function LevelingAdvisor() {
 
   const selectedItem = selectedRow?.item ?? null;
 
+  const planning = useMemo<LevelGoalResult | null>(() => {
+    if (!selectedRow || isCostUnknown(selectedRow) || selectedRow.craftCost <= 0) return null;
+    return calculateCraftsToTarget(
+      selectedRow.item.level,
+      jobLevel,
+      Math.max(jobLevel + 1, Math.min(200, targetLevel)),
+      currentXp,
+      activeJob,
+      selectedRow.item.name,
+      selectedRow.craftCost,
+    );
+  }, [selectedRow, jobLevel, targetLevel, currentXp, activeJob]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
 
@@ -218,25 +240,64 @@ export default function LevelingAdvisor() {
 
         <div className="glass-panel rounded-xl p-4">
           <label className="text-[11px] uppercase tracking-widest text-slate-300 font-bold mb-2 block">
-            Niveau du métier
+            Niveaux
           </label>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
+            {/* Niveau actuel */}
             <div className="flex items-center gap-3">
+              <span className="text-[10px] text-slate-400 w-[52px] shrink-0">Actuel</span>
               <input
                 type="number"
                 min={1}
                 max={200}
                 value={jobLevel}
                 onChange={e => setJobLevel(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
-                className="w-24 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 text-center"
+                className="w-20 bg-slate-950/50 border border-slate-700/50 rounded-lg px-2 py-1.5 text-sm text-white font-bold focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 text-center"
               />
               <span className="text-xs text-slate-400">/ 200</span>
             </div>
-            {/* Progress bar */}
-            <div className="w-full h-1.5 bg-slate-800/40 rounded-full overflow-hidden">
+            <div className="w-full h-1 bg-slate-800/40 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 transition-all duration-300"
                 style={{ width: `${Math.round((jobLevel / 200) * 100)}%` }}
+              />
+            </div>
+            {/* XP actuelle */}
+            {(() => {
+              const currentLevelMaxXp = Math.max(0, (JOB_XP_LEVELS[jobLevel + 1] ?? 0) - (JOB_XP_LEVELS[jobLevel] ?? 0));
+              return (
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-slate-500 w-[52px] shrink-0">XP</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={currentLevelMaxXp}
+                    value={currentXp}
+                    onChange={e => setCurrentXp(Math.max(0, Math.min(currentLevelMaxXp, Number(e.target.value) || 0)))}
+                    className="w-20 bg-slate-950/50 border border-slate-700/50 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="0"
+                  />
+                  <span className="text-[10px] text-slate-500">/ {currentLevelMaxXp.toLocaleString()} XP</span>
+                </div>
+              );
+            })()}
+            {/* Niveau cible */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-slate-400 w-[52px] shrink-0">Objectif</span>
+              <input
+                type="number"
+                min={jobLevel + 1}
+                max={200}
+                value={targetLevel}
+                onChange={e => setTargetLevel(Math.max(jobLevel + 1, Math.min(200, Number(e.target.value) || jobLevel + 1)))}
+                className="w-20 bg-slate-950/50 border border-slate-700/50 rounded-lg px-2 py-1.5 text-sm text-white font-bold focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 text-center"
+              />
+              <span className="text-xs text-slate-400">/ 200</span>
+            </div>
+            <div className="w-full h-1 bg-slate-800/40 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-500 transition-all duration-300"
+                style={{ width: `${Math.round((targetLevel / 200) * 100)}%` }}
               />
             </div>
           </div>
@@ -533,8 +594,44 @@ export default function LevelingAdvisor() {
                   );
                 })()}
 
+                {/* Planification objectif de niveau */}
+                {planning && (
+                  <div className="p-4 rounded-xl border border-cyan-500/25 bg-cyan-500/[0.03]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <GraduationCap className="h-4 w-4 text-cyan-400" />
+                      <span className="text-[11px] uppercase tracking-widest text-cyan-300 font-bold">
+                        Objectif Niveau {targetLevel}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="bg-slate-900/40 rounded-lg p-3 text-center">
+                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Crafts nécessaires</p>
+                        <p className="text-xl font-extrabold text-cyan-400">{planning.totalCrafts.toLocaleString()}</p>
+                      </div>
+                      <div className="bg-slate-900/40 rounded-lg p-3 text-center">
+                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Coût total estimé</p>
+                        <p className="text-xl font-extrabold text-cyan-400">{Math.round(planning.totalCost).toLocaleString()} K</p>
+                      </div>
+                    </div>
+                    <details className="group">
+                      <summary className="text-[10px] text-slate-500 cursor-pointer hover:text-slate-300 transition-colors list-none flex items-center gap-1 [&::-webkit-details-marker]:hidden">
+                        <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
+                        Détail par niveau
+                      </summary>
+                      <div className="mt-2 space-y-1 max-h-[200px] overflow-y-auto">
+                        {planning.xpPerLevel.map(d => (
+                          <div key={d.level} className="flex items-center justify-between text-[10px] text-slate-400 bg-slate-900/30 rounded px-2 py-1">
+                            <span className="font-mono text-slate-300">Niv. {d.level}</span>
+                            <span className="text-slate-500">{d.xpNeeded.toLocaleString()} XP</span>
+                            <span className="text-cyan-400">× {d.crafts} craft{d.crafts > 1 ? 's' : ''}</span>
+                            <span className="font-mono text-slate-300">{Math.round(d.subtotalCost).toLocaleString()} K</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )}
 
-  
                 {/* Ingredients */}
                 <div>
                   <label className="text-[11px] uppercase tracking-widest text-slate-300 font-bold mb-2 block">
