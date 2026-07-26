@@ -84,7 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('profiles')
       .update({ pseudo: pseudo.trim() })
       .eq('id', user.id);
-    if (error) return { error: error.message };
+    if (error) {
+      const msg = error.message;
+      if (msg.includes('duplicate key') || msg.includes('unique')) {
+        return { error: 'Ce pseudo est déjà pris.' };
+      }
+      return { error: msg };
+    }
     setProfile(prev => prev ? { ...prev, pseudo: pseudo.trim() } : prev);
     setNeedsPseudo(false);
     return {};

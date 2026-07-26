@@ -1,19 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, CheckCircle, User } from 'lucide-react';
+import { AlertCircle, User, Loader2 } from 'lucide-react';
 
 export default function PseudoSetupModal() {
-  const { needsPseudo, updatePseudo } = useAuth();
+  const { user, needsPseudo, updatePseudo } = useAuth();
   const [pseudo, setPseudo] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (needsPseudo && user?.email && !pseudo) {
+      const suggested = user.email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 20);
+      if (suggested.length >= 3) setPseudo(suggested);
+    }
+  }, [needsPseudo, user?.email]);
+
+  // Bloquer la touche Escape (modal obligatoire)
+  useEffect(() => {
+    if (!needsPseudo) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') e.preventDefault();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [needsPseudo]);
 
   if (!needsPseudo) return null;
 
   const validate = (value: string): string | null => {
     if (!value.trim()) return 'Le pseudo ne peut pas être vide.';
     if (value.trim().length < 3) return 'Le pseudo doit contenir au moins 3 caractères.';
-    if (value.includes('@')) return 'Les adresses e-mail ne sont pas autorisées comme pseudo. Choisissez un pseudo public.';
+    if (value.includes('@')) return 'Les adresses e-mail ne sont pas autorisées comme pseudo.';
     return null;
   };
 
@@ -24,7 +41,11 @@ export default function PseudoSetupModal() {
     setSaving(true);
     setError(null);
     const result = await updatePseudo(pseudo);
-    if (result.error) setError(result.error);
+    if (result.error) {
+      setError(result.error.includes('duplicate key') || result.error.includes('unique')
+        ? 'Ce pseudo est déjà pris. Veuillez en choisir un autre.'
+        : result.error);
+    }
     setSaving(false);
   };
 
@@ -36,7 +57,7 @@ export default function PseudoSetupModal() {
             <User className="h-5 w-5 text-purple-400" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Configuration obligatoire</h2>
+            <h2 className="text-base font-bold text-white">Bienvenue !</h2>
             <p className="text-[11px] text-slate-400">Choisissez un pseudo public</p>
           </div>
         </div>
@@ -61,8 +82,7 @@ export default function PseudoSetupModal() {
 
           <p className="text-[10px] text-slate-500 leading-relaxed">
             Ce pseudo sera affiché publiquement à côté de vos modifications de prix
-            (ex: "Modifié par Pseudo"). Les adresses e-mail ne sont pas autorisées
-            pour protéger votre confidentialité.
+            (ex: "Modifié par Pseudo"). Les adresses e-mail ne sont pas autorisées.
           </p>
 
           <button
@@ -70,6 +90,7 @@ export default function PseudoSetupModal() {
             disabled={saving}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-4 py-2.5 rounded-lg transition-all"
           >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {saving ? 'Enregistrement...' : 'Confirmer le pseudo'}
           </button>
         </form>
