@@ -102,7 +102,7 @@ async function deletePrice(server: string, category: string, itemKey: string, lo
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, author_id, profiles!author_id(pseudo)')
+    .select('item_key, price, lot, author_id, updated_at, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -114,13 +114,14 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null };
+    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null, updatedAt: null };
     if (row.lot === 'x1') prices[id].x1 = row.price;
     else if (row.lot === 'x10') prices[id].x10 = row.price;
     else if (row.lot === 'x100') prices[id].x100 = row.price;
     else if (row.lot === 'x1000') prices[id].x1000 = row.price;
     if ((row as any).profiles?.pseudo) prices[id].author = (row as any).profiles.pseudo;
     if (row.author_id) prices[id].authorId = row.author_id;
+    if (row.updated_at) prices[id].updatedAt = row.updated_at;
   }
 
   for (const id of Object.keys(prices)) {
@@ -168,105 +169,23 @@ export async function fetchMonthlySalesVolumeFromServer(server: string): Promise
   return volumes;
 }
 
-// ─── Votes sur prix consolidés ───────────────────────────────
-
-export type VoteCounts = Record<string, { up: number; down: number; myVote?: 'up' | 'down' | null }>;
-
-export async function fetchVoteCounts(server: string): Promise<VoteCounts> {
-  const { data, error } = await supabase.rpc('get_consolidated_vote_counts', {
-    p_server_name: server,
-  });
-  if (error) { console.warn('[Sync] fetchVoteCounts error:', error.message); return {}; }
-  const result: VoteCounts = {};
-  for (const row of data ?? []) {
-    result[row.item_key] = {
-      up: Number(row.up_count),
-      down: Number(row.down_count),
-      myVote: row.my_vote as 'up' | 'down' | null ?? null,
-    };
-  }
-  return result;
-}
-
-export async function toggleConsolidatedVote(itemKey: string, server: string, vote: 'up' | 'down'): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const userId = session?.user?.id;
-  if (!userId) {
-    console.error('[Sync] Cannot vote: no authenticated session');
-    throw new Error('No authenticated session');
-  }
-
-  // Lire le vote existant via REST (les RLS gèrent auth.uid() correctement)
-  const { data: existing, error: readErr } = await supabase
-    .from('price_consolidated_votes')
-    .select('vote')
-    .eq('item_id', itemKey)
-    .eq('server_name', server)
-    .maybeSingle();
-
-  if (readErr) {
-    console.error('[Sync] toggleConsolidatedVote read error', {
-      code: readErr.code, message: readErr.message, details: readErr.details, hint: readErr.hint,
-    });
-    throw readErr;
-  }
-
-  if (!existing) {
-    const { error: insErr } = await supabase
-      .from('price_consolidated_votes')
-      .insert({ item_id: itemKey, server_name: server, user_id: userId, vote });
-    if (insErr) {
-      console.error('[Sync] toggleConsolidatedVote insert error', {
-        params: { itemKey, server, vote, userId },
-        code: insErr.code, message: insErr.message, details: insErr.details, hint: insErr.hint,
-      });
-      throw insErr;
-    }
-  } else if (existing.vote === vote) {
-    const { error: delErr } = await supabase
-      .from('price_consolidated_votes')
-      .delete()
-      .eq('item_id', itemKey)
-      .eq('server_name', server);
-    if (delErr) {
-      console.error('[Sync] toggleConsolidatedVote delete error', {
-        code: delErr.code, message: delErr.message, details: delErr.details, hint: delErr.hint,
-      });
-      throw delErr;
-    }
-  } else {
-    const { error: updErr } = await supabase
-      .from('price_consolidated_votes')
-      .update({ vote })
-      .eq('item_id', itemKey)
-      .eq('server_name', server);
-    if (updErr) {
-      console.error('[Sync] toggleConsolidatedVote update error', {
-        code: updErr.code, message: updErr.message, details: updErr.details, hint: updErr.hint,
-      });
-      throw updErr;
-    }
-  }
-}
-
 // ─── Statistiques utilisateur ────────────────────────────────
 
 export interface UserStats {
   pricesCount: number;
-  votesCount: number;
 }
 
 export async function fetchUserStats(userId: string): Promise<UserStats | null> {
   const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId });
   if (error) { console.warn('[Sync] fetchUserStats error:', error.message); return null; }
-  if (!data || data.length === 0) return { pricesCount: 0, votesCount: 0 };
-  return { pricesCount: Number(data[0].prices_count), votesCount: Number(data[0].votes_count) };
+  if (!data || data.length === 0) return { pricesCount: 0 };
+  return { pricesCount: Number(data[0].prices_count) };
 }
 
-export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null; authorId: string | null }>> {
+export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null; authorId: string | null; updatedAt: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')
-    .select('item_key, price, lot, author_id, profiles!author_id(pseudo)')
+    .select('item_key, price, lot, author_id, updated_at, profiles!author_id(pseudo)')
     .eq('server_name', server)
     .eq('category', 'hdv');
 
@@ -278,13 +197,14 @@ export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<s
   const result: Record<string, any> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!result[id]) result[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null };
+    if (!result[id]) result[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null, updatedAt: null };
     if (row.lot === 'x1') result[id].x1 = row.price;
     else if (row.lot === 'x10') result[id].x10 = row.price;
     else if (row.lot === 'x100') result[id].x100 = row.price;
     else if (row.lot === 'x1000') result[id].x1000 = row.price;
     if ((row as any).profiles?.pseudo) result[id].author = (row as any).profiles.pseudo;
     if (row.author_id) result[id].authorId = row.author_id;
+    if (row.updated_at) result[id].updatedAt = row.updated_at;
   }
 
   for (const id of Object.keys(result)) {

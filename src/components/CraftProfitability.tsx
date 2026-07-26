@@ -3,7 +3,7 @@ import type { ComponentType } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
-import VoteControls from './VoteControls';
+
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
@@ -615,10 +615,10 @@ export default function CraftProfitability() {
                             <Check className="h-3.5 w-3.5 text-emerald-400" />
                           </button>
                         </div>
-                        {hdvPrices[ing.id]?.author && (
+                        {(hdvPrices[ing.id]?.author || hdvPrices[ing.id]?.updatedAt) && (
                           <div className="flex items-center justify-end gap-2 mt-1.5">
-                            <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[ing.id].author}</p>
-                            <VoteControls itemKey={ing.id} authorId={hdvPrices[ing.id].authorId} />
+                            {hdvPrices[ing.id]?.author && <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[ing.id].author}</p>}
+                            {hdvPrices[ing.id]?.updatedAt && <p className="text-[9px] text-slate-600">{new Date(hdvPrices[ing.id].updatedAt!).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>}
                           </div>
                         )}
                       </div>
@@ -677,10 +677,10 @@ export default function CraftProfitability() {
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
                       </button>
                     </div>
-                    {hdvPrices[selectedItem._id]?.author && (
+                    {(hdvPrices[selectedItem._id]?.author || hdvPrices[selectedItem._id]?.updatedAt) && (
                       <div className="flex items-center gap-2 mt-1.5">
-                        <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[selectedItem._id].author}</p>
-                        <VoteControls itemKey={selectedItem._id} authorId={hdvPrices[selectedItem._id].authorId} />
+                        {hdvPrices[selectedItem._id]?.author && <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[selectedItem._id].author}</p>}
+                        {hdvPrices[selectedItem._id]?.updatedAt && <p className="text-[9px] text-slate-600">{new Date(hdvPrices[selectedItem._id].updatedAt!).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>}
                       </div>
                     )}
                   </div>

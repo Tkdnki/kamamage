@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { fetchUserStats } from '../lib/sync';
 
 interface Profile {
   id: string;
@@ -16,7 +15,6 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
-  computedScore: number;
   loading: boolean;
   needsPseudo: boolean;
   signInWithDiscord: () => Promise<void>;
@@ -25,7 +23,6 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   updatePseudo: (pseudo: string) => Promise<{ error?: string }>;
-  refreshUserStats: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [computedScore, setComputedScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const [needsPseudo, setNeedsPseudo] = useState(false);
 
@@ -56,12 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const refreshUserStats = async () => {
-    if (!user) return;
-    const stats = await fetchUserStats(user.id);
-    if (stats) setComputedScore(stats.pricesCount * 10 + stats.votesCount * 2);
-  };
-
   async function fetchProfile(userId: string) {
     const { data } = await supabase
       .from('profiles')
@@ -72,9 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data);
       setNeedsPseudo(!data.pseudo || data.pseudo === user?.email || data.pseudo.includes('@'));
     }
-    fetchUserStats(userId).then(stats => {
-      if (stats) setComputedScore(stats.pricesCount * 10 + stats.votesCount * 2);
-    });
   }
 
   const updatePseudo = async (pseudo: string): Promise<{ error?: string }> => {
@@ -128,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, profile, computedScore, loading, needsPseudo,
-      signInWithDiscord, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updatePseudo, refreshUserStats,
+      session, user, profile, loading, needsPseudo,
+      signInWithDiscord, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, updatePseudo,
     }}>
       {children}
     </AuthContext.Provider>

@@ -9,7 +9,6 @@ import { fetchHdvPricesWithAuthor } from '../lib/sync';
 import type { DofusItem } from '../data/mockData';
 import { Search, Plus, Trash2, X, Coins, TrendingDown, Sparkles, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import ItemImage from './ItemImage';
-import VoteControls from './VoteControls';
 
 export default function HdvPrices() {
   const { user } = useAuth();
@@ -308,10 +307,10 @@ export default function HdvPrices() {
                 />
               </div>
             </div>
-            {displayAuthor && (
+            {(displayAuthor || activePrices?.updatedAt) && (
               <div className="flex items-center gap-2 mb-3">
-                <p className="text-[9px] text-slate-600">Modifié par {displayAuthor}</p>
-                {activeHdvItem && <VoteControls itemKey={activeHdvItem._id} authorId={activePrices.authorId} />}
+                {displayAuthor && <p className="text-[9px] text-slate-600">Modifié par {displayAuthor}</p>}
+                {activePrices?.updatedAt && <p className="text-[9px] text-slate-600">{new Date(activePrices.updatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>}
               </div>
             )}
 

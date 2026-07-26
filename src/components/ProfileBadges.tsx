@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { fetchUserStats } from '../lib/sync';
 import type { UserStats } from '../lib/sync';
-import { Lock, CheckCircle, Sprout, Search, Package, Gem, Crown, TrendingUp, ThumbsUp } from 'lucide-react';
+import { Lock, CheckCircle, Sprout, Package, Crown, TrendingUp } from 'lucide-react';
 
 const BADGES = [
   {
@@ -15,15 +15,6 @@ const BADGES = [
     max: 1,
   },
   {
-    id: 'inquisitor',
-    icon: Search,
-    title: 'Inquisiteur HDV',
-    description: 'Avoir évalué au moins 10 prix',
-    condition: (s: UserStats) => s.votesCount >= 10,
-    progress: (s: UserStats) => Math.min(s.votesCount, 10),
-    max: 10,
-  },
-  {
     id: 'regular',
     icon: Package,
     title: 'Négociant Régulier',
@@ -31,15 +22,6 @@ const BADGES = [
     condition: (s: UserStats) => s.pricesCount >= 25,
     progress: (s: UserStats) => Math.min(s.pricesCount, 25),
     max: 25,
-  },
-  {
-    id: 'mage',
-    icon: Gem,
-    title: "Mage de l'Économie",
-    description: 'Atteindre un score de 250 points',
-    condition: (s: UserStats) => (s.pricesCount * 10 + s.votesCount * 2) >= 250,
-    progress: (s: UserStats) => Math.min(s.pricesCount * 10 + s.votesCount * 2, 250),
-    max: 250,
   },
   {
     id: 'legend',
@@ -53,7 +35,7 @@ const BADGES = [
 ];
 
 export default function ProfileBadges() {
-  const { user, computedScore } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,10 +43,10 @@ export default function ProfileBadges() {
     if (!user) { setLoading(false); return; }
     setLoading(true);
     fetchUserStats(user.id).then(data => {
-      setStats(data ?? { pricesCount: 0, votesCount: 0 });
+      setStats(data ?? { pricesCount: 0 });
       setLoading(false);
     });
-  }, [user, computedScore]);
+  }, [user]);
 
   if (loading) {
     return (
@@ -76,8 +58,6 @@ export default function ProfileBadges() {
 
   if (!stats) return null;
 
-  const score = stats.pricesCount * 10 + stats.votesCount * 2;
-
   return (
     <div className="space-y-6">
       {/* Statistiques */}
@@ -86,27 +66,13 @@ export default function ProfileBadges() {
           <TrendingUp className="h-4 w-4 text-purple-400" />
           Statistiques de Contribution
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="bg-[#0c101d]/60 border border-white/5 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-1">
               <Package className="h-4 w-4 text-amber-400" />
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prix renseignés</span>
             </div>
             <p className="text-2xl font-extrabold text-white">{stats.pricesCount}</p>
-          </div>
-          <div className="bg-[#0c101d]/60 border border-white/5 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ThumbsUp className="h-4 w-4 text-emerald-400" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Évaluations données</span>
-            </div>
-            <p className="text-2xl font-extrabold text-white">{stats.votesCount}</p>
-          </div>
-          <div className="bg-[#0c101d]/60 border border-white/5 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Gem className="h-4 w-4 text-purple-400" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Score total</span>
-            </div>
-            <p className="text-2xl font-extrabold text-purple-400">{score}</p>
           </div>
         </div>
       </div>

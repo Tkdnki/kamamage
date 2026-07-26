@@ -308,70 +308,18 @@ DROP POLICY IF EXISTS "kama_hdv_no_update" ON kama_hdv_prices;
 CREATE POLICY "kama_hdv_no_update" ON kama_hdv_prices FOR UPDATE USING (false);
 
 -- ============================================================
--- VOTES SUR PRIX CONSOLIDÉS (upvote/downvote par item)
--- ============================================================
-CREATE TABLE IF NOT EXISTS price_consolidated_votes (
-  item_id     TEXT NOT NULL,
-  server_name TEXT NOT NULL,
-  user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  vote        TEXT NOT NULL CHECK (vote IN ('up', 'down')),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (item_id, server_name, user_id)
-);
-
-ALTER TABLE price_consolidated_votes ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "votes_consolidated_select_public" ON price_consolidated_votes
-  FOR SELECT USING (true);
-
-CREATE POLICY "votes_consolidated_insert_own" ON price_consolidated_votes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "votes_consolidated_update_own" ON price_consolidated_votes
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "votes_consolidated_delete_own" ON price_consolidated_votes
-  FOR DELETE USING (auth.uid() = user_id);
-
--- RPC: vote ou toggle (si même type => supprime, sinon upsert)
--- NOTÉ : le toggle se fait côté frontend via REST + RLS.
--- Cette RPC reste disponible comme alternative mais n'est plus appelée par le client.
-
--- RPC: obtenir les comptes de votes pour un serveur (avec mon vote)
-CREATE OR REPLACE FUNCTION get_consolidated_vote_counts(p_server_name TEXT)
-RETURNS TABLE(item_key TEXT, up_count BIGINT, down_count BIGINT, my_vote TEXT)
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = ''
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    pcv.item_id AS item_key,
-    COUNT(*) FILTER (WHERE pcv.vote = 'up')::BIGINT AS up_count,
-    COUNT(*) FILTER (WHERE pcv.vote = 'down')::BIGINT AS down_count,
-    (SELECT pcv2.vote FROM public.price_consolidated_votes pcv2
-     WHERE pcv2.item_id = pcv.item_id AND pcv2.server_name = pcv.server_name AND pcv2.user_id = auth.uid()
-     LIMIT 1) AS my_vote
-  FROM public.price_consolidated_votes pcv
-  WHERE pcv.server_name = p_server_name
-  GROUP BY pcv.item_id;
-END;
-$$;
-
--- ============================================================
 -- STATISTIQUES UTILISATEUR (pour page profil)
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION get_user_stats(p_user_id UUID)
-RETURNS TABLE(prices_count BIGINT, votes_count BIGINT)
+RETURNS TABLE(prices_count BIGINT)
 LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    (SELECT COUNT(*)::BIGINT FROM public.consolidated_prices WHERE author_id = p_user_id) AS prices_count,
-    (SELECT COUNT(*)::BIGINT FROM public.price_consolidated_votes WHERE user_id = p_user_id) AS votes_count;
+    (SELECT COUNT(*)::BIGINT FROM public.consolidated_prices WHERE author_id = p_user_id) AS prices_count;
 END;
 $$;
 

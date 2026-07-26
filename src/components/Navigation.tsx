@@ -134,7 +134,7 @@ export default function Navigation() {
 
 function AuthButton() {
   const [showAuthPanel, setShowAuthPanel] = useState(false);
-  const { user, profile, computedScore, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const { setActiveView } = useNavigation();
 
   if (loading) return null;
@@ -163,7 +163,6 @@ function AuthButton() {
       <div className="absolute right-0 top-full mt-1 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
         <div className="bg-[#0c101d] border border-white/10 rounded-lg py-1 shadow-xl">
           <div className="px-3 py-1.5 text-[10px] text-slate-500 border-b border-white/5">
-            Score: <span className="text-purple-400 font-bold">{computedScore}</span>
             {profile?.role === 'admin' && (
               <span className="ml-1.5 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.5 rounded-full">Admin</span>
             )}

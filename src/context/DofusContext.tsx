@@ -1,12 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useMemo, useCallback, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import type { DofusItem } from '../data/mockData';
 import { useServer } from './ServerContext';
 import { useAuth } from './AuthContext';
-import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer, fetchVoteCounts, toggleConsolidatedVote } from '../lib/sync';
-import type { VoteCounts } from '../lib/sync';
+import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer } from '../lib/sync';
 
 export interface PriceData {
   x1: number;
@@ -17,6 +16,7 @@ export interface PriceData {
   author?: string | null;
   authorId?: string | null;
   monthlySalesVolume?: number;
+  updatedAt?: string | null;
 }
 
 export interface HdvPrices {
@@ -29,8 +29,6 @@ interface DofusContextType {
   customItems: DofusItem[];
   setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number) => void;
   setMonthlySalesVolume: (itemId: string, volume: number) => void;
-  votes: VoteCounts;
-  toggleVote: (itemKey: string, vote: 'up' | 'down') => void;
   trackItem: (item: DofusItem) => void;
   untrackItem: (itemId: string) => void;
   getItemById: (itemId: string) => DofusItem | undefined;
@@ -64,9 +62,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   // hdvPrices est un état local, initialisé depuis le cache localStorage
   const [hdvPrices, setHdvPrices] = useState<HdvPrices>(() => loadCache(storageKey));
 
-  // Votes sur les prix consolidés
-  const [votes, setVotes] = useState<VoteCounts>({});
-
   // Persiste dans localStorage à chaque changement
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -82,10 +77,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const loadFromServer = async () => {
-      const [remote, remoteVolumes, remoteVotes] = await Promise.all([
+      const [remote, remoteVolumes] = await Promise.all([
         fetchHdvPricesFromServer(selectedServer),
         fetchMonthlySalesVolumeFromServer(selectedServer),
-        fetchVoteCounts(selectedServer),
       ]);
 
       if (cancelled) return;
@@ -114,33 +108,13 @@ export function DofusProvider({ children }: { children: ReactNode }) {
           return changed ? merged : prev;
         });
       }
-
-      if (remoteVotes && Object.keys(remoteVotes).length > 0) {
-        setVotes(remoteVotes);
-      }
     };
 
     loadFromServer();
     return () => { cancelled = true; };
   }, [selectedServer]);
 
-  const { user, refreshUserStats } = useAuth();
-
-  // Re-fetch les votes une fois l'auth prête (pour obtenir myVote correct)
-  useEffect(() => {
-    if (!user) return;
-    fetchVoteCounts(selectedServer).then(remoteVotes => {
-      if (remoteVotes && Object.keys(remoteVotes).length > 0) {
-        setVotes(remoteVotes);
-      }
-    });
-  }, [user?.id, selectedServer]);
-
-  const statsRefreshTimer = useRef<ReturnType<typeof setTimeout>>();
-  const debouncedRefreshStats = useCallback(() => {
-    if (statsRefreshTimer.current) clearTimeout(statsRefreshTimer.current);
-    statsRefreshTimer.current = setTimeout(() => refreshUserStats(), 2000);
-  }, [refreshUserStats]);
+  const { user } = useAuth();
 
   // Sauvegarde : push immédiat à Supabase + update local
   const pendingPush = useRef<Record<string, PriceData>>({});
@@ -150,37 +124,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingPush.current = {};
     if (Object.keys(data).length > 0) {
       pushHdvPricesToServer(selectedServer, data);
-      debouncedRefreshStats();
     }
-  }, [selectedServer, debouncedRefreshStats]);
-
-  const toggleVote = useCallback((itemKey: string, vote: 'up' | 'down') => {
-    setVotes(prev => {
-      const current = prev[itemKey];
-      const myVote = current?.myVote;
-      let newUp = current?.up ?? 0;
-      let newDown = current?.down ?? 0;
-
-      if (myVote === vote) {
-        if (vote === 'up') newUp--;
-        else newDown--;
-        return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: null } };
-      }
-
-      if (myVote === 'up') newUp--;
-      else if (myVote === 'down') newDown--;
-
-      if (vote === 'up') newUp++;
-      else newDown++;
-
-      return { ...prev, [itemKey]: { up: newUp, down: newDown, myVote: vote } };
-    });
-    toggleConsolidatedVote(itemKey, selectedServer, vote).then(() => {
-      debouncedRefreshStats();
-    }).catch(err => {
-      console.error('[DofusContext] toggleVote failed', err);
-    });
-  }, [selectedServer, debouncedRefreshStats]);
+  }, [selectedServer]);
 
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
     if (!user) return;
@@ -210,9 +155,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingVolumePush.current = {};
     if (Object.keys(data).length > 0) {
       pushMonthlySalesVolumeToServer(selectedServer, data);
-      debouncedRefreshStats();
     }
-  }, [selectedServer, debouncedRefreshStats]);
+  }, [selectedServer]);
 
   const setMonthlySalesVolume = useCallback((itemId: string, volume: number) => {
     if (!user) return;
@@ -237,7 +181,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       flushPending();
       if (volumePushTimer.current) clearTimeout(volumePushTimer.current);
       flushVolumePending();
-      if (statsRefreshTimer.current) clearTimeout(statsRefreshTimer.current);
     };
   }, [flushPending, flushVolumePending]);
 
@@ -276,8 +219,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       customItems,
       setHdvPrice,
       setMonthlySalesVolume,
-      votes,
-      toggleVote,
       trackItem,
       untrackItem,
       getItemById,
