@@ -53,7 +53,7 @@ const BADGES = [
 ];
 
 export default function ProfileBadges() {
-  const { user } = useAuth();
+  const { user, computedScore } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +64,7 @@ export default function ProfileBadges() {
       setStats(data ?? { pricesCount: 0, votesCount: 0 });
       setLoading(false);
     });
-  }, [user]);
+  }, [user, computedScore]);
 
   if (loading) {
     return (
