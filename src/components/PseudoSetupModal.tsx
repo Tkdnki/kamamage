@@ -50,7 +50,7 @@ export default function PseudoSetupModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md" onContextMenu={e => e.preventDefault()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md" onContextMenu={e => e.preventDefault()} onClick={e => e.preventDefault()}>
       <div className="bg-[#0c101d] border border-white/10 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">

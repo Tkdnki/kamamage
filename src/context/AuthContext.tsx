@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
     if (data) {
       setProfile(data);
-      setNeedsPseudo(!data.pseudo || data.pseudo === user?.email);
+      setNeedsPseudo(!data.pseudo || data.pseudo === user?.email || data.pseudo.includes('@'));
     }
     fetchUserStats(userId).then(stats => {
       if (stats) setComputedScore(stats.pricesCount * 10 + stats.votesCount * 2);
