@@ -194,7 +194,16 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
     p_server_name: server,
     p_vote: vote,
   });
-  if (error) console.warn('[Sync] toggleConsolidatedVote error:', error.message);
+  if (error) {
+    console.error('[Sync] toggleConsolidatedVote failed', {
+      params: { itemKey, server, vote },
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw error;
+  }
 }
 
 // ─── Statistiques utilisateur ────────────────────────────────
