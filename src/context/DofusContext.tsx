@@ -4,7 +4,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import type { DofusItem } from '../data/mockData';
 import { useServer } from './ServerContext';
-import { pushHdvPricesToServer, fetchHdvPricesFromServer } from '../lib/sync';
+import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer } from '../lib/sync';
 
 export interface PriceData {
   x1: number;
@@ -13,6 +13,7 @@ export interface PriceData {
   x1000: number;
   unitAverage: number;
   author?: string | null;
+  monthlySalesVolume?: number;
 }
 
 export interface HdvPrices {
@@ -24,6 +25,7 @@ interface DofusContextType {
   trackedItemIds: string[];
   customItems: DofusItem[];
   setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number) => void;
+  setMonthlySalesVolume: (itemId: string, volume: number) => void;
   trackItem: (item: DofusItem) => void;
   untrackItem: (itemId: string) => void;
   getItemById: (itemId: string) => DofusItem | undefined;
@@ -70,17 +72,42 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     serverRef.current = selectedServer;
     let cancelled = false;
-    fetchHdvPricesFromServer(selectedServer).then(remote => {
-      if (cancelled || !remote || Object.keys(remote).length === 0) return;
-      setHdvPrices(prev => {
-        const merged = { ...prev };
-        for (const [key, val] of Object.entries(remote)) {
-          merged[key] = { ...merged[key], ...val, author: val.author ?? merged[key]?.author };
-        }
-        if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
-        return merged;
-      });
-    });
+
+    const loadFromServer = async () => {
+      const [remote, remoteVolumes] = await Promise.all([
+        fetchHdvPricesFromServer(selectedServer),
+        fetchMonthlySalesVolumeFromServer(selectedServer),
+      ]);
+
+      if (cancelled) return;
+
+      if (remote && Object.keys(remote).length > 0) {
+        setHdvPrices(prev => {
+          const merged = { ...prev };
+          for (const [key, val] of Object.entries(remote)) {
+            merged[key] = { ...merged[key], ...val, author: val.author ?? merged[key]?.author };
+          }
+          if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
+          return merged;
+        });
+      }
+
+      if (remoteVolumes && Object.keys(remoteVolumes).length > 0) {
+        setHdvPrices(prev => {
+          let changed = false;
+          const merged = { ...prev };
+          for (const [key, volume] of Object.entries(remoteVolumes)) {
+            if (merged[key]?.monthlySalesVolume !== volume) {
+              changed = true;
+              merged[key] = { ...merged[key], monthlySalesVolume: volume };
+            }
+          }
+          return changed ? merged : prev;
+        });
+      }
+    };
+
+    loadFromServer();
     return () => { cancelled = true; };
   }, [selectedServer]);
 
@@ -114,13 +141,41 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pushTimer.current = setTimeout(flushPending, 1000);
   }, [flushPending]);
 
-  // Ménage du timer au démontage
+  // Volume de ventes mensuel — même pattern debounced
+  const pendingVolumePush = useRef<Record<string, number>>({});
+  const volumePushTimer = useRef<ReturnType<typeof setTimeout>>();
+  const flushVolumePending = useCallback(() => {
+    const data = { ...pendingVolumePush.current };
+    pendingVolumePush.current = {};
+    if (Object.keys(data).length > 0) {
+      pushMonthlySalesVolumeToServer(selectedServer, data);
+    }
+  }, [selectedServer]);
+
+  const setMonthlySalesVolume = useCallback((itemId: string, volume: number) => {
+    setHdvPrices(prev => {
+      const current = prev[itemId];
+      const updated: PriceData = current
+        ? { ...current, monthlySalesVolume: volume }
+        : { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, monthlySalesVolume: volume };
+      return { ...prev, [itemId]: updated };
+    });
+
+    // Push à Supabase (debounced)
+    pendingVolumePush.current[itemId] = volume;
+    if (volumePushTimer.current) clearTimeout(volumePushTimer.current);
+    volumePushTimer.current = setTimeout(flushVolumePending, 1000);
+  }, [flushVolumePending]);
+
+  // Ménage des timers au démontage
   useEffect(() => {
     return () => {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       flushPending();
+      if (volumePushTimer.current) clearTimeout(volumePushTimer.current);
+      flushVolumePending();
     };
-  }, [flushPending]);
+  }, [flushPending, flushVolumePending]);
 
   const trackItem = useCallback((item: DofusItem) => {
     if (!trackedItemIds.includes(item._id)) {
@@ -156,6 +211,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       trackedItemIds,
       customItems,
       setHdvPrice,
+      setMonthlySalesVolume,
       trackItem,
       untrackItem,
       getItemById,

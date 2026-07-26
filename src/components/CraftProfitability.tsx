@@ -26,7 +26,7 @@ const JOB_ICONS: { [key: string]: ComponentType<any> } = {
 
 export default function CraftProfitability() {
   const { user } = useAuth();
-  const { hdvPrices, setHdvPrice, trackItem } = useDofus();
+  const { hdvPrices, setHdvPrice, setMonthlySalesVolume, trackItem } = useDofus();
   const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
@@ -36,8 +36,10 @@ export default function CraftProfitability() {
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc'>('level-asc');
+  const [sortBy, setSortBy] = useState<'level-asc' | 'level-desc' | 'name-asc' | 'name-desc' | 'profit-m-desc' | 'profit-m-asc'>('profit-m-desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [hideLowVolume, setHideLowVolume] = useState(false);
+  const [minSalesVolume, setMinSalesVolume] = useState(5);
 
   const ITEMS_PER_PAGE = 50;
 
@@ -90,17 +92,35 @@ export default function CraftProfitability() {
         case 'level-desc': return b.level - a.level;
         case 'name-asc': return a.name.localeCompare(b.name);
         case 'name-desc': return b.name.localeCompare(a.name);
+        case 'profit-m-desc': {
+          const sA = getCraftStats(a, a.ingredients);
+          const sB = getCraftStats(b, b.ingredients);
+          return (sB.estimatedMonthlyProfit || 0) - (sA.estimatedMonthlyProfit || 0);
+        }
+        case 'profit-m-asc': {
+          const sA = getCraftStats(a, a.ingredients);
+          const sB = getCraftStats(b, b.ingredients);
+          return (sA.estimatedMonthlyProfit || 0) - (sB.estimatedMonthlyProfit || 0);
+        }
         default: return 0;
       }
     });
     return list;
-  }, [craftItems, searchQuery, sortBy]);
+  }, [craftItems, searchQuery, sortBy, hdvPrices]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const filteredVolumeItems = useMemo(() => {
+    if (!hideLowVolume) return filteredItems;
+    return filteredItems.filter(item => {
+      const volume = hdvPrices[item._id]?.monthlySalesVolume ?? 0;
+      return volume >= (minSalesVolume || 0);
+    });
+  }, [filteredItems, hideLowVolume, minSalesVolume, hdvPrices]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredVolumeItems.length / ITEMS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
   const displayedItems = useMemo(
-    () => filteredItems.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
-    [filteredItems, safePage],
+    () => filteredVolumeItems.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
+    [filteredVolumeItems, safePage],
   );
 
   const selectedItem = selectedItemId
@@ -148,7 +168,7 @@ export default function CraftProfitability() {
     setHdvPrice(ingredientId, x1, x10, x100, x1000);
   };
 
-  const getCraftStats = (item: CraftItem, ingredients: NormalizedRecipeIngredient[]) => {
+  function getCraftStats(item: CraftItem, ingredients: NormalizedRecipeIngredient[]) {
     let totalCost = 0;
     let hasMissingPrices = false;
 
@@ -165,9 +185,21 @@ export default function CraftProfitability() {
     const { price: sellPrice, isMissing: isSellPriceMissing } = getBestUnitPrice(item._id);
     const benefit = sellPrice - totalCost;
     const roi = totalCost > 0 ? Math.round((benefit / totalCost) * 100) : 0;
+    const monthlySalesVolume = hdvPrices[item._id]?.monthlySalesVolume ?? 0;
+    const estimatedMonthlyProfit = monthlySalesVolume * benefit;
 
-    return { enriched, totalCost, hasMissingPrices, sellPrice, isSellPriceMissing, benefit, roi };
-  };
+    return {
+      enriched,
+      totalCost,
+      hasMissingPrices,
+      sellPrice,
+      isSellPriceMissing,
+      benefit: isNaN(benefit) ? 0 : benefit,
+      roi: isNaN(roi) ? 0 : roi,
+      monthlySalesVolume,
+      estimatedMonthlyProfit: isNaN(estimatedMonthlyProfit) ? 0 : estimatedMonthlyProfit,
+    };
+  }
 
   const stats = selectedItem ? getCraftStats(selectedItem, activeIngredients) : null;
 
@@ -230,6 +262,8 @@ export default function CraftProfitability() {
                 onChange={e => setSortBy(e.target.value as typeof sortBy)}
                 className="flex-1 bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs text-slate-300 focus:outline-none focus:border-dofus-accent/40 appearance-none cursor-pointer"
               >
+                <option value="profit-m-desc">Bénéfice/mois ↓</option>
+                <option value="profit-m-asc">Bénéfice/mois ↑</option>
                 <option value="level-asc">Niveau ↑</option>
                 <option value="level-desc">Niveau ↓</option>
                 <option value="name-asc">Nom A-Z</option>
@@ -290,13 +324,24 @@ export default function CraftProfitability() {
                               Prix Vente ?
                             </span>
                           ) : (
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              itemStats.benefit >= 0
-                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-                                : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-                            }`}>
-                              {itemStats.benefit >= 0 ? '+' : ''}{Math.round(itemStats.benefit).toLocaleString()} K
-                            </span>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                itemStats.benefit >= 0
+                                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                                  : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                              }`}>
+                                {itemStats.benefit >= 0 ? '+' : ''}{Math.round(itemStats.benefit).toLocaleString()} K
+                              </span>
+                              {(itemStats.monthlySalesVolume || 0) > 0 && (
+                                <span className={`text-[9px] font-semibold ${
+                                  (itemStats.estimatedMonthlyProfit || 0) >= 0
+                                    ? 'text-emerald-400/70'
+                                    : 'text-rose-400/70'
+                                }`}>
+                                  ~{Math.round(itemStats.estimatedMonthlyProfit || 0).toLocaleString()} K/mois
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -312,9 +357,30 @@ export default function CraftProfitability() {
                   );
                 })}
               </div>
+              {/* Volume filter */}
+              <div className="flex items-center gap-3 pt-2 border-t border-white/5 mt-2">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideLowVolume}
+                    onChange={e => setHideLowVolume(e.target.checked)}
+                    className="rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/40 focus:ring-offset-0"
+                  />
+                  <span className="text-[10px] text-slate-400 font-medium">Masquer items &lt;</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={minSalesVolume}
+                  onChange={e => setMinSalesVolume(Math.max(1, Number(e.target.value) || 1))}
+                  disabled={!hideLowVolume}
+                  className="w-14 bg-slate-950/50 border border-slate-700/50 rounded px-1.5 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500/50 disabled:opacity-40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-[10px] text-slate-500">ventes/mois</span>
+              </div>
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-2">
-                  <span className="text-[10px] text-slate-500">{filteredItems.length} objets — page {safePage}/{totalPages}</span>
+                  <span className="text-[10px] text-slate-500">{filteredVolumeItems.length} objets — page {safePage}/{totalPages}</span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -539,6 +605,24 @@ export default function CraftProfitability() {
                       )}
                     </div>
                   </div>
+
+                  {/* Volume de ventes mensuel */}
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ventes / mois</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="number"
+                        min={0}
+                        value={stats.monthlySalesVolume ?? ''}
+                        onChange={e => {
+                          const v = Math.max(0, Number(e.target.value) || 0);
+                          setMonthlySalesVolume(selectedItem._id, v);
+                        }}
+                        className="w-24 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-1.5 text-lg font-extrabold text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs text-slate-400 font-bold">unités</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className={`p-4 rounded-xl border flex flex-col justify-between gap-3 shadow-lg ${
@@ -578,6 +662,16 @@ export default function CraftProfitability() {
                       <span>Rendement (ROI) :</span>
                       <span className={`text-sm ${stats.benefit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {stats.roi > 0 ? '+' : ''}{stats.roi}%
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Bénéfice mensuel estimé */}
+                  {!stats.hasMissingPrices && !stats.isSellPriceMissing && (stats.monthlySalesVolume || 0) > 0 && (
+                    <div className="flex justify-between items-center text-xs font-bold border-t border-white/5 pt-2.5">
+                      <span>Bénéfice estimé / mois :</span>
+                      <span className={`text-sm ${(stats.estimatedMonthlyProfit || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {(stats.estimatedMonthlyProfit || 0) >= 0 ? '+' : ''}{Math.round(stats.estimatedMonthlyProfit || 0).toLocaleString()} K
                       </span>
                     </div>
                   )}

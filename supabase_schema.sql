@@ -306,3 +306,43 @@ DROP POLICY IF EXISTS "kama_hdv_no_write" ON kama_hdv_prices;
 CREATE POLICY "kama_hdv_no_write" ON kama_hdv_prices FOR INSERT WITH CHECK (false);
 DROP POLICY IF EXISTS "kama_hdv_no_update" ON kama_hdv_prices;
 CREATE POLICY "kama_hdv_no_update" ON kama_hdv_prices FOR UPDATE USING (false);
+
+-- ============================================================
+-- VOLUME DE VENTES MENSUEL (partagé par la communauté)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS item_monthly_sales_volume (
+  server_name   TEXT NOT NULL,
+  item_key      TEXT NOT NULL,
+  volume        INTEGER NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (server_name, item_key)
+);
+
+ALTER TABLE item_monthly_sales_volume ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "monthly_volume_select_public" ON item_monthly_sales_volume
+  FOR SELECT USING (true);
+
+-- Écriture uniquement via RPC SECURITY DEFINER
+CREATE POLICY "monthly_volume_no_insert" ON item_monthly_sales_volume
+  FOR INSERT WITH CHECK (false);
+
+CREATE POLICY "monthly_volume_no_update" ON item_monthly_sales_volume
+  FOR UPDATE USING (false);
+
+CREATE OR REPLACE FUNCTION upsert_monthly_sales_volume(
+  p_server_name TEXT,
+  p_item_key    TEXT,
+  p_volume      INTEGER
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO public.item_monthly_sales_volume (server_name, item_key, volume, updated_at)
+  VALUES (p_server_name, p_item_key, p_volume, now())
+  ON CONFLICT (server_name, item_key)
+  DO UPDATE SET volume = p_volume, updated_at = now();
+END;
+$$;

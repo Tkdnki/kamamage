@@ -135,6 +135,38 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   return prices;
 }
 
+// ─── Volume de ventes mensuel ─────────────────────────────────────
+
+export async function pushMonthlySalesVolumeToServer(server: string, data: Record<string, number>): Promise<void> {
+  await Promise.all(
+    Object.entries(data).map(([itemKey, volume]) =>
+      supabase.rpc('upsert_monthly_sales_volume', {
+        p_server_name: server,
+        p_item_key: itemKey,
+        p_volume: volume,
+      })
+    )
+  );
+}
+
+export async function fetchMonthlySalesVolumeFromServer(server: string): Promise<Record<string, number> | null> {
+  const { data, error } = await supabase
+    .from('item_monthly_sales_volume')
+    .select('item_key, volume')
+    .eq('server_name', server);
+
+  if (error) {
+    console.warn('[Sync] fetchMonthlySalesVolume error:', error.message);
+    return null;
+  }
+
+  const volumes: Record<string, number> = {};
+  for (const row of data ?? []) {
+    volumes[row.item_key] = row.volume;
+  }
+  return volumes;
+}
+
 export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<string, { x1: number; x10: number; x100: number; x1000: number; unitAverage: number; author: string | null }>> {
   const { data, error } = await supabase
     .from('consolidated_prices')
