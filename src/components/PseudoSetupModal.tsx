@@ -34,8 +34,10 @@ export default function PseudoSetupModal() {
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent | React.MouseEvent) => {
     e.preventDefault();
+    console.log('[PseudoModal] Tentative de soumission du pseudo:', pseudo);
+    if (!user) { setError('Session non trouvée. Veuillez rafraîchir la page.'); return; }
     const validationError = validate(pseudo);
     if (validationError) { setError(validationError); return; }
     setSaving(true);
@@ -43,11 +45,12 @@ export default function PseudoSetupModal() {
     try {
       const result = await updatePseudo(pseudo);
       if (result.error) {
+        console.log('[PseudoModal] Erreur retournée par updatePseudo:', result.error);
         setError(result.error);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[PseudoModal] submit error:', err);
+      console.error('[PseudoModal] Exception dans handleSubmit:', err);
       setError('Erreur inattendue : ' + msg);
     } finally {
       setSaving(false);
@@ -55,7 +58,7 @@ export default function PseudoSetupModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md" onContextMenu={e => e.preventDefault()} onClick={e => e.preventDefault()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md" onContextMenu={e => e.preventDefault()}>
       <div className="bg-[#0c101d] border border-white/10 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
@@ -81,7 +84,7 @@ export default function PseudoSetupModal() {
           {error && (
             <div className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-lg">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {error}
+              <span>{error}</span>
             </div>
           )}
 
@@ -93,6 +96,7 @@ export default function PseudoSetupModal() {
           <button
             type="submit"
             disabled={saving}
+            onClick={handleSubmit}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 px-4 py-2.5 rounded-lg transition-all"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
