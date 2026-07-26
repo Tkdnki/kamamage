@@ -311,12 +311,12 @@ CREATE POLICY "kama_hdv_no_update" ON kama_hdv_prices FOR UPDATE USING (false);
 -- VOTES SUR PRIX CONSOLIDÉS (upvote/downvote par item)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS price_consolidated_votes (
-  item_key    TEXT NOT NULL,
+  item_id     TEXT NOT NULL,
   server_name TEXT NOT NULL,
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   vote        TEXT NOT NULL CHECK (vote IN ('up', 'down')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (item_key, server_name, user_id)
+  PRIMARY KEY (item_id, server_name, user_id)
 );
 
 ALTER TABLE price_consolidated_votes ENABLE ROW LEVEL SECURITY;
@@ -346,15 +346,15 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    pcv.item_key,
+    pcv.item_id AS item_key,
     COUNT(*) FILTER (WHERE pcv.vote = 'up')::BIGINT AS up_count,
     COUNT(*) FILTER (WHERE pcv.vote = 'down')::BIGINT AS down_count,
     (SELECT pcv2.vote FROM public.price_consolidated_votes pcv2
-     WHERE pcv2.item_key = pcv.item_key AND pcv2.server_name = pcv.server_name AND pcv2.user_id = auth.uid()
+     WHERE pcv2.item_id = pcv.item_id AND pcv2.server_name = pcv.server_name AND pcv2.user_id = auth.uid()
      LIMIT 1) AS my_vote
   FROM public.price_consolidated_votes pcv
   WHERE pcv.server_name = p_server_name
-  GROUP BY pcv.item_key;
+  GROUP BY pcv.item_id;
 END;
 $$;
 

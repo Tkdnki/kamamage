@@ -200,7 +200,7 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
   const { data: existing, error: readErr } = await supabase
     .from('price_consolidated_votes')
     .select('vote')
-    .eq('item_key', itemKey)
+    .eq('item_id', itemKey)
     .eq('server_name', server)
     .maybeSingle();
 
@@ -214,7 +214,7 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
   if (!existing) {
     const { error: insErr } = await supabase
       .from('price_consolidated_votes')
-      .insert({ item_key: itemKey, server_name: server, user_id: userId, vote });
+      .insert({ item_id: itemKey, server_name: server, user_id: userId, vote });
     if (insErr) {
       console.error('[Sync] toggleConsolidatedVote insert error', {
         params: { itemKey, server, vote, userId },
@@ -226,7 +226,7 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
     const { error: delErr } = await supabase
       .from('price_consolidated_votes')
       .delete()
-      .eq('item_key', itemKey)
+      .eq('item_id', itemKey)
       .eq('server_name', server);
     if (delErr) {
       console.error('[Sync] toggleConsolidatedVote delete error', {
@@ -238,7 +238,7 @@ export async function toggleConsolidatedVote(itemKey: string, server: string, vo
     const { error: updErr } = await supabase
       .from('price_consolidated_votes')
       .update({ vote })
-      .eq('item_key', itemKey)
+      .eq('item_id', itemKey)
       .eq('server_name', server);
     if (updErr) {
       console.error('[Sync] toggleConsolidatedVote update error', {
