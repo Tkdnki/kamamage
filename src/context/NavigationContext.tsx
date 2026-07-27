@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { DofusItem } from '../data/mockData';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
-export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'elevage' | 'shopping' | 'profile';
+export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'breaking' | 'elevage' | 'shopping' | 'profile';
 
 export interface CartEntry {
   item: DofusItem;
@@ -35,6 +35,9 @@ interface NavigationContextType {
   pendingLevelingItemLevel: number | null;
   navigateToLevelingItem: (itemId: string, job?: string, jobLevel?: number, itemLevel?: number) => void;
   clearPendingLevelingNavigation: () => void;
+  pendingBreakingItemId: string | null;
+  navigateToBreakingItem: (itemId: string) => void;
+  clearPendingBreakingNavigation: () => void;
   shoppingCart: ShoppingCart;
   addIngredientsToCart: (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => void;
   updateCartGathered: (id: string, gathered: number) => void;
@@ -57,6 +60,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [pendingLevelingJob, setPendingLevelingJob] = useState<string | null>(null);
   const [pendingLevelingJobLevel, setPendingLevelingJobLevel] = useState<number | null>(null);
   const [pendingLevelingItemLevel, setPendingLevelingItemLevel] = useState<number | null>(null);
+  const [pendingBreakingItemId, setPendingBreakingItemId] = useState<string | null>(null);
 
   const navigateToHdvItem = (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => {
     setPreviousView(activeView);
@@ -101,6 +105,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     setPendingLevelingItemLevel(null);
   };
 
+  const navigateToBreakingItem = (itemId: string) => {
+    setPendingBreakingItemId(itemId);
+    setActiveView('breaking');
+  };
+
+  const clearPendingBreakingNavigation = () => {
+    setPendingBreakingItemId(null);
+  };
+
   const addIngredientsToCart = (ingredients: { id: string; name: string; type: string; level: number; imgUrl: string; quantity: number }[]) => {
     setShoppingCart(prev => {
       const next = { ...prev };
@@ -139,6 +152,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,
       pendingCraftsItemId, pendingCraftsJob, navigateToCraftsItem, clearPendingCraftsNavigation,
       pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, navigateToLevelingItem, clearPendingLevelingNavigation,
+      pendingBreakingItemId, navigateToBreakingItem, clearPendingBreakingNavigation,
       shoppingCart, addIngredientsToCart, updateCartGathered, resetCart,
     }}>
       {children}

@@ -5,6 +5,7 @@ import CraftProfitability from './components/CraftProfitability';
 import LevelingAdvisor from './components/LevelingAdvisor';
 import ElevageCalculator from './components/ElevageCalculator';
 import ForgemagieHelper from './components/ForgemagieHelper';
+import BreakingSimulator from './components/BreakingSimulator';
 import ShoppingList from './components/ShoppingList';
 import ProfileSettings from './components/ProfileSettings';
 import PseudoSetupModal from './components/PseudoSetupModal';
@@ -28,6 +29,7 @@ function AppContent() {
         {activeView === 'crafts' && <CraftProfitability key={selectedServer} />}
         {activeView === 'leveling' && <LevelingAdvisor key={selectedServer} />}
         {activeView === 'forgemagie' && <ForgemagieHelper />}
+        {activeView === 'breaking' && <BreakingSimulator />}
         {activeView === 'elevage' && <ElevageCalculator />}
         {activeView === 'shopping' && <ShoppingList />}
         {activeView === 'profile' && <ProfileSettings />}

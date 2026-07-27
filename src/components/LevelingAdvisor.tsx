@@ -6,6 +6,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem } from '../services/api';
+import { BREAKING_JOBS } from '../lib/breaking';
 import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
@@ -59,7 +60,7 @@ interface LevelRow {
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { user } = useAuth();
-  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -127,6 +128,16 @@ export default function LevelingAdvisor() {
       clearPendingLevelingNavigation();
     }
   }, [pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, craftItems, activeJob, jobLevel, clearPendingLevelingNavigation]);
+
+  // Navigation entrante depuis le Simulateur de Brisage
+  useEffect(() => {
+    if (!pendingBreakingItemId || craftItems.length === 0) return;
+    const exists = craftItems.find(item => item._id === pendingBreakingItemId);
+    if (exists) {
+      setSelectedItemId(pendingBreakingItemId);
+      clearPendingBreakingNavigation();
+    }
+  }, [pendingBreakingItemId, craftItems, clearPendingBreakingNavigation]);
 
   const minLevel = Math.max(1, jobLevel - 20);
 
@@ -550,6 +561,17 @@ export default function LevelingAdvisor() {
                     <TrendingUp className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Rentabilité</span>
                   </button>
+                  {BREAKING_JOBS.includes(activeJob) && (
+                    <button
+                      type="button"
+                      onClick={() => navigateToBreakingItem(selectedItem._id)}
+                      className="shrink-0 flex items-center gap-1.5 bg-[#151f32] hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-slate-300 hover:text-red-400 text-[10px] font-bold py-2 px-2.5 rounded-lg transition-all"
+                      title="Voir dans Simulateur de Brisage"
+                    >
+                      <Wrench className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Brisage</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Resale Price */}

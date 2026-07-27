@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap, Wrench } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,8 +46,16 @@ export default function Navigation() {
       activeColor: 'text-purple-400 border-purple-500',
     },
     {
+      id: 'breaking' as ViewType,
+      label: 'Brisage',
+      icon: Wrench,
+      description: 'Simulateur de brisage',
+      color: 'from-red-500 to-orange-500',
+      activeColor: 'text-red-400 border-red-500',
+    },
+    {
       id: 'elevage' as ViewType,
-      label: 'Élevage/ brisage muldo et volkorne GEN1',
+      label: 'Élevage',
       icon: Beef,
       description: 'Rentabilité montures',
       color: 'from-orange-500 to-amber-500',
@@ -100,7 +108,7 @@ export default function Navigation() {
             ))}
           </select>
 
-          <nav className="flex space-x-1 sm:space-x-4">
+          <nav className="flex overflow-x-auto flex-nowrap space-x-1 sm:space-x-4 scrollbar-none">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeView === tab.id;

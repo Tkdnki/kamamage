@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
+import { BREAKING_JOBS } from '../lib/breaking';
 import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
@@ -51,7 +52,7 @@ const CopyButton = ({ text }: { text: string }) => {
 export default function CraftProfitability() {
   const { user } = useAuth();
   const { hdvPrices, setHdvPrice, setMonthlySalesVolume, trackItem } = useDofus();
-  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation } = useNavigation();
+  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -155,6 +156,16 @@ export default function CraftProfitability() {
       clearPendingCraftsNavigation();
     }
   }, [pendingCraftsItemId, pendingCraftsJob, craftItems, activeJob, clearPendingCraftsNavigation]);
+
+  // Navigation entrante depuis le Simulateur de Brisage
+  useEffect(() => {
+    if (!pendingBreakingItemId || craftItems.length === 0) return;
+    const exists = craftItems.find(item => item._id === pendingBreakingItemId);
+    if (exists) {
+      setSelectedItemId(pendingBreakingItemId);
+      clearPendingBreakingNavigation();
+    }
+  }, [pendingBreakingItemId, craftItems, clearPendingBreakingNavigation]);
 
   const filteredItems = useMemo(() => {
     let list = craftItems;
@@ -573,6 +584,14 @@ export default function CraftProfitability() {
                   >
                     <GraduationCap className="h-3.5 w-3.5" /> XP
                   </button>
+                  {BREAKING_JOBS.includes(activeJob) && (
+                    <button
+                      onClick={() => navigateToBreakingItem(selectedItem._id)}
+                      className="bg-[#151f32] hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-slate-300 hover:text-red-400 text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
+                    >
+                      <Wrench className="h-3.5 w-3.5" /> Brisage
+                    </button>
+                  )}
                 </div>
               </div>
 
