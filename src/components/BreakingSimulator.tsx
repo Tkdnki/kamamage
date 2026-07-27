@@ -309,12 +309,12 @@ export default function BreakingSimulator() {
                     <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Coefficient</label>
                     <input
                       type="number"
-                      min={10}
-                      max={300}
+                      min={1}
                       value={coefficient}
                       onChange={e => {
                         const v = parseInt(e.target.value);
-                        if (!isNaN(v) && v >= 10 && v <= 300) setCoefficient(v);
+                        if (!isNaN(v) && v >= 1) setCoefficient(v);
+                        if (e.target.value === '') setCoefficient(1);
                       }}
                       className="w-16 bg-[#070a12] border border-white/10 rounded px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
