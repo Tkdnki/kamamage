@@ -79,6 +79,11 @@ export const DOFUS_RUNES: Rune[] = [
   // Dommages
   { id: 'pa_do', name: 'Rune Pa Do', code: 'Pa Do', weight: 60, statEffect: '+3 Dommages', category: 'Dommages' },
   { id: 'do', name: 'Rune Do', code: 'Do', weight: 20, statEffect: '+1 Dommage', category: 'Dommages' },
+  { id: 'do_terre', name: 'Rune Do Terre', code: 'Do Terre', weight: 5, statEffect: '+1 Dommages Terre', category: 'Dommages' },
+  { id: 'do_feu', name: 'Rune Do Feu', code: 'Do Feu', weight: 5, statEffect: '+1 Dommages Feu', category: 'Dommages' },
+  { id: 'do_eau', name: 'Rune Do Eau', code: 'Do Eau', weight: 5, statEffect: '+1 Dommages Eau', category: 'Dommages' },
+  { id: 'do_air', name: 'Rune Do Air', code: 'Do Air', weight: 5, statEffect: '+1 Dommages Air', category: 'Dommages' },
+  { id: 'do_neutre', name: 'Rune Do Neutre', code: 'Do Neutre', weight: 5, statEffect: '+1 Dommages Neutre', category: 'Dommages' },
   { id: 'do_cri', name: 'Rune Do Cri', code: 'Do Cri', weight: 5, statEffect: '+1 Dommage Critique', category: 'Dommages' },
   { id: 'do_pou', name: 'Rune Do Pou', code: 'Do Pou', weight: 5, statEffect: '+1 Dommage Poussée', category: 'Dommages' },
   { id: 'cri', name: 'Rune Cri', code: 'Cri', weight: 10, statEffect: '+1 Coup Critique', category: 'Dommages' },
@@ -94,6 +99,7 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 're_f_feu', name: 'Rune Re Feu (fixe)', code: 'Re Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances' },
   { id: 're_f_eau', name: 'Rune Re Eau (fixe)', code: 'Re Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances' },
   { id: 're_f_air', name: 'Rune Re Air (fixe)', code: 'Re Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances' },
+  { id: 're_pm', name: 'Rune Ré PM', code: 'Ré PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances' },
 
   // Utilitaires (Tacle, Fuite, Prospection, Pods, Initiative)
   { id: 'pa_tac', name: 'Rune Pa Tac', code: 'Pa Tac', weight: 12, statEffect: '+3 Tacle', category: 'Utilitaires' },
