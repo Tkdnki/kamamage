@@ -31,7 +31,7 @@ export default function BreakingSimulator() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { selectedServer } = useServer();
   const { user } = useAuth();
-  const { navigateToCraftsItem, navigateToLevelingItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
+  const { navigateToCraftsItem, navigateToLevelingItem, navigateToHdvItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState('Forgeron');
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
