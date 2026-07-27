@@ -9,6 +9,7 @@ import type { CraftItem } from '../services/api';
 import {
   Gem, Scissors, Shield, Flame, Wand2, Heart,
   Loader2, Search, AlertTriangle, Coins, Info, Hammer, GraduationCap, Crosshair, Plus,
+  Copy, ExternalLink,
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -18,6 +19,7 @@ import {
 } from '../lib/breaking';
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
+import type { Rune } from '../data/mockData';
 import { fetchRunePricesWithAuthor } from '../lib/sync';
 
 const JOB_ICONS: Record<string, FC<any>> = {
@@ -38,7 +40,6 @@ export default function BreakingSimulator() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [coefficient, setCoefficient] = useState(100);
   const [rollMode, setRollMode] = useState<'avg' | 'min' | 'max'>('avg');
-  const [craftCostOverride, setCraftCostOverride] = useState<number | null>(null);
 
   const [itemStats, setItemStats] = useState<DofusDbItemFull | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -47,6 +48,16 @@ export default function BreakingSimulator() {
 
   // Focus
   const [focusEffectIndex, setFocusEffectIndex] = useState<number | null>(null);
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1200);
+    } catch {}
+  };
 
   // Exos
   const [exoEntries, setExoEntries] = useState<ExoEntry[]>([]);
@@ -132,8 +143,7 @@ export default function BreakingSimulator() {
   const breaking = useMemo<BreakingResult | null>(() => {
     if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0) return null;
 
-    const itemPriceData = hdvPrices[selectedItem._id];
-    const craftCost = craftCostOverride ?? itemPriceData?.unitAverage ?? 0;
+    const craftCost = hdvPrices[selectedItem._id]?.unitAverage ?? 0;
 
     return calculateBreaking(
       itemStats.possibleEffects,
@@ -147,7 +157,7 @@ export default function BreakingSimulator() {
       focusEffectIndex,
       exoEntries,
     );
-  }, [selectedItem, itemStats, coefficient, rollMode, pricesByCode, hdvPrices, focusEffectIndex, exoEntries, craftCostOverride]);
+  }, [selectedItem, itemStats, coefficient, rollMode, pricesByCode, hdvPrices, focusEffectIndex, exoEntries]);
 
   const formatKamas = (n: number) => {
     const sign = n >= 0 ? '+' : '';
@@ -303,7 +313,33 @@ export default function BreakingSimulator() {
                 <div className="flex items-center gap-3 mb-4">
                   <ItemImage item={selectedItem} className="h-12 w-12 bg-slate-800/30 rounded-xl p-1 border border-slate-700/30" />
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-base font-bold text-white truncate">{selectedItem.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigateToHdvItem({
+                          _id: selectedItem._id,
+                          name: selectedItem.name,
+                          type: selectedItem.type,
+                          level: selectedItem.level,
+                          imgUrl: selectedItem.imgUrl,
+                        })}
+                        className="text-base font-bold text-white truncate hover:text-amber-400 transition-colors text-left"
+                        title="Voir dans les prix HDV"
+                      >
+                        {selectedItem.name}
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(selectedItem.name, `item-name-${selectedItem._id}`)}
+                        className={`p-1 rounded transition-all shrink-0 ${
+                          copiedId === `item-name-${selectedItem._id}`
+                            ? 'text-emerald-400 bg-emerald-500/10'
+                            : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/30'
+                        }`}
+                        title="Copier le nom"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                      <ExternalLink className="h-3 w-3 text-slate-500 shrink-0" />
+                    </div>
                     <p className="text-[11px] text-slate-400">
                       Niveau {selectedItem.level} — {activeJob}
                       {(() => {
@@ -311,6 +347,16 @@ export default function BreakingSimulator() {
                         return p?.unitAverage ? <span className="ml-2 text-amber-400">{Math.round(p.unitAverage).toLocaleString()} K</span> : null;
                       })()}
                     </p>
+                    <div className="mt-1.5">
+                      <QuickPriceInput
+                        x1={hdvPrices[selectedItem._id]?.x1 ?? 0}
+                        x10={hdvPrices[selectedItem._id]?.x10 ?? 0}
+                        x100={hdvPrices[selectedItem._id]?.x100 ?? 0}
+                        x1000={hdvPrices[selectedItem._id]?.x1000 ?? 0}
+                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(selectedItem._id, x1, x10, x100, x1000)}
+                        disabled={!user}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -388,11 +434,10 @@ export default function BreakingSimulator() {
                       <input
                         type="number"
                         min={0}
-                        value={craftCostOverride ?? breaking.craftCost}
+                        value={breaking.craftCost}
                         onChange={e => {
                           const v = parseInt(e.target.value);
-                          setCraftCostOverride(!isNaN(v) && v >= 0 ? v : null);
-                          if (e.target.value === '') setCraftCostOverride(null);
+                          if (!isNaN(v) && v >= 0) setHdvPrice(selectedItem._id, v, 0, 0, 0);
                         }}
                         className="w-full bg-transparent text-center text-lg font-extrabold text-slate-300 focus:outline-none focus:text-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
@@ -479,9 +524,35 @@ export default function BreakingSimulator() {
                                       >
                                         <Crosshair className="h-4 w-4" />
                                       </button>
-                                      <div>
-                                        <span className="font-semibold text-slate-200">{l.rune.code}</span>
-                                        <div className="text-[9px] text-slate-500">{l.statName}</div>
+                                      <div className="flex items-center gap-1.5">
+                                        <RuneIcon rune={l.rune} />
+                                        <div>
+                                          <button
+                                            onClick={() => navigateToHdvItem({
+                                              _id: l.rune.id,
+                                              name: l.rune.name,
+                                              type: 'Rune',
+                                              level: 1,
+                                              imgUrl: l.rune.imgUrl ?? '',
+                                            })}
+                                            className="font-semibold text-slate-200 hover:text-amber-400 transition-colors text-left"
+                                            title="Voir les prix de cette rune"
+                                          >
+                                            {l.rune.code}
+                                          </button>
+                                          <div className="text-[9px] text-slate-500">{l.statName}</div>
+                                        </div>
+                                        <button
+                                          onClick={() => copyToClipboard(l.rune.code, `rune-${l.rune.id}`)}
+                                          className={`p-0.5 rounded transition-all ${
+                                            copiedId === `rune-${l.rune.id}`
+                                              ? 'text-emerald-400 bg-emerald-500/10'
+                                              : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700/30'
+                                          }`}
+                                          title="Copier le nom de la rune"
+                                        >
+                                          <Copy className="h-2.5 w-2.5" />
+                                        </button>
                                       </div>
                                     </div>
                                   </td>
@@ -536,9 +607,24 @@ export default function BreakingSimulator() {
                                     >
                                       ×
                                     </button>
-                                    <div>
-                                      <span className="font-semibold text-cyan-300">{exo.rune.code}</span>
-                                      <div className="text-[9px] text-cyan-400/60">Exo</div>
+                                    <div className="flex items-center gap-1.5">
+                                      <RuneIcon rune={exo.rune} />
+                                      <div>
+                                        <button
+                                          onClick={() => navigateToHdvItem({
+                                            _id: exo.rune.id,
+                                            name: exo.rune.name,
+                                            type: 'Rune',
+                                            level: 1,
+                                            imgUrl: exo.rune.imgUrl ?? '',
+                                          })}
+                                          className="font-semibold text-cyan-300 hover:text-amber-400 transition-colors text-left"
+                                          title="Voir les prix de cette rune"
+                                        >
+                                          {exo.rune.code}
+                                        </button>
+                                        <div className="text-[9px] text-cyan-400/60">Exo</div>
+                                      </div>
                                     </div>
                                   </div>
                                 </td>
@@ -594,15 +680,15 @@ export default function BreakingSimulator() {
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="flex flex-col">
                         <label className="text-[8px] text-slate-500 uppercase font-bold mb-0.5">Rune</label>
-                        <select
-                          value={exoSelectRuneId}
-                          onChange={e => setExoSelectRuneId(e.target.value)}
-                          className="bg-[#070a12] border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-cyan-500/40 max-w-[160px]"
-                        >
-                          {DOFUS_RUNES.map(r => (
-                            <option key={r.id} value={r.id}>{r.name} ({r.code})</option>
-                          ))}
-                        </select>
+                          <select
+                            value={exoSelectRuneId}
+                            onChange={e => setExoSelectRuneId(e.target.value)}
+                            className="bg-[#070a12] border border-white/10 rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-cyan-500/40 max-w-[160px]"
+                          >
+                            {DOFUS_RUNES.map(r => (
+                              <option key={r.id} value={r.id}>{r.code}</option>
+                            ))}
+                          </select>
                       </div>
                       <div className="flex flex-col">
                         <label className="text-[8px] text-slate-500 uppercase font-bold mb-0.5">Quantité</label>
@@ -630,7 +716,8 @@ export default function BreakingSimulator() {
                           const r = runeOptionById[e.runeId];
                           return (
                             <span key={e.runeId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-900/20 border border-cyan-500/20 text-[10px] text-cyan-300">
-                              {r?.name ?? e.runeId} ×{e.quantity}
+                              {r && <RuneIcon rune={r} />}
+                              {r?.code ?? e.runeId} ×{e.quantity}
                               <button onClick={() => removeExo(e.runeId)} className="text-slate-500 hover:text-rose-400 ml-0.5">×</button>
                             </span>
                           );
@@ -653,5 +740,19 @@ export default function BreakingSimulator() {
         </div>
       </div>
     </div>
+  );
+}
+
+function RuneIcon({ rune, size = 18 }: { rune: { imgUrl?: string; name?: string; code?: string }; size?: number }) {
+  const [hasError, setHasError] = useState(false);
+  if (!rune.imgUrl || hasError) return null;
+  return (
+    <img
+      src={rune.imgUrl}
+      alt={rune.name ?? ''}
+      onError={() => setHasError(true)}
+      className="shrink-0 object-contain"
+      style={{ width: size, height: size }}
+    />
   );
 }
