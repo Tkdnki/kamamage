@@ -129,7 +129,7 @@ export default function Navigation() {
                   <Icon className={`h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 ${
                     isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-amber-300'
                   }`} />
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="text-[10px] sm:text-xs">{tab.label}</span>
                 </button>
               );
             })}

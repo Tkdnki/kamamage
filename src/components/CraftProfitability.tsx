@@ -64,45 +64,7 @@ export default function CraftProfitability() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hideLowVolume, setHideLowVolume] = useState(false);
   const [minSalesVolume, setMinSalesVolume] = useState(5);
-  const [localPrices, setLocalPrices] = useState<Record<string, [number, number, number, number]>>({});
-
   const ITEMS_PER_PAGE = 50;
-
-  const getPricesFor = useCallback((id: string): [number, number, number, number] => {
-    const p = hdvPrices[id];
-    return localPrices[id] ?? [p?.x1 ?? 0, p?.x10 ?? 0, p?.x100 ?? 0, p?.x1000 ?? 0];
-  }, [localPrices, hdvPrices]);
-
-  const handleLocalPriceChange = useCallback((id: string, index: number, value: number) => {
-    setLocalPrices(prev => {
-      const current = prev[id] ?? [0, 0, 0, 0];
-      const updated = [...current] as [number, number, number, number];
-      updated[index] = value;
-      return { ...prev, [id]: updated };
-    });
-  }, []);
-
-  const handleConfirmPrices = useCallback((id: string) => {
-    const [x1, x10, x100, x1000] = getPricesFor(id);
-    setHdvPrice(id, x1, x10, x100, x1000);
-  }, [getPricesFor, setHdvPrice]);
-
-  useEffect(() => {
-    if (!selectedItemId) return;
-    const item = craftItems.find(i => i._id === selectedItemId);
-    if (!item) return;
-    const ids = [selectedItemId, ...item.ingredients.map(i => i.id)];
-    setLocalPrices(prev => {
-      const next = { ...prev };
-      for (const id of ids) {
-        if (!next[id]) {
-          const p = hdvPrices[id];
-          next[id] = [p?.x1 ?? 0, p?.x10 ?? 0, p?.x100 ?? 0, p?.x1000 ?? 0];
-        }
-      }
-      return next;
-    });
-  }, [selectedItemId, craftItems, hdvPrices]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -626,37 +588,14 @@ export default function CraftProfitability() {
                           </div>
                         </div>
 
-                        <div className="flex items-end gap-1.5 shrink-0">
-                          <div className="flex gap-1">
-                            {(['x1', 'x10', 'x100', 'x1000'] as const).map((lot, li) => {
-                              const idx = li;
-                              const prices = getPricesFor(ing.id);
-                              return (
-                                <div key={lot} className="flex flex-col items-center">
-                                  <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    value={prices[idx]}
-                                    onChange={e => handleLocalPriceChange(ing.id, idx, Math.max(0, Number(e.target.value) || 0))}
-                                    placeholder="0"
-                                    disabled={!user}
-                                    title={!user ? 'Connectez-vous pour modifier' : ''}
-                                    className="w-14 bg-slate-950/50 border border-slate-700/50 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <button
-                            onClick={() => handleConfirmPrices(ing.id)}
-                            disabled={!user}
-                            title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
-                            className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <Check className="h-3.5 w-3.5 text-emerald-400" />
-                          </button>
-                        </div>
+                        <QuickPriceInput
+                          x1={hdvPrices[ing.id]?.x1}
+                          x10={hdvPrices[ing.id]?.x10}
+                          x100={hdvPrices[ing.id]?.x100}
+                          x1000={hdvPrices[ing.id]?.x1000}
+                          onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d)}
+                          disabled={!user}
+                        />
                         {(hdvPrices[ing.id]?.author || hdvPrices[ing.id]?.updatedAt) && (
                           <div className="flex items-center justify-end gap-2 mt-1.5">
                             {hdvPrices[ing.id]?.author && <p className="text-[9px] text-slate-500">Modifié par {hdvPrices[ing.id].author}</p>}
@@ -688,36 +627,15 @@ export default function CraftProfitability() {
                   {/* Prix de vente (HDV) — inputs directs */}
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prix de vente (HDV)</span>
-                    <div className="flex items-end gap-1.5 mt-1">
-                      <div className="flex gap-1">
-                        {(['x1', 'x10', 'x100', 'x1000'] as const).map((lot, li) => {
-                          const idx = li;
-                          const prices = getPricesFor(selectedItem._id);
-                          return (
-                            <div key={lot} className="flex flex-col items-center">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5">{lot.replace('x', '×')}</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={prices[idx]}
-                                onChange={e => handleLocalPriceChange(selectedItem._id, idx, Math.max(0, Number(e.target.value) || 0))}
-                                placeholder="0"
-                                disabled={!user}
-                                title={!user ? 'Connectez-vous pour modifier' : ''}
-                                className="w-16 bg-slate-950/50 border border-slate-700/50 rounded px-1.5 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-40 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <button
-                        onClick={() => handleConfirmPrices(selectedItem._id)}
+                    <div className="mt-1">
+                      <QuickPriceInput
+                        x1={hdvPrices[selectedItem._id]?.x1}
+                        x10={hdvPrices[selectedItem._id]?.x10}
+                        x100={hdvPrices[selectedItem._id]?.x100}
+                        x1000={hdvPrices[selectedItem._id]?.x1000}
+                        onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d)}
                         disabled={!user}
-                        title={!user ? 'Connectez-vous pour valider' : 'Valider les prix'}
-                        className="h-7 w-7 mb-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 rounded flex items-center justify-center transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      </button>
+                      />
                     </div>
                     {(hdvPrices[selectedItem._id]?.author || hdvPrices[selectedItem._id]?.updatedAt) && (
                       <div className="flex items-center gap-2 mt-1.5">
