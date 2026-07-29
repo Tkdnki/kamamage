@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
 import { searchItems } from '../services/api';
@@ -213,9 +214,9 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80" onClick={onClose}>
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xl max-h-[90vh] overflow-y-auto bg-[#0c101d] border border-slate-700/50 rounded-xl shadow-2xl z-50" onClick={e => e.stopPropagation()}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-[#0c101d] border border-slate-700/50 rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 sticky top-0 bg-[#0c101d] z-10">
           <div className="flex items-center gap-2.5">
@@ -363,6 +364,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
