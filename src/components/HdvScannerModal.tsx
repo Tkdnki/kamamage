@@ -217,9 +217,9 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-[#0c101d] border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#0c101d] border border-slate-700/50 rounded-2xl shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 sticky top-0 bg-[#0c101d] z-10">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
               <Camera className="h-4 w-4 text-white" />
@@ -229,7 +229,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
               <p className="text-[10px] text-slate-400">Import par capture d'écran</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors border border-white/10">
             <X className="h-4 w-4" />
           </button>
         </div>
