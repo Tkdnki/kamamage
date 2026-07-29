@@ -300,7 +300,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
               <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-rose-300">Erreur d'analyse</p>
-                <p className="text-[11px] text-rose-400/80 mt-0.5">{error}</p>
+                <p className="text-[11px] text-rose-400/80 mt-0.5 max-h-40 overflow-y-auto break-words whitespace-pre-wrap select-text">{error}</p>
               </div>
               <button onClick={handleRetry} className="text-[10px] font-bold text-rose-400 hover:text-rose-300 shrink-0">
                 Réessayer
