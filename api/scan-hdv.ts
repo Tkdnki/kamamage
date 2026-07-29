@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-function normalize(str: string): string {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-}
+const normalizeItemName = (name: string): string => {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[‘’`']/g, "'")
+    .trim();
+};
 
 function cleanPrice(val: any): number {
   if (typeof val === 'string') return parseInt(val.replace(/\s+/g, ''), 10) || 0;
@@ -13,7 +17,7 @@ function sanitizeResponse(data: any): any {
   if (!data || !data.items || !Array.isArray(data.items)) return data;
   return {
     items: data.items.map((item: any) => ({
-      name: normalize(item.name || ''),
+      name: normalizeItemName(item.name || ''),
       prices: {
         x1: cleanPrice(item.prices?.x1),
         x10: cleanPrice(item.prices?.x10),

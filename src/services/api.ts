@@ -54,10 +54,18 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery || cleanQuery.length < 3) return [];
 
+  const normalizeQuery = (s: string) => s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[‘’`']/g, "'")
+    .trim()
+    .toLowerCase();
+
   const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const trySearch = async (q: string): Promise<DofusItem[]> => {
-    const encoded = encodeURIComponent(escapeRegex(q));
+    const clean = q.replace(/[‘’`']/g, "'");
+    const encoded = encodeURIComponent(escapeRegex(clean));
     const path = `/items?name.fr[$regex]=${encoded}&name.fr[$options]=i&$limit=25`;
     const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbItem>>(path);
     return (data.data ?? []).map(normalizeDofusDbItem);
@@ -69,8 +77,8 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
     console.log('[searchItems] Résultats (originale):', items.length);
 
     if (items.length === 0) {
-      // Fallback 1 : normalisé sans accents
-      const normalized = cleanQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // Fallback 1 : normalisé sans accents + apostrophes uniformisées
+      const normalized = normalizeQuery(cleanQuery);
       if (normalized !== cleanQuery) {
         console.log('[searchItems] Fallback normalisé:', normalized);
         items = await trySearch(normalized);
