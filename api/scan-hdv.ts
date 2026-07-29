@@ -1,5 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+function normalize(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function cleanPrice(val: any): number {
+  if (typeof val === 'string') return parseInt(val.replace(/\s+/g, ''), 10) || 0;
+  return typeof val === 'number' ? val : 0;
+}
+
+function sanitizeResponse(data: any): any {
+  if (!data || !data.items || !Array.isArray(data.items)) return data;
+  return {
+    items: data.items.map((item: any) => ({
+      name: normalize(item.name || ''),
+      prices: {
+        x1: cleanPrice(item.prices?.x1),
+        x10: cleanPrice(item.prices?.x10),
+        x100: cleanPrice(item.prices?.x100),
+        x1000: cleanPrice(item.prices?.x1000),
+      }
+    }))
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
@@ -81,7 +105,8 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
           const content = data.choices?.[0]?.message?.content;
           if (content) {
             const parsedData = JSON.parse(content);
-            return res.status(200).json(parsedData);
+            const sanitized = sanitizeResponse(parsedData);
+            return res.status(200).json(sanitized);
           }
         } else {
           const errText = await response.text();

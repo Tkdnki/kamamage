@@ -349,6 +349,10 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           showToast('success', `${matched.length} prix mis à jour sur Supabase !`);
         }
 
+        if (unmatched.length > 0) {
+          showToast('error', `${unmatched.length} item${unmatched.length > 1 ? 's' : ''} non trouvé${unmatched.length > 1 ? 's' : ''} — passage au suivant`);
+        }
+
         await new Promise(resolve => setTimeout(resolve, 800));
       }
     }
