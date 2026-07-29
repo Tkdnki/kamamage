@@ -233,10 +233,16 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       try {
+        const body: Record<string, any> = { image: entry.base64 };
+        // Passer le nom attendu pour guider l'IA et permettre la sauvegarde directe
+        const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
+        if (unresolvedExpected.length === 1) {
+          body.expectedName = unresolvedExpected[0].expectedName;
+        }
         const response = await fetch('/api/scan-hdv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: entry.base64 }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -309,46 +315,70 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         const matched: { item: ScanItem; dofusItem: DofusItem }[] = [];
         const unmatched: string[] = [];
         const newResolved = new Set(resolvedIdsRef.current);
+        const unresolvedExpected = expectedItemsRef.current.filter(e => !newResolved.has(e.expectedId));
 
         for (const item of scanResult.items) {
           const normalizedInput = normalize(item.name);
           let dofusItem: DofusItem | undefined;
+          let matchedExpected: ScannerQueueItem | undefined;
 
-          try {
-            const items = await searchItems(item.name);
-            console.log(`[scan] Recherche "${item.name}" → ${items.length} résultat(s)`);
-            dofusItem = items.find(i => normalize(i.name) === normalizedInput);
-            if (!dofusItem) {
-              dofusItem = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
-            }
-            if (!dofusItem) {
-              const words = normalizedInput.split(/\s+/).filter(Boolean);
-              dofusItem = items.find(i => {
-                const normName = normalize(i.name);
-                const cover = words.filter(w => normName.includes(w)).length;
-                return cover >= Math.ceil(words.length / 2);
-              });
-            }
-            if (!dofusItem && items.length > 0) {
-              console.warn(`[scan] Aucune correspondance pour "${item.name}", forçage vers "${items[0].name}"`);
-              dofusItem = items[0];
-            }
-          } catch {}
+          // Étape 1 : correspondre directement avec un item attendu non résolu
+          matchedExpected = unresolvedExpected.find(e => normalize(e.expectedName) === normalizedInput);
+          if (!matchedExpected) {
+            matchedExpected = unresolvedExpected.find(e => {
+              const normExpected = normalize(e.expectedName);
+              return normExpected.includes(normalizedInput) || normalizedInput.includes(normExpected);
+            });
+          }
+          if (!matchedExpected) {
+            const words = normalizedInput.split(/\s+/).filter(Boolean);
+            matchedExpected = unresolvedExpected.find(e => {
+              const normExpected = normalize(e.expectedName);
+              const cover = words.filter(w => normExpected.includes(w)).length;
+              return cover >= Math.ceil(words.length / 2);
+            });
+          }
 
-          if (dofusItem) {
+          if (matchedExpected) {
+            // Sauvegarde directe sans passer par DofusDB
+            console.log(`[scan] Correspondance directe "${item.name}" → "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`);
+            setHdvPrice(matchedExpected.expectedId, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
+            newResolved.add(matchedExpected.expectedId);
+            // Créer un faux DofusItem pour l'affichage
+            dofusItem = { _id: matchedExpected.expectedId, name: matchedExpected.expectedName } as DofusItem;
             matched.push({ item, dofusItem });
-            setHdvPrice(
-              dofusItem._id,
-              item.prices.x1,
-              item.prices.x10,
-              item.prices.x100,
-              item.prices.x1000,
-            );
-            if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
-              newResolved.add(dofusItem._id);
-            }
           } else {
-            unmatched.push(item.name);
+            // Étape 2 : fallback DofusDB (ancien comportement)
+            try {
+              const dbItems = await searchItems(item.name);
+              console.log(`[scan] Fallback DofusDB "${item.name}" → ${dbItems.length} résultat(s)`);
+              dofusItem = dbItems.find(i => normalize(i.name) === normalizedInput);
+              if (!dofusItem) {
+                dofusItem = dbItems.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
+              }
+              if (!dofusItem) {
+                const words = normalizedInput.split(/\s+/).filter(Boolean);
+                dofusItem = dbItems.find(i => {
+                  const normName = normalize(i.name);
+                  const cover = words.filter(w => normName.includes(w)).length;
+                  return cover >= Math.ceil(words.length / 2);
+                });
+              }
+              if (!dofusItem && dbItems.length > 0) {
+                console.warn(`[scan] Fallback : aucun match pour "${item.name}", forçage vers "${dbItems[0].name}"`);
+                dofusItem = dbItems[0];
+              }
+            } catch {}
+
+            if (dofusItem) {
+              matched.push({ item, dofusItem });
+              setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
+              if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
+                newResolved.add(dofusItem._id);
+              }
+            } else {
+              unmatched.push(item.name);
+            }
           }
         }
 
