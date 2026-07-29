@@ -15,21 +15,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { image } = req.body || {};
     if (!image) {
-      return res.status(400).json({ error: 'Aucune image fournie dans la requête.' });
+      return res.status(400).json({ error: 'Aucune image fournie.' });
     }
 
-    // Formatage Data URI requis par Groq
     let imageUrl = image;
     if (!image.startsWith('data:')) {
       imageUrl = `data:image/png;base64,${image}`;
     }
 
-    const promptText = `Tu es un extracteur de données ultra-précis pour l'Hôtel de Vente (HDV) du jeu Dofus.
-Analyse cette capture d'écran HDV et extrait :
-1. Le nom exact de l'item (ex: "Gelano", "Bois de Frêne", "Laine de Bouftou").
-2. Les prix de vente associés aux lots (1, 10, 100, 1000). Si un lot n'est pas présent, mets 0.
+    const promptText = `Tu es un extracteur de données pour l'Hôtel de Vente (HDV) de Dofus.
+Analyse l'image fournie et extrait :
+1. Le nom exact de l'item.
+2. Les prix associés aux lots (x1, x10, x100, x1000). Si un lot est absent, mets 0.
 
-Réponds EXCLUSIVEMENT sous la forme d'un objet JSON strict avec ce format :
+Réponds uniquement avec un objet JSON strict au format :
 {
   "item_name": "Nom de l'item",
   "prices": {
@@ -40,49 +39,64 @@ Réponds EXCLUSIVEMENT sous la forme d'un objet JSON strict avec ce format :
   }
 }`;
 
-    // Appel API REST Groq (Format compatible OpenAI)
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: promptText },
+    // Modèles Vision Groq à tester par ordre de priorité
+    const visionModels = [
+      'llama-3.2-90b-vision-preview',
+      'llama-3.2-11b-vision-instruct',
+      'llama-3.2-90b-vision-instruct',
+      'meta-llama/llama-3.2-11b-vision-instruct',
+      'meta-llama/llama-3.2-90b-vision-instruct'
+    ];
+
+    let lastError = '';
+
+    for (const model of visionModels) {
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
               {
-                type: 'image_url',
-                image_url: { url: imageUrl }
+                role: 'user',
+                content: [
+                  { type: 'text', text: promptText },
+                  {
+                    type: 'image_url',
+                    image_url: { url: imageUrl }
+                  }
+                ]
               }
-            ]
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.1
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content) {
+            const parsedData = JSON.parse(content);
+            return res.status(200).json(parsedData);
           }
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' }
-      })
+        } else {
+          const errText = await response.text();
+          lastError = `[${model}] ${response.status}: ${errText}`;
+          console.warn(`Groq Fallback: modèle ${model} non valide, test du suivant...`);
+        }
+      } catch (err: any) {
+        lastError = `[${model}] Exception: ${err.message}`;
+      }
+    }
+
+    return res.status(500).json({
+      error: `Aucun modèle vision Groq fonctionnel. Dernière erreur : ${lastError}`
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Groq API Error:', errText);
-      return res.status(response.status).json({
-        error: `Erreur API Groq (${response.status}): ${errText}`
-      });
-    }
-
-    const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-
-    if (!rawContent) {
-      return res.status(500).json({ error: 'Groq n\'a renvoyé aucun contenu.' });
-    }
-
-    const parsedData = JSON.parse(rawContent);
-    return res.status(200).json(parsedData);
 
   } catch (err: any) {
     console.error('Handler Error:', err);
