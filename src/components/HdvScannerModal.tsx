@@ -348,16 +348,25 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
             dofusItem = { _id: matchedExpected.expectedId, name: matchedExpected.expectedName } as DofusItem;
             matched.push({ item, dofusItem });
           } else {
-            // Étape 2 : fallback DofusDB (ancien comportement)
+            // Étape 2 : fallback DofusDB — utiliser le nom attendu si disponible
+            const bestExpected = unresolvedExpected.find(e => {
+              const normExpected = normalize(e.expectedName);
+              const words = normalizedInput.split(/\s+/).filter(Boolean);
+              const cover = words.filter(w => normExpected.includes(w)).length;
+              return cover >= Math.ceil(words.length / 2);
+            });
+            const searchQuery = bestExpected?.expectedName || item.name;
+            console.log(`[scan] Nom utilisé pour la recherche : "${searchQuery}" (OCR: "${item.name}")`);
             try {
-              const dbItems = await searchItems(item.name);
-              console.log(`[scan] Fallback DofusDB "${item.name}" → ${dbItems.length} résultat(s)`);
-              dofusItem = dbItems.find(i => normalize(i.name) === normalizedInput);
+              const dbItems = await searchItems(searchQuery);
+              console.log(`[scan] Fallback DofusDB "${searchQuery}" → ${dbItems.length} résultat(s)`);
+              const searchNormalized = normalize(searchQuery);
+              dofusItem = dbItems.find(i => normalize(i.name) === searchNormalized);
               if (!dofusItem) {
-                dofusItem = dbItems.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
+                dofusItem = dbItems.find(i => normalize(i.name).includes(searchNormalized) || searchNormalized.includes(normalize(i.name)));
               }
               if (!dofusItem) {
-                const words = normalizedInput.split(/\s+/).filter(Boolean);
+                const words = searchNormalized.split(/\s+/).filter(Boolean);
                 dofusItem = dbItems.find(i => {
                   const normName = normalize(i.name);
                   const cover = words.filter(w => normName.includes(w)).length;
@@ -365,7 +374,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
                 });
               }
               if (!dofusItem && dbItems.length > 0) {
-                console.warn(`[scan] Fallback : aucun match pour "${item.name}", forçage vers "${dbItems[0].name}"`);
+                console.warn(`[scan] Fallback : aucun match pour "${searchQuery}", forçage vers "${dbItems[0].name}"`);
                 dofusItem = dbItems[0];
               }
             } catch {}
