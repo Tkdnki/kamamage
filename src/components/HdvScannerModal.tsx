@@ -256,23 +256,25 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         if (!response.ok) {
           const errData = await response.json();
           scanError = errData.detail ? `${errData.error} — ${errData.detail}` : (errData.error || 'Erreur lors de l\'analyse');
-          continue;
-        }
-
-        const data = await response.json();
-
-        if (data.items && Array.isArray(data.items)) {
-          scanResult = data as ScanRecipeResult;
-        } else if (data.item_name && data.prices) {
-          scanResult = { items: [{ name: data.item_name, prices: data.prices }] };
         } else {
-          scanError = 'Format de réponse inattendu';
+          const data = await response.json();
+
+          if (data.items && Array.isArray(data.items)) {
+            scanResult = data as ScanRecipeResult;
+          } else if (data.item_name && data.prices) {
+            scanResult = { items: [{ name: data.item_name, prices: data.prices }] };
+          } else {
+            scanError = 'Format de réponse inattendu';
+          }
         }
       } catch (err) {
         scanError = err instanceof Error ? err.message : 'Erreur inconnue';
       }
 
-      if (cancelCurrentRef.current) break;
+      if (cancelCurrentRef.current) {
+        setIsLoading(false);
+        break;
+      }
 
       if (isRateLimited) continue;
 
@@ -330,7 +332,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
               item.prices.x100,
               item.prices.x1000,
             );
-            // Mark as resolved if this item is in the expected recipe queue
             if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
               newResolved.add(dofusItem._id);
             }
@@ -344,8 +345,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         setMatchedItems(matched);
         setUnmatchedNames(unmatched);
 
-        // Toast for individual success
-        if (matched.length > 0 && expectedItems.length === 0) {
+        if (matched.length > 0 && expectedItemsRef.current.length === 0) {
           showToast('success', `${matched.length} prix mis à jour sur Supabase !`);
         }
 
