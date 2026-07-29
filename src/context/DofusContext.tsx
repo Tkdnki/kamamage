@@ -70,7 +70,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   }, [hdvPrices, storageKey]);
 
   // Au montage / changement de serveur : on tente de récupérer depuis Supabase
-  // (les données distantes écrasent le cache local — communauté d'abord)
+  // (les données locales utilisateur prennent priorité sur les données distantes)
   const serverRef = useRef(selectedServer);
   useEffect(() => {
     serverRef.current = selectedServer;
@@ -88,7 +88,24 @@ export function DofusProvider({ children }: { children: ReactNode }) {
         setHdvPrices(prev => {
           const merged = { ...prev };
           for (const [key, val] of Object.entries(remote)) {
-            merged[key] = { ...merged[key], ...val, author: val.author ?? merged[key]?.author };
+            if (!merged[key]) {
+              // L'utilisateur n'a pas ce item en local → on prend la valeur distante
+              merged[key] = val;
+            } else {
+              // L'utilisateur a déjà ce item en local → on conserve ses lots, on comble les trous
+              const local = merged[key];
+              merged[key] = {
+                x1: local.x1 || val.x1 || 0,
+                x10: local.x10 || val.x10 || 0,
+                x100: local.x100 || val.x100 || 0,
+                x1000: local.x1000 || val.x1000 || 0,
+                unitAverage: local.unitAverage || val.unitAverage || 0,
+                author: local.author ?? val.author ?? null,
+                authorId: local.authorId ?? val.authorId ?? null,
+                updatedAt: local.updatedAt ?? val.updatedAt ?? null,
+                monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
+              };
+            }
           }
           if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
           return merged;
