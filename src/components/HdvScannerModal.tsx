@@ -191,13 +191,17 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
       let scanResult: ScanResult | null = null;
       let scanError: string | null = null;
       let isRateLimited = false;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       try {
         const response = await fetch('/api/scan-hdv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: entry.base64 }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         if (response.status === 429) {
           const retryAfter = response.headers.get('Retry-After');

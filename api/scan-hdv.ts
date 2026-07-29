@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const promptText = `Tu es un extracteur de données ultra-stricte pour l'Hôtel de Vente (HDV) du jeu Dofus.
 Analyse l'image fournie et extrait :
 1. Le nom exact de l'item tel qu'il est écrit textuellement en haut de la fenêtre (ex: "Ailes de Moskito"). NE MODIFIE PAS l'orthographe, ne rajoute pas de 's' pluriel si le jeu met un singulier, recopie exactement les caractères visibles.
-2. Les prix associés aux lots (x1, x10, x100, x1000). Si un lot est absent, mets 0.
+2. Les prix associés aux lots (x1, x10, x100, x1000). Attention, les prix peuvent contenir des espaces pour séparer les milliers (ex: "1 200 000"). Tu dois nettoyer ces espaces pour renvoyer uniquement des valeurs numériques brutes (ex: 1200000). Si un lot est absent, mets 0.
 
 Réponds uniquement avec un objet JSON strict au format :
 {
