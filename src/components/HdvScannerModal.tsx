@@ -30,6 +30,30 @@ function normalize(str: string): string {
     .trim();
 }
 
+const compressImage = (base64Str: string): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str.startsWith('data:') ? base64Str : `data:image/png;base64,${base64Str}`;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 1024;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH) {
+        height = Math.round((height * MAX_WIDTH) / width);
+        width = MAX_WIDTH;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
+    };
+  });
+};
+
 export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProps) {
   const { setHdvPrice } = useDofus();
   const { user } = useAuth();
@@ -101,10 +125,11 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
-      const base64 = dataUrl.split(',')[1];
-      setImageData(dataUrl);
+      const compressed = await compressImage(dataUrl);
+      const base64 = compressed.split(',')[1];
+      setImageData(compressed);
       analyzeImage(base64);
     };
     reader.readAsDataURL(file);
