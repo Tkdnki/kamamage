@@ -214,10 +214,8 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#0c101d] border border-slate-700/50 rounded-2xl shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-[#0c101d] border border-slate-700/50 rounded-xl shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 sticky top-0 bg-[#0c101d] z-10">
           <div className="flex items-center gap-2.5">
