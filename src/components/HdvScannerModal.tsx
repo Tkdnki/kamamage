@@ -4,7 +4,7 @@ import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
 import { searchItems } from '../services/api';
 import type { DofusItem } from '../data/mockData';
-import { Camera, X, Upload, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Camera, X, Upload, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock } from 'lucide-react';
 
 interface ScanResult {
   item_name: string;
@@ -14,6 +14,11 @@ interface ScanResult {
     x100: number;
     x1000: number;
   };
+}
+
+interface QueueEntry {
+  dataUrl: string;
+  base64: string;
 }
 
 interface HdvScannerModalProps {
@@ -58,19 +63,54 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
   const { setHdvPrice } = useDofus();
   const { user } = useAuth();
 
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pauseMessage, setPauseMessage] = useState<string | null>(null);
+
   const [imageData, setImageData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [matchedItem, setMatchedItem] = useState<DofusItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [matchAttempted, setMatchAttempted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [matchAttempted, setMatchAttempted] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+  const queueRef = useRef<QueueEntry[]>([]);
+  const processingRef = useRef(false);
+
+  const cancelCurrentRef = useRef(false);
+
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  const updateDisplay = useCallback((entry: QueueEntry | null) => {
+    if (entry) {
+      setImageData(entry.dataUrl);
+      setResult(null);
+      setMatchedItem(null);
+      setError(null);
+      setMatchAttempted(false);
+    } else {
+      setImageData(null);
+      setResult(null);
+      setMatchedItem(null);
+      setError(null);
+      setMatchAttempted(false);
+    }
+  }, []);
 
   const reset = useCallback(() => {
+    queueRef.current = [];
+    processingRef.current = false;
+    cancelCurrentRef.current = true;
+    setQueue([]);
+    setIsProcessing(false);
+    setPauseMessage(null);
     setImageData(null);
     setIsLoading(false);
     setResult(null);
@@ -97,7 +137,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
         if (item.type.startsWith('image/')) {
           e.preventDefault();
           const file = item.getAsFile();
-          if (file) processFile(file);
+          if (file) addToQueue(file);
           return;
         }
       }
@@ -107,20 +147,9 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     return () => document.removeEventListener('paste', handlePaste);
   }, [isOpen]);
 
-  const processFile = (file: File) => {
-    setError(null);
-    setResult(null);
-    setMatchedItem(null);
-    setMatchAttempted(false);
-    setToast(null);
-
+  const addToQueue = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Le fichier doit être une image (PNG, JPG, etc.)');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError('L\'image ne doit pas dépasser 10 Mo');
       return;
     }
 
@@ -129,15 +158,149 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
       const dataUrl = e.target?.result as string;
       const compressed = await compressImage(dataUrl);
       const base64 = compressed.split(',')[1];
-      setImageData(compressed);
-      analyzeImage(base64);
+      const entry: QueueEntry = { dataUrl: compressed, base64 };
+
+      setQueue(prev => {
+        const next = [...prev, entry];
+        queueRef.current = next;
+        return next;
+      });
+
+      setError(null);
+
+      if (!processingRef.current) {
+        processingRef.current = true;
+        cancelCurrentRef.current = false;
+        setIsProcessing(true);
+        setTimeout(() => processQueue(), 50);
+      }
     };
     reader.readAsDataURL(file);
   };
 
+  const processQueue = async () => {
+    while (queueRef.current.length > 0 && !cancelCurrentRef.current) {
+      const entry = queueRef.current[0];
+      queueRef.current = queueRef.current.slice(1);
+      setQueue([...queueRef.current]);
+
+      updateDisplay(entry);
+      setIsLoading(true);
+      setError(null);
+
+      let scanResult: ScanResult | null = null;
+      let scanError: string | null = null;
+      let isRateLimited = false;
+
+      try {
+        const response = await fetch('/api/scan-hdv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: entry.base64 }),
+        });
+
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitSeconds = retryAfter ? parseInt(retryAfter, 10) : 15;
+          isRateLimited = true;
+          setIsLoading(false);
+          setPauseMessage(`Limite de débit atteinte — pause de ${waitSeconds}s...`);
+          await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+          setPauseMessage(null);
+          queueRef.current = [entry, ...queueRef.current];
+          setQueue([...queueRef.current]);
+          continue;
+        }
+
+        if (!response.ok) {
+          const errData = await response.json();
+          scanError = errData.detail ? `${errData.error} — ${errData.detail}` : (errData.error || 'Erreur lors de l\'analyse');
+          continue;
+        }
+
+        const data: ScanResult = await response.json();
+        scanResult = data;
+      } catch (err) {
+        scanError = err instanceof Error ? err.message : 'Erreur inconnue';
+      }
+
+      if (cancelCurrentRef.current) break;
+
+      if (isRateLimited) continue;
+
+      if (scanError) {
+        setResult(null);
+        setError(scanError);
+        setIsLoading(false);
+        // Wait for user interaction before continuing
+        await new Promise<void>(resolve => {
+          const interval = setInterval(() => {
+            if (cancelCurrentRef.current || queueRef.current.length === 0) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 200);
+          const onRetry = () => {
+            clearInterval(interval);
+            queueRef.current = [entry, ...queueRef.current];
+            setQueue([...queueRef.current]);
+            resolve();
+          };
+          (window as any).__scannerRetry = onRetry;
+        });
+        continue;
+      }
+
+      if (scanResult) {
+        setResult(scanResult);
+        setIsLoading(false);
+
+        // Fuzzy matching
+        const normalizedInput = normalize(scanResult.item_name);
+        setMatchAttempted(true);
+        let matched: DofusItem | undefined;
+
+        try {
+          const items = await searchItems(scanResult.item_name);
+          matched = items.find(i => normalize(i.name) === normalizedInput);
+          if (!matched) {
+            matched = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
+          }
+          if (!matched && items.length > 0) {
+            matched = items[0];
+          }
+        } catch {}
+
+        if (matched) {
+          setMatchedItem(matched);
+          // Auto-save
+          setHdvPrice(
+            matched._id,
+            scanResult.prices.x1,
+            scanResult.prices.x10,
+            scanResult.prices.x100,
+            scanResult.prices.x1000,
+          );
+          showToast('success', `✅ ${matched.name} : prix mis à jour sur Supabase !`);
+
+          // Clear display briefly before next item
+          await new Promise(resolve => setTimeout(resolve, 600));
+        } else {
+          // Item not matched — keep displayed for manual action
+        }
+      }
+    }
+
+    if (!cancelCurrentRef.current) {
+      processingRef.current = false;
+      setIsProcessing(false);
+      updateDisplay(null);
+    }
+  };
+
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processFile(file);
+    if (file) addToQueue(file);
     e.target.value = '';
   };
 
@@ -158,86 +321,22 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     e.stopPropagation();
     setIsDragging(false);
 
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
-  };
-
-  const analyzeImage = async (base64: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/scan-hdv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        const msg = errData.detail ? `${errData.error} — ${errData.detail}` : (errData.error || 'Erreur lors de l\'analyse');
-        throw new Error(msg);
+    for (const file of Array.from(e.dataTransfer.files)) {
+      if (file.type.startsWith('image/')) {
+        addToQueue(file);
       }
-
-      const scanResult: ScanResult = await response.json();
-      setResult(scanResult);
-
-      // Fuzzy matching
-      await matchItem(scanResult.item_name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const matchItem = async (itemName: string) => {
-    setMatchAttempted(true);
-    const normalizedInput = normalize(itemName);
-
-    try {
-      const items = await searchItems(itemName);
-
-      // Try exact match first
-      let best: DofusItem | undefined = items.find(i => normalize(i.name) === normalizedInput);
-      if (!best) {
-        // Try substring: le nom recherché est contenu dans le nom de l'item
-        best = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
-      }
-      if (!best && items.length > 0) {
-        best = items[0];
-      }
-
-      if (best) {
-        setMatchedItem(best);
-      }
-    } catch {
-      // DofusDB indisponible — on garde le nom texte sans ID
-    }
-  };
-
-  const handleSave = () => {
-    if (!matchedItem || !result) return;
-
-    setHdvPrice(
-      matchedItem._id,
-      result.prices.x1,
-      result.prices.x10,
-      result.prices.x100,
-      result.prices.x1000,
-    );
-
-    setToast({ type: 'success', message: `✅ Prix de ${matchedItem.name} mis à jour sur Supabase !` });
   };
 
   const handleRetry = () => {
-    if (imageData) {
-      const base64 = imageData.split(',')[1];
-      analyzeImage(base64);
+    if (typeof (window as any).__scannerRetry === 'function') {
+      (window as any).__scannerRetry();
     }
   };
 
   if (!isOpen) return null;
+
+  const queueCount = queue.length;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
@@ -260,8 +359,24 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
 
         {/* Content */}
         <div className="p-5 space-y-4">
-          {/* Drop zone — only when no image loaded */}
-          {!imageData && (
+          {/* Queue status */}
+          {(queueCount > 0 || isProcessing) && (
+            <div className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold ${
+              pauseMessage
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                : 'bg-cyan-500/5 border-cyan-500/20 text-cyan-300'
+            }`}>
+              {pauseMessage ? (
+                <Clock className="h-4 w-4 shrink-0 animate-pulse" />
+              ) : (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              )}
+              <span>{pauseMessage || `${queueCount} image${queueCount > 1 ? 's' : ''} restante${queueCount > 1 ? 's' : ''} dans la file d'attente`}</span>
+            </div>
+          )}
+
+          {/* Drop zone — only when no image and nothing in progress */}
+          {!imageData && !isLoading && queueCount === 0 && (
             <div
               ref={dropRef}
               onDragOver={handleDragOver}
@@ -300,21 +415,27 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
           {imageData && (
             <div className="relative rounded-xl overflow-hidden border border-slate-700/50 bg-[#070a12]">
               <img src={imageData} alt="Aperçu" className="w-full max-h-64 object-contain" />
-              <button
-                onClick={() => { setImageData(null); setResult(null); setMatchedItem(null); setError(null); setMatchAttempted(false); }}
-                className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-white/10"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {isLoading && (
+                <div className="absolute inset-0 bg-slate-950/60 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+                </div>
+              )}
             </div>
           )}
 
           {/* Loading */}
-          {isLoading && (
+          {isLoading && !imageData && (
             <div className="flex flex-col items-center gap-3 py-6">
               <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
               <p className="text-sm text-slate-400 font-semibold">Analyse par intelligence artificielle...</p>
-              <p className="text-[10px] text-slate-500">Gemini 1.5 Flash analyse la capture d'écran</p>
+            </div>
+          )}
+
+          {/* Pause / Rate limit */}
+          {pauseMessage && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Clock className="h-5 w-5 text-amber-400 shrink-0 animate-pulse" />
+              <p className="text-xs font-semibold text-amber-300">{pauseMessage}</p>
             </div>
           )}
 
@@ -335,7 +456,6 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
           {/* Result */}
           {result && !isLoading && (
             <div className="space-y-3">
-              {/* Item identification */}
               <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Item détecté</span>
@@ -343,7 +463,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
                 </div>
                 <p className="text-sm font-bold text-white mt-1">{result.item_name}</p>
                 {matchedItem && (
-                  <p className="text-[11px] text-emerald-400 mt-0.5">Correspondance : {matchedItem.name}</p>
+                  <p className="text-[11px] text-emerald-400 mt-0.5">✓ Auto-sauvegardé — {matchedItem.name}</p>
                 )}
                 {matchAttempted && !matchedItem && (
                   <p className="text-[11px] text-amber-400 mt-0.5 flex items-center gap-1">
@@ -352,7 +472,6 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
                 )}
               </div>
 
-              {/* Prices */}
               <div className="grid grid-cols-4 gap-2">
                 {(['x1', 'x10', 'x100', 'x1000'] as const).map(lot => (
                   <div key={lot} className="flex flex-col items-center p-2 rounded-lg bg-[#070a12] border border-white/5">
@@ -364,16 +483,19 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
                 ))}
               </div>
 
-              {/* Save button */}
-              <button
-                onClick={handleSave}
-                disabled={!matchedItem || !user}
-                title={!user ? 'Connectez-vous pour sauvegarder' : !matchedItem ? 'Item non identifié' : ''}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20"
-              >
-                <Upload className="h-4 w-4" />
-                {!user ? 'Connectez-vous pour sauvegarder' : !matchedItem ? 'Item non identifié' : 'Sauvegarder les prix'}
-              </button>
+              {!matchedItem && (
+                <button
+                  onClick={() => {
+                    if (typeof (window as any).__scannerQueueRetry === 'function') {
+                      (window as any).__scannerQueueRetry();
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-lg shadow-cyan-500/20"
+                >
+                  <Upload className="h-4 w-4" />
+                  Passer au suivant
+                </button>
+              )}
             </div>
           )}
 
