@@ -1,12 +1,28 @@
 import type { DofusDbItem, DofusDbRecipe, DofusDbPaginatedResponse } from '../types/dofusdb';
 import type { DofusItem } from '../data/mockData';
 
-
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const TIMEOUT_MS = 5000;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Map des Métiers DofusDB ──────────────────────────────────────────────────
 
+export const DOFUSDB_JOB_IDS: Record<string, number> = {
+  'Alchimiste': 26,
+  'Bijoutier': 16,
+  'Bricoleur': 60,
+  'Bûcheron': 2,
+  'Chasseur': 41,
+  'Cordonnier': 15,
+  'Façonneur': 65,
+  'Forgeron': 11,
+  'Mineur': 24,
+  'Paysan': 28,
+  'Pêcheur': 36,
+  'Sculpteur': 13,
+  'Tailleur': 27,
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function dofusdbGet<T>(path: string): Promise<T> {
   const controller = new AbortController();
@@ -28,10 +44,6 @@ async function dofusdbGet<T>(path: string): Promise<T> {
 
 // ─── Normalisation : DofusDbItem → DofusItem (format interne de l'app) ───────
 
-/**
- * Transforme un item DofusDB en format interne DofusItem utilisé par le reste de l'app.
- * On stocke `dofusdbId` pour pouvoir récupérer la recette plus tard.
- */
 export function normalizeDofusDbItem(raw: DofusDbItem): DofusItem {
   return {
     _id: String(raw.id),
@@ -39,16 +51,36 @@ export function normalizeDofusDbItem(raw: DofusDbItem): DofusItem {
     type: raw.type?.name?.fr ?? String(raw.typeId),
     level: raw.level,
     imgUrl: raw.img,
-    // Pas de recette embarquée : elle sera chargée à la demande via fetchRecipeForItem()
   };
+}
+
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+
+export interface NormalizedRecipeIngredient {
+  id: string;
+  name: string;
+  quantity: number;
+  imgUrl: string;
+  type: string;
+  level: number;
+}
+
+export interface CraftItem {
+  _id: string;
+  name: string;
+  type: string;
+  level: number;
+  imgUrl: string;
+  dofusdbId?: number;
+  job?: string;
+  recipeIngredients: NormalizedRecipeIngredient[];
 }
 
 // ─── Recherche d'items ────────────────────────────────────────────────────────
 
 /**
- * Recherche des items par nom (partiel, insensible à la casse) sur DofusDB.
- * La liste est vide tant que l'utilisateur n'a pas tapé 3 caractères.
- * En cas d'échec de l'API, retourne un tableau vide sans injecter de fausses données.
+ * Recherche des items par nom sur DofusDB.
+ * Ne fait AUCUN fallback sur un seul mot-clé pour éviter de retourner des résultats sans rapport.
  */
 export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
@@ -72,30 +104,14 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   };
 
   try {
-    console.log('[searchItems] Requête originale:', cleanQuery);
+    console.log('[searchItems] Recherche DofusDB stricte:', cleanQuery);
     let items = await trySearch(cleanQuery);
-    console.log('[searchItems] Résultats (originale):', items.length);
 
     if (items.length === 0) {
-      // Fallback 1 : normalisé sans accents + apostrophes uniformisées
       const normalized = normalizeQuery(cleanQuery);
       if (normalized !== cleanQuery) {
-        console.log('[searchItems] Fallback normalisé:', normalized);
+        console.log('[searchItems] Recherche DofusDB (sans accents):', normalized);
         items = await trySearch(normalized);
-        console.log('[searchItems] Résultats (normalisé):', items.length);
-      }
-    }
-
-    if (items.length === 0) {
-      // Fallback 2 : recherche par mots-clés (prendre le 1er mot significatif)
-      const words = cleanQuery.split(/\s+/).filter(w => w.length >= 3);
-      for (const word of words) {
-        console.log('[searchItems] Fallback mot-clé:', word);
-        items = await trySearch(word);
-        if (items.length > 0) {
-          console.log('[searchItems] Résultats (mot-clé):', items.length);
-          break;
-        }
       }
     }
 
@@ -106,14 +122,8 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   }
 }
 
-// ─── Récupération de recette ──────────────────────────────────────────────────
+// ─── Récupération de recette par item ─────────────────────────────────────────
 
-/**
- * Récupère la recette d'un item via son ID numérique DofusDB.
- * Endpoint : GET /recipes?resultId={dofusdbId}
- *
- * Retourne un tableau d'ingrédients normalisés ou `null` si la recette est absente.
- */
 export async function fetchRecipeForItem(dofusdbId: number): Promise<NormalizedRecipeIngredient[] | null> {
   try {
     const path = `/recipes?resultId=${dofusdbId}`;
@@ -121,8 +131,6 @@ export async function fetchRecipeForItem(dofusdbId: number): Promise<NormalizedR
 
     if (!data.data || data.data.length === 0) return null;
 
-    // DofusDB peut retourner plusieurs recettes pour un même item (variantes de craft).
-    // On prend la première.
     const recipe = data.data[0];
 
     return recipe.ingredients.map((ing, idx) => ({
@@ -139,10 +147,49 @@ export async function fetchRecipeForItem(dofusdbId: number): Promise<NormalizedR
   }
 }
 
-/**
- * Récupère les recettes pour un métier donné (par jobId DofusDB).
- * Endpoint : GET /recipes?jobId={jobId}&$limit=50
- */
+// ─── Récupération de crafts par métier ───────────────────────────────────────
+
+export async function fetchCraftsByJob(jobName: string): Promise<CraftItem[]> {
+  const jobId = DOFUSDB_JOB_IDS[jobName];
+  if (!jobId) {
+    console.warn(`[KamaMage] Métier inconnu: "${jobName}"`);
+    return [];
+  }
+
+  try {
+    const path = `/recipes?jobId=${jobId}&$limit=50`;
+    const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+
+    if (!data.data) return [];
+
+    return data.data.map(recipe => {
+      const resultItem = recipe.result;
+      const ingredients: NormalizedRecipeIngredient[] = (recipe.ingredients ?? []).map((ing, idx) => ({
+        id: String(ing.id),
+        name: ing.name?.fr ?? 'Ingrédient inconnu',
+        quantity: recipe.quantities?.[idx] ?? 1,
+        imgUrl: ing.img ?? '',
+        type: ing.type?.name?.fr ?? 'Ressource',
+        level: ing.level ?? 1,
+      }));
+
+      return {
+        _id: String(resultItem.id),
+        name: resultItem.name?.fr ?? 'Item inconnu',
+        type: recipe.resultType?.name?.fr ?? resultItem.type?.name?.fr ?? 'Équipement',
+        level: recipe.resultLevel ?? resultItem.level ?? 1,
+        imgUrl: resultItem.img ?? '',
+        dofusdbId: resultItem.id,
+        job: jobName,
+        recipeIngredients: ingredients,
+      };
+    });
+  } catch (err) {
+    console.warn(`[KamaMage] fetchCraftsByJob(${jobName}) — DofusDB inaccessible :`, err);
+    return [];
+  }
+}
+
 export async function fetchRecipesByJob(jobId: number): Promise<DofusDbRecipe[]> {
   try {
     const path = `/recipes?jobId=${jobId}&$limit=50`;
@@ -152,129 +199,4 @@ export async function fetchRecipesByJob(jobId: number): Promise<DofusDbRecipe[]>
     console.warn(`[KamaMage] fetchRecipesByJob(${jobId}) — DofusDB inaccessible :`, err);
     return [];
   }
-}
-
-// ─── New: fetch crafts by job (via /recipes) ──────────────────────────────────
-
-/** Objet craft tel que consommé par CraftProfitability (recette embarquée) */
-export interface CraftItem {
-  _id: string;
-  name: string;
-  type: string;
-  level: number;
-  imgUrl: string;
-  dofusdbId: number;
-  baseXp: number;
-  ingredients: NormalizedRecipeIngredient[];
-  /** Nombre d'ingrédients requis (calculé) */
-  ingredientCount: number;
-  /** Somme des niveaux de tous les ingrédients (calculé) */
-  totalIngredientLevel: number;
-}
-
-/** Mapping nom de métier → jobId DofusDB (source : /jobs) */
-const JOB_ID_MAP: Record<string, number> = {
-  Alchimiste: 26,
-  Bijoutier: 16,
-  Bricoleur: 65,
-  Bûcheron: 2,
-  Chasseur: 41,
-  Cordonnier: 15,
-  Éleveur: 79,
-  Façonneur: 60,
-  Forgeron: 11,
-  Mineur: 24,
-  Paysan: 28,
-  Pêcheur: 36,
-  Sculpteur: 13,
-  Tailleur: 27,
-};
-
-const CRAFTS_PER_PAGE = 200;
-
-/**
- * Récupère tous les crafts d'un métier depuis DofusDB.
- * Interroge /recipes?jobId={id} qui retourne chaque recette avec
- * result (objet crafté), ingredients (full items) et quantities.
- */
-export async function fetchCraftsByJob(
-  jobName: string,
-): Promise<CraftItem[]> {
-  const jobId = JOB_ID_MAP[jobName];
-  if (!jobId) {
-    console.warn(`[KamaMage] fetchCraftsByJob — métier inconnu : ${jobName}`);
-    return [];
-  }
-
-  const seenByItemId = new Map<string, CraftItem>();
-  const seenByRecipeId = new Set<number>();
-  let allItems: CraftItem[] = [];
-  let skip = 0;
-
-  try {
-    while (true) {
-      const path = `/recipes?jobId=${jobId}&$limit=${CRAFTS_PER_PAGE}&$skip=${skip}`;
-      const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
-      const batch = data.data ?? [];
-
-      if (batch.length === 0) break;
-
-      for (const recipe of batch) {
-        if (seenByRecipeId.has(recipe.id)) continue;
-        seenByRecipeId.add(recipe.id);
-
-        const itemId = String(recipe.result.id);
-        if (seenByItemId.has(itemId)) continue;
-
-        const normalizedIngredients = recipe.ingredients.map((ing, idx) => ({
-          id: String(ing.id),
-          name: ing.name.fr,
-          quantity: recipe.quantities[idx] ?? 1,
-          imgUrl: ing.img,
-          type: ing.type?.name?.fr ?? String(ing.typeId),
-          level: ing.level,
-        }));
-
-        const totalIngredientLevel = normalizedIngredients.reduce(
-          (sum, ing) => sum + ing.level * ing.quantity, 0,
-        );
-
-        seenByItemId.set(itemId, {
-          _id: itemId,
-          name: recipe.result.name.fr,
-          type: recipe.result.type?.name?.fr ?? String(recipe.result.typeId),
-          level: recipe.result.level,
-          imgUrl: recipe.result.img,
-          dofusdbId: recipe.result.id,
-          baseXp: recipe.experience ?? recipe.result.level * 100,
-          ingredients: normalizedIngredients,
-          ingredientCount: normalizedIngredients.length,
-          totalIngredientLevel,
-        });
-      }
-
-      skip += batch.length;
-    }
-
-    allItems = Array.from(seenByItemId.values());
-    return allItems;
-  } catch (err) {
-    console.warn(
-      `[KamaMage] fetchCraftsByJob(${jobName}) — DofusDB inaccessible :`,
-      err,
-    );
-    return allItems.length > 0 ? allItems : [];
-  }
-}
-
-// ─── Types exportés pour les composants ──────────────────────────────────────
-
-/** Ingrédient normalisé prêt à l'emploi dans les composants */
-export interface NormalizedRecipeIngredient {
-  id: string;         // String(dofusDbItem.id)
-  name: string;       // item.name.fr
-  quantity: number;
-  imgUrl: string;
-  type: string;
-  level: number;
 }

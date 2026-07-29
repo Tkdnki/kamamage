@@ -33,11 +33,11 @@ interface HdvScannerModalProps {
 }
 
 /**
- * Normalise une chaîne de caractères pour faciliter la comparaison :
- * - Minuscules
- * - Suppression des diacritiques (accents : É -> e, etc.)
- * - Normalisation des apostrophes
- * - Suppression des caractères spéciaux
+ * Normalise une chaîne de caractères pour comparaison stricte :
+ * - Passage en minuscules
+ * - Suppression des accents (É -> e, etc.)
+ * - Normalisation des apostrophes et tirets
+ * - Suppression des espaces superflus
  */
 function normalize(str: string): string {
   return str
@@ -147,7 +147,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     setCopiedId(null);
   }, []);
 
-  // Re-initialise expectedItems à chaque ouverture ou changement d'initialQueue
   useEffect(() => {
     if (isOpen && initialQueue && initialQueue.length > 0) {
       setExpectedItems(initialQueue);
@@ -243,10 +242,9 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         const body: Record<string, any> = { image: entry.base64 };
         const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
         if (unresolvedExpected.length > 0) {
-          // Fournir le nom attendu à l'IA OCR pour maximiser la précision
           body.expectedName = unresolvedExpected[0].expectedName;
         }
-        console.log('[scan] 📤 Envoi image à /api/scan-hdv. Item attendu suggéré:', body.expectedName || '(aucun)');
+        console.log('[scan] 📤 Envoi image à /api/scan-hdv. Suggéré:', body.expectedName || '(aucun)');
 
         const response = await fetch('/api/scan-hdv', {
           method: 'POST',
@@ -330,100 +328,58 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           let matchedExpected: ScannerQueueItem | undefined;
 
           // =========================================================================
-          // RÈGLE N°1 : La file d'attente SAIT quel item est attendu (expectedItems).
-          // Utiliser TOUJOURS le nom exact ou l'ID de cet item attendu pour la mise à jour Supabase,
-          // au lieu de faire confiance aveuglément au texte brut extrait par l'OCR.
+          // CORRESPONDANCE STRICTE ET SÉCURISÉE (SANS FALLBACK HASARDEUX)
           // =========================================================================
 
+          // 1. Recherche stricte dans la file d'attente d'items attendus (expectedItems)
           if (unresolvedExpected.length > 0) {
-            // Étape 1a : Correspondance exacte normalisée (ex: "Casque de l'Ecumouth" vs "Casque de l'Écumouth")
+            // Correspondance exacte sur le nom normalisé (ignore casse, accents et apostrophes)
             matchedExpected = unresolvedExpected.find(e => normalize(e.expectedName) === normalizedInput);
 
-            // Étape 1b : Correspondance par sous-chaîne normalisée
-            if (!matchedExpected) {
-              matchedExpected = unresolvedExpected.find(e => {
-                const normExpected = normalize(e.expectedName);
-                return normExpected.includes(normalizedInput) || normalizedInput.includes(normExpected);
-              });
-            }
-
-            // Étape 1c : Correspondance par mots clés (word overlap)
-            if (!matchedExpected) {
-              const words = normalizedInput.split(/\s+/).filter(w => w.length > 1);
-              if (words.length > 0) {
-                matchedExpected = unresolvedExpected.find(e => {
-                  const normExpected = normalize(e.expectedName);
-                  const cover = words.filter(w => normExpected.includes(w)).length;
-                  return cover >= Math.ceil(words.length / 2);
-                });
-              }
-            }
-
-            // Étape 1d : S'il n'y a qu'UN SEUL item attendu non résolu dans la file d'attente,
-            // l'image scannée correspond impérativement à cet item attendu.
+            // Si un seul item est attendu dans la file, l'image scannée lui correspond directement
             if (!matchedExpected && unresolvedExpected.length === 1) {
               matchedExpected = unresolvedExpected[0];
-              console.log(`[scan] 🎯 1 seul item attendu restant dans la file : association auto OCR "${item.name}" -> "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`);
+              console.log(`[scan] 🎯 Item unique attendu restant : OCR "${item.name}" -> Nom exact "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`);
             }
           }
 
           if (matchedExpected) {
-            // Sauvegarde directe avec l'expectedId et l'expectedName EXACTS (sans passer par DofusDB)
-            console.log(`[scan] ✅ Match item attendu réussi : OCR "${item.name}" -> Nom exact "${matchedExpected.expectedName}" (ID "${matchedExpected.expectedId}")`, item.prices);
+            // Sauvegarde directe avec l'expectedId et l'expectedName EXACTS
+            console.log(`[scan] ✅ Match exact item attendu : OCR "${item.name}" -> "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`, item.prices);
             
-            // Appeler setHdvPrice avec l'ID attendu
             setHdvPrice(matchedExpected.expectedId, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
             newResolved.add(matchedExpected.expectedId);
 
             const dofusItem = { _id: matchedExpected.expectedId, name: matchedExpected.expectedName } as DofusItem;
             matched.push({ item, dofusItem });
           } else {
-            // Étape 2 : Pas d'item attendu direct ou file d'attente vide -> Recherche DofusDB
-            console.log(`[scan] 🔍 Recherche DofusDB pour OCR "${item.name}"...`);
+            // 2. Recherche stricte sur DofusDB (pour les scans hors file d'attente)
+            console.log(`[scan] 🔍 Recherche DofusDB stricte pour OCR "${item.name}"...`);
             let dofusItem: DofusItem | undefined;
 
             try {
               const dbItems = await searchItems(item.name);
-              console.log(`[scan] DofusDB "${item.name}" → ${dbItems.length} résultat(s)`);
               const searchNormalized = normalize(item.name);
 
-              // 2a. Match exact
+              // Correspondance stricte : le nom de l'item DofusDB normalisé doit correspondre EXACTEMENT
               dofusItem = dbItems.find(i => normalize(i.name) === searchNormalized);
 
-              // 2b. Match sous-chaîne
               if (!dofusItem) {
-                dofusItem = dbItems.find(i => normalize(i.name).includes(searchNormalized) || searchNormalized.includes(normalize(i.name)));
-              }
-
-              // 2c. Match mots-clés
-              if (!dofusItem) {
-                const words = searchNormalized.split(/\s+/).filter(w => w.length > 1);
-                if (words.length > 0) {
-                  dofusItem = dbItems.find(i => {
-                    const normName = normalize(i.name);
-                    const cover = words.filter(w => normName.includes(w)).length;
-                    return cover >= Math.ceil(words.length / 2);
-                  });
-                }
-              }
-
-              // SÉCURITÉ CRITIQUE : Ne PLUS attribuer aveuglément dbItems[0] si aucune correspondance réelle n'est trouvée !
-              if (!dofusItem) {
-                console.warn(`[scan] ⚠️ Aucun match pertinent dans DofusDB pour "${item.name}". Aucun item erroné ne sera mis à jour.`);
+                console.warn(`[scan] ⚠️ Aucun match exact dans DofusDB pour "${item.name}" (${dbItems.length} résultat(s) ignoré(s)). Aucune action effectuée.`);
               }
             } catch (err) {
               console.error(`[scan] ❌ Erreur recherche DofusDB pour "${item.name}":`, err);
             }
 
             if (dofusItem) {
-              console.log(`[scan] ✅ Match DofusDB trouvé : OCR "${item.name}" -> ID "${dofusItem._id}" ("${dofusItem.name}")`, item.prices);
+              console.log(`[scan] ✅ Match DofusDB exact trouvé : OCR "${item.name}" -> "${dofusItem.name}" (ID "${dofusItem._id}")`, item.prices);
               setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
               if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
                 newResolved.add(dofusItem._id);
               }
               matched.push({ item, dofusItem });
             } else {
-              console.warn(`[scan] ❌ Échec de la reconnaissance pour OCR "${item.name}"`);
+              console.warn(`[scan] 🛑 Item non reconnu avec certitude : "${item.name}". Ignoré pour éviter toute écriture erronée.`);
               unmatched.push(item.name);
             }
           }
@@ -451,7 +407,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       setIsProcessing(false);
       updateDisplay(null);
 
-      // Auto-close si tous les items attendus sont résolus
       if (expectedItemsRef.current.length > 0 && !recipeDoneRef.current && expectedItemsRef.current.every(e => resolvedIdsRef.current.has(e.expectedId))) {
         recipeDoneRef.current = true;
         showToast('success', 'Prix de la recette mis à jour sur Supabase !');
