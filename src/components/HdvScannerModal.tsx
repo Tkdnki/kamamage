@@ -86,6 +86,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   const [expectedItems, setExpectedItems] = useState<ScannerQueueItem[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const resolvedIdsRef = useRef<Set<string>>(new Set());
   const recipeDoneRef = useRef(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,6 +133,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     setToast(null);
     setExpectedItems([]);
     setResolvedIds(new Set());
+    resolvedIdsRef.current = new Set();
     setCopiedId(null);
   }, []);
 
@@ -140,11 +142,13 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     if (isOpen && initialQueue && initialQueue.length > 0) {
       setExpectedItems(initialQueue);
       setResolvedIds(new Set());
+      resolvedIdsRef.current = new Set();
       setCopiedId(null);
       recipeDoneRef.current = false;
     } else if (isOpen) {
       setExpectedItems([]);
       setResolvedIds(new Set());
+      resolvedIdsRef.current = new Set();
       setCopiedId(null);
     }
   }, [isOpen, initialQueue]);
@@ -296,7 +300,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
         const matched: { item: ScanItem; dofusItem: DofusItem }[] = [];
         const unmatched: string[] = [];
-        const newResolved = new Set(resolvedIds);
+        const newResolved = new Set(resolvedIdsRef.current);
 
         for (const item of scanResult.items) {
           const normalizedInput = normalize(item.name);
@@ -331,6 +335,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           }
         }
 
+        resolvedIdsRef.current = newResolved;
         setResolvedIds(newResolved);
         setMatchedItems(matched);
         setUnmatchedNames(unmatched);
@@ -338,12 +343,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         // Toast for individual success
         if (matched.length > 0 && expectedItems.length === 0) {
           showToast('success', `${matched.length} prix mis à jour sur Supabase !`);
-        }
-
-        // Final toast when all expected items are done
-        if (expectedItems.length > 0 && !recipeDoneRef.current && expectedItems.every(e => newResolved.has(e.expectedId))) {
-          recipeDoneRef.current = true;
-          showToast('success', 'Prix mis à jour');
         }
 
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -354,6 +353,13 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       processingRef.current = false;
       setIsProcessing(false);
       updateDisplay(null);
+
+      // Auto-close si tous les items attendus sont résolus
+      if (expectedItems.length > 0 && !recipeDoneRef.current && expectedItems.every(e => resolvedIdsRef.current.has(e.expectedId))) {
+        recipeDoneRef.current = true;
+        showToast('success', 'Prix de la recette mis à jour sur Supabase !');
+        setTimeout(() => onClose(), 1200);
+      }
     }
   };
 
