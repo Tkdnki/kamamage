@@ -39,13 +39,10 @@ Réponds uniquement avec un objet JSON strict au format :
   }
 }`;
 
-    // Modèles Vision Groq à tester par ordre de priorité
+    // Modèles Vision Groq actifs à tester
     const visionModels = [
-      'llama-3.2-90b-vision-preview',
-      'llama-3.2-11b-vision-instruct',
-      'llama-3.2-90b-vision-instruct',
-      'meta-llama/llama-3.2-11b-vision-instruct',
-      'meta-llama/llama-3.2-90b-vision-instruct'
+      'qwen/qwen3.6-27b',
+      'meta-llama/llama-4-scout-17b-16e-instruct'
     ];
 
     let lastError = '';
