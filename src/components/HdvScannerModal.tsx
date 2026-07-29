@@ -149,7 +149,8 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.error || 'Erreur lors de l\'analyse');
+        const msg = errData.detail ? `${errData.error} — ${errData.detail}` : (errData.error || 'Erreur lors de l\'analyse');
+        throw new Error(msg);
       }
 
       const scanResult: ScanResult = await response.json();

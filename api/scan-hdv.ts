@@ -1,54 +1,56 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-interface GeminiResponse {
-  candidates?: {
-    content?: {
-      parts?: { text?: string }[];
-    };
-  }[];
-}
-
-interface ScanResult {
-  item_name: string;
-  prices: {
-    x1: number;
-    x10: number;
-    x100: number;
-    x1000: number;
-  };
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS & Méthode
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { image } = req.body;
-  if (!image || typeof image !== 'string') {
-    return res.status(400).json({ error: 'Image (base64) requise' });
+    return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY non configurée' });
+    return res.status(500).json({ 
+      error: 'La clé GEMINI_API_KEY est manquante sur le serveur Vercel. Vérifiez les variables d\'environnement Vercel.' 
+    });
   }
 
-  const prompt =
-    'Tu es un extracteur de données pour l\'Hôtel de Vente (HDV) du jeu Dofus. ' +
-    'Analyse cette capture d\'écran et extrait au format JSON strict :\n' +
-    '{\n' +
-    '  "item_name": string (nom exact de l\'item),\n' +
-    '  "prices": {\n' +
-    '    "x1": number,\n' +
-    '    "x10": number,\n' +
-    '    "x100": number,\n' +
-    '    "x1000": number\n' +
-    '  }\n' +
-    '}\n' +
-    'Ne réponds rien d\'autre que l\'objet JSON.';
-
   try {
-    const geminiRes = await fetch(
+    const { image } = req.body || {};
+    if (!image) {
+      return res.status(400).json({ error: 'Aucune image fournie dans le corps de la requête.' });
+    }
+
+    // Extraction du mimeType et de la chaîne Base64 pure
+    let mimeType = 'image/png';
+    let base64Data = image;
+
+    if (image.startsWith('data:')) {
+      const match = image.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      } else {
+        base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+      }
+    }
+
+    const promptText = `Tu es un extracteur de données ultra-précis pour l'Hôtel de Vente (HDV) du jeu Dofus.
+Analyse cette capture d'écran HDV et extrait :
+1. Le nom exact de l'item (ex: "Gelano", "Bois de Frêne", "Laine de Bouftou").
+2. Les prix de vente associés aux lots (1, 10, 100, 1000). Si un lot n'est pas présent sur l'image, mets 0.
+
+Réponds EXCLUSIVEMENT avec un objet JSON au format strict suivant, sans aucun autre texte ou markdown :
+{
+  "item_name": "Nom de l'item",
+  "prices": {
+    "x1": 0,
+    "x10": 0,
+    "x100": 0,
+    "x1000": 0
+  }
+}`;
+
+    // Appel REST Gemini 1.5 Flash
+    const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -57,42 +59,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           contents: [
             {
               parts: [
-                { text: prompt },
-                { inlineData: { mimeType: 'image/png', data: image } },
+                { text: promptText },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data,
+                  },
+                },
               ],
             },
           ],
+          generationConfig: {
+            response_mime_type: 'application/json',
+            temperature: 0.1,
+          },
         }),
-      },
+      }
     );
 
-    if (!geminiRes.ok) {
-      const errorText = await geminiRes.text();
-      console.error('[scan-hdv] Gemini error:', geminiRes.status, errorText);
-      return res.status(502).json({ error: 'Erreur API Gemini', detail: errorText });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API Error:', errText);
+      return res.status(response.status).json({ 
+        error: `Erreur API Gemini (${response.status}): ${errText}` 
+      });
     }
 
-    const data: GeminiResponse = await geminiRes.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) {
-      return res.status(502).json({ error: 'Gemini n\'a rien retourné' });
+    if (!rawText) {
+      return res.status(500).json({ error: 'Gemini n\'a renvoyé aucune donnée exploitable.' });
     }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.status(502).json({ error: 'Format JSON attendu', raw: text });
-    }
+    // Parsing JSON
+    const parsedData = JSON.parse(rawText);
+    return res.status(200).json(parsedData);
 
-    const result: ScanResult = JSON.parse(jsonMatch[0]);
-
-    if (!result.item_name || !result.prices) {
-      return res.status(502).json({ error: 'JSON invalide', raw: jsonMatch[0] });
-    }
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error('[scan-hdv] Error:', err);
-    return res.status(500).json({ error: 'Erreur interne' });
+  } catch (err: any) {
+    console.error('Handler Error:', err);
+    return res.status(500).json({ error: `Erreur serveur : ${err.message || String(err)}` });
   }
 }
