@@ -76,14 +76,9 @@ export async function pushHdvPricesToServer(server: string, data: Record<string,
       if (pd.x10 > 0) lots.push({ lot: 'x10', price: pd.x10 });
       if (pd.x100 > 0) lots.push({ lot: 'x100', price: pd.x100 });
       if (pd.x1000 > 0) lots.push({ lot: 'x1000', price: pd.x1000 });
-      // Lots mis à 0 : supprimer l'entrée côté serveur
-      const zeroLots: { lot: string }[] = [];
-      if (pd.x1 === 0) zeroLots.push({ lot: 'x1' });
-      if (pd.x10 === 0) zeroLots.push({ lot: 'x10' });
-      if (pd.x100 === 0) zeroLots.push({ lot: 'x100' });
-      if (pd.x1000 === 0) zeroLots.push({ lot: 'x1000' });
-      const deletes = zeroLots.map(l => deletePrice(server, 'hdv', itemId, l.lot));
-      return [...lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price)), ...deletes];
+      const isEquipment = lots.length === 1 && lots[0].lot === 'x1';
+      console.log(`[Sync] Payload pour "${itemId}":`, { lots, isEquipment });
+      return lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price));
     })
   );
 }
