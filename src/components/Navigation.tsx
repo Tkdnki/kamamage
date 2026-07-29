@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap, Wrench } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap, Wrench, Camera } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
 import AuthPanel from './AuthPanel';
+import HdvScannerModal from './HdvScannerModal';
 import type { ViewType } from '../context/NavigationContext';
 
 export type { ViewType } from '../context/NavigationContext';
@@ -11,6 +12,7 @@ export type { ViewType } from '../context/NavigationContext';
 export default function Navigation() {
   const { selectedServer, setSelectedServer } = useServer();
   const { activeView, setActiveView } = useNavigation();
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const tabs = [
     {
@@ -133,7 +135,17 @@ export default function Navigation() {
                 </button>
               );
             })}
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-300 group text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+            >
+              <Camera className="h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 text-slate-400 group-hover:text-cyan-300" />
+              <span className="text-[10px] sm:text-xs">Scan HDV</span>
+            </button>
           </nav>
+
+          {/* Scanner Modal */}
+          <HdvScannerModal isOpen={scannerOpen} onClose={() => setScannerOpen(false)} />
         </div>
       </div>
     </header>
