@@ -269,6 +269,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         }
       } catch (err) {
         scanError = err instanceof Error ? err.message : 'Erreur inconnue';
+        console.error('[scan] Erreur fetch scan-hdv:', scanError);
       }
 
       if (cancelCurrentRef.current) {
@@ -314,11 +315,21 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
           try {
             const items = await searchItems(item.name);
+            console.log(`[scan] Recherche "${item.name}" → ${items.length} résultat(s)`);
             dofusItem = items.find(i => normalize(i.name) === normalizedInput);
             if (!dofusItem) {
               dofusItem = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
             }
+            if (!dofusItem) {
+              const words = normalizedInput.split(/\s+/).filter(Boolean);
+              dofusItem = items.find(i => {
+                const normName = normalize(i.name);
+                const cover = words.filter(w => normName.includes(w)).length;
+                return cover >= Math.ceil(words.length / 2);
+              });
+            }
             if (!dofusItem && items.length > 0) {
+              console.warn(`[scan] Aucune correspondance pour "${item.name}", forçage vers "${items[0].name}"`);
               dofusItem = items[0];
             }
           } catch {}

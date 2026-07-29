@@ -105,7 +105,9 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
           const content = data.choices?.[0]?.message?.content;
           if (content) {
             const parsedData = JSON.parse(content);
+            console.log('[scan-hdv] IA brute:', JSON.stringify(parsedData));
             const sanitized = sanitizeResponse(parsedData);
+            console.log('[scan-hdv] Sanitized:', JSON.stringify(sanitized));
             return res.status(200).json(sanitized);
           }
         } else {

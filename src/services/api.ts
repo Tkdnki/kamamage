@@ -54,12 +54,42 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery || cleanQuery.length < 3) return [];
 
-  try {
-    const encoded = encodeURIComponent(cleanQuery);
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const trySearch = async (q: string): Promise<DofusItem[]> => {
+    const encoded = encodeURIComponent(escapeRegex(q));
     const path = `/items?name.fr[$regex]=${encoded}&name.fr[$options]=i&$limit=25`;
     const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbItem>>(path);
+    return (data.data ?? []).map(normalizeDofusDbItem);
+  };
 
-    const items: DofusItem[] = (data.data ?? []).map(normalizeDofusDbItem);
+  try {
+    console.log('[searchItems] Requête originale:', cleanQuery);
+    let items = await trySearch(cleanQuery);
+    console.log('[searchItems] Résultats (originale):', items.length);
+
+    if (items.length === 0) {
+      // Fallback 1 : normalisé sans accents
+      const normalized = cleanQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (normalized !== cleanQuery) {
+        console.log('[searchItems] Fallback normalisé:', normalized);
+        items = await trySearch(normalized);
+        console.log('[searchItems] Résultats (normalisé):', items.length);
+      }
+    }
+
+    if (items.length === 0) {
+      // Fallback 2 : recherche par mots-clés (prendre le 1er mot significatif)
+      const words = cleanQuery.split(/\s+/).filter(w => w.length >= 3);
+      for (const word of words) {
+        console.log('[searchItems] Fallback mot-clé:', word);
+        items = await trySearch(word);
+        if (items.length > 0) {
+          console.log('[searchItems] Résultats (mot-clé):', items.length);
+          break;
+        }
+      }
+    }
 
     return items;
   } catch (err) {
