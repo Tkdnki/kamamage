@@ -11,8 +11,7 @@ export type { ViewType } from '../context/NavigationContext';
 
 export default function Navigation() {
   const { selectedServer, setSelectedServer } = useServer();
-  const { activeView, setActiveView } = useNavigation();
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const { activeView, setActiveView, isScannerOpen, openScanner, closeScanner, scannerInitialQueue } = useNavigation();
 
   const tabs = [
     {
@@ -136,7 +135,7 @@ export default function Navigation() {
               );
             })}
             <button
-              onClick={() => setScannerOpen(true)}
+              onClick={openScanner}
               className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-300 group text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
             >
               <Camera className="h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 text-slate-400 group-hover:text-cyan-300" />
@@ -145,7 +144,7 @@ export default function Navigation() {
           </nav>
 
           {/* Scanner Modal */}
-          <HdvScannerModal isOpen={scannerOpen} onClose={() => setScannerOpen(false)} />
+          <HdvScannerModal isOpen={isScannerOpen} onClose={closeScanner} initialQueue={scannerInitialQueue} />
         </div>
       </div>
     </header>

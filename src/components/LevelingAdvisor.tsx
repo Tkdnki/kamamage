@@ -11,7 +11,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   Loader2, TrendingUp, TrendingDown, AlertTriangle, Search,
-  GraduationCap, Info, Copy, Check, ChevronDown
+  GraduationCap, Info, Copy, Check, ChevronDown, Camera
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -60,7 +60,7 @@ interface LevelRow {
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { user } = useAuth();
-  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -560,6 +560,18 @@ export default function LevelingAdvisor() {
                   >
                     <TrendingUp className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Rentabilité</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openScanner([
+                      { expectedName: selectedItem.name, expectedId: selectedItem._id },
+                      ...selectedItem.ingredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
+                    ])}
+                    className="shrink-0 flex items-center gap-1.5 bg-[#151f32] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-500/20 text-slate-300 hover:text-cyan-400 text-[10px] font-bold py-2 px-2.5 rounded-lg transition-all"
+                    title="Scanner les prix de cette recette"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Scan recette</span>
                   </button>
                   {BREAKING_JOBS.includes(activeJob) && (
                     <button

@@ -24,20 +24,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const promptText = `Tu es un extracteur de données ultra-stricte pour l'Hôtel de Vente (HDV) du jeu Dofus.
-Analyse l'image fournie et extrait :
-1. Le nom exact de l'item tel qu'il est écrit textuellement en haut de la fenêtre (ex: "Ailes de Moskito"). NE MODIFIE PAS l'orthographe, ne rajoute pas de 's' pluriel si le jeu met un singulier, recopie exactement les caractères visibles.
-2. Les prix associés aux lots (x1, x10, x100, x1000). Attention, les prix peuvent contenir des espaces pour séparer les milliers (ex: "1 200 000"). Tu dois nettoyer ces espaces pour renvoyer uniquement des valeurs numériques brutes (ex: 1200000). Si un lot est absent, mets 0.
+Analyse l'image fournie et extrait TOUS les items visibles dans la fenêtre (l'item principal ET ses ingrédients). Pour chaque item :
+1. Le nom exact de l'item tel qu'il est écrit textuellement. NE MODIFIE PAS l'orthographe, recopie exactement les caractères visibles.
+2. Les prix associés aux lots (x1, x10, x100, x1000). Attention, les prix peuvent contenir des espaces pour séparer les milliers (ex: "1 200 000"). Tu dois nettoyer ces espaces pour renvoyer uniquement des valeurs numériques brutes (ex: 1200000). Si un lot est absent ou non visible, mets 0.
 
 Réponds uniquement avec un objet JSON strict au format :
 {
-  "item_name": "Nom exact de l'item",
-  "prices": {
-    "x1": 0,
-    "x10": 0,
-    "x100": 0,
-    "x1000": 0
-  }
-}`;
+  "items": [
+    {
+      "name": "Nom exact de l'item",
+      "prices": { "x1": 0, "x10": 0, "x100": 0, "x1000": 0 }
+    }
+  ]
+}
+
+Si un seul item est visible, retourne-le dans le tableau avec un seul élément.`;
 
     // Modèle Vision Groq actif actuel
     const visionModels = [

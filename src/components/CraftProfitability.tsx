@@ -12,7 +12,7 @@ import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   TrendingUp, TrendingDown, AlertTriangle, Coins, Sparkles, Loader2, Search,
-  ShoppingCart, Check, Copy, GraduationCap
+  ShoppingCart, Check, Copy, GraduationCap, Camera
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -52,7 +52,7 @@ const CopyButton = ({ text }: { text: string }) => {
 export default function CraftProfitability() {
   const { user } = useAuth();
   const { hdvPrices, setHdvPrice, setMonthlySalesVolume, trackItem } = useDofus();
-  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
+  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -539,6 +539,15 @@ export default function CraftProfitability() {
                     className="bg-[#151f32] hover:bg-dofus-accent/10 border border-white/10 hover:border-dofus-accent/20 text-slate-300 hover:text-dofus-accent text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
                   >
                     Suivre en HDV
+                  </button>
+                  <button
+                    onClick={() => openScanner([
+                      { expectedName: selectedItem.name, expectedId: selectedItem._id },
+                      ...activeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
+                    ])}
+                    className="bg-[#151f32] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-500/20 text-slate-300 hover:text-cyan-400 text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
+                  >
+                    <Camera className="h-3.5 w-3.5" /> Scan recette
                   </button>
                   <button
                     onClick={() => navigateToLevelingItem(selectedItem._id, activeJob, undefined, selectedItem.level)}

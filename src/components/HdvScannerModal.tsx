@@ -4,16 +4,21 @@ import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
 import { searchItems } from '../services/api';
 import type { DofusItem } from '../data/mockData';
-import { Camera, X, Upload, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock } from 'lucide-react';
+import type { ScannerQueueItem } from '../context/NavigationContext';
+import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks } from 'lucide-react';
 
-interface ScanResult {
-  item_name: string;
+interface ScanItem {
+  name: string;
   prices: {
     x1: number;
     x10: number;
     x100: number;
     x1000: number;
   };
+}
+
+interface ScanRecipeResult {
+  items: ScanItem[];
 }
 
 interface QueueEntry {
@@ -24,6 +29,7 @@ interface QueueEntry {
 interface HdvScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialQueue?: ScannerQueueItem[];
 }
 
 function normalize(str: string): string {
@@ -59,7 +65,7 @@ const compressImage = (base64Str: string): Promise<string> => {
   });
 };
 
-export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProps) {
+export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvScannerModalProps) {
   const { setHdvPrice } = useDofus();
   const { user } = useAuth();
 
@@ -69,18 +75,23 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
 
   const [imageData, setImageData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
-  const [matchedItem, setMatchedItem] = useState<DofusItem | null>(null);
+  const [result, setResult] = useState<ScanRecipeResult | null>(null);
+  const [matchedItems, setMatchedItems] = useState<{ item: ScanItem; dofusItem: DofusItem }[]>([]);
+  const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [matchAttempted, setMatchAttempted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Recipe progress tracking
+  const [expectedItems, setExpectedItems] = useState<ScannerQueueItem[]>([]);
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const recipeDoneRef = useRef(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const queueRef = useRef<QueueEntry[]>([]);
   const processingRef = useRef(false);
-
   const cancelCurrentRef = useRef(false);
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
@@ -92,15 +103,15 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     if (entry) {
       setImageData(entry.dataUrl);
       setResult(null);
-      setMatchedItem(null);
+      setMatchedItems([]);
+      setUnmatchedNames([]);
       setError(null);
-      setMatchAttempted(false);
     } else {
       setImageData(null);
       setResult(null);
-      setMatchedItem(null);
+      setMatchedItems([]);
+      setUnmatchedNames([]);
       setError(null);
-      setMatchAttempted(false);
     }
   }, []);
 
@@ -108,17 +119,35 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     queueRef.current = [];
     processingRef.current = false;
     cancelCurrentRef.current = true;
+    recipeDoneRef.current = false;
     setQueue([]);
     setIsProcessing(false);
     setPauseMessage(null);
     setImageData(null);
     setIsLoading(false);
     setResult(null);
-    setMatchedItem(null);
+    setMatchedItems([]);
+    setUnmatchedNames([]);
     setError(null);
-    setMatchAttempted(false);
     setToast(null);
+    setExpectedItems([]);
+    setResolvedIds(new Set());
+    setCopiedId(null);
   }, []);
+
+  // Re-initialise expectedItems à chaque ouverture ou changement d'initialQueue
+  useEffect(() => {
+    if (isOpen && initialQueue && initialQueue.length > 0) {
+      setExpectedItems(initialQueue);
+      setResolvedIds(new Set());
+      setCopiedId(null);
+      recipeDoneRef.current = false;
+    } else if (isOpen) {
+      setExpectedItems([]);
+      setResolvedIds(new Set());
+      setCopiedId(null);
+    }
+  }, [isOpen, initialQueue]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -188,7 +217,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
       setIsLoading(true);
       setError(null);
 
-      let scanResult: ScanResult | null = null;
+      let scanResult: ScanRecipeResult | null = null;
       let scanError: string | null = null;
       let isRateLimited = false;
       const controller = new AbortController();
@@ -222,8 +251,15 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
           continue;
         }
 
-        const data: ScanResult = await response.json();
-        scanResult = data;
+        const data = await response.json();
+
+        if (data.items && Array.isArray(data.items)) {
+          scanResult = data as ScanRecipeResult;
+        } else if (data.item_name && data.prices) {
+          scanResult = { items: [{ name: data.item_name, prices: data.prices }] };
+        } else {
+          scanError = 'Format de réponse inattendu';
+        }
       } catch (err) {
         scanError = err instanceof Error ? err.message : 'Erreur inconnue';
       }
@@ -236,7 +272,6 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
         setResult(null);
         setError(scanError);
         setIsLoading(false);
-        // Wait for user interaction before continuing
         await new Promise<void>(resolve => {
           const interval = setInterval(() => {
             if (cancelCurrentRef.current || queueRef.current.length === 0) {
@@ -259,39 +294,59 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
         setResult(scanResult);
         setIsLoading(false);
 
-        // Fuzzy matching
-        const normalizedInput = normalize(scanResult.item_name);
-        setMatchAttempted(true);
-        let matched: DofusItem | undefined;
+        const matched: { item: ScanItem; dofusItem: DofusItem }[] = [];
+        const unmatched: string[] = [];
+        const newResolved = new Set(resolvedIds);
 
-        try {
-          const items = await searchItems(scanResult.item_name);
-          matched = items.find(i => normalize(i.name) === normalizedInput);
-          if (!matched) {
-            matched = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
+        for (const item of scanResult.items) {
+          const normalizedInput = normalize(item.name);
+          let dofusItem: DofusItem | undefined;
+
+          try {
+            const items = await searchItems(item.name);
+            dofusItem = items.find(i => normalize(i.name) === normalizedInput);
+            if (!dofusItem) {
+              dofusItem = items.find(i => normalize(i.name).includes(normalizedInput) || normalizedInput.includes(normalize(i.name)));
+            }
+            if (!dofusItem && items.length > 0) {
+              dofusItem = items[0];
+            }
+          } catch {}
+
+          if (dofusItem) {
+            matched.push({ item, dofusItem });
+            setHdvPrice(
+              dofusItem._id,
+              item.prices.x1,
+              item.prices.x10,
+              item.prices.x100,
+              item.prices.x1000,
+            );
+            // Mark as resolved if this item is in the expected recipe queue
+            if (expectedItems.some(e => e.expectedId === dofusItem!._id)) {
+              newResolved.add(dofusItem._id);
+            }
+          } else {
+            unmatched.push(item.name);
           }
-          if (!matched && items.length > 0) {
-            matched = items[0];
-          }
-        } catch {}
-
-        if (matched) {
-          setMatchedItem(matched);
-          // Auto-save
-          setHdvPrice(
-            matched._id,
-            scanResult.prices.x1,
-            scanResult.prices.x10,
-            scanResult.prices.x100,
-            scanResult.prices.x1000,
-          );
-          showToast('success', `✅ ${matched.name} : prix mis à jour sur Supabase !`);
-
-          // Clear display briefly before next item
-          await new Promise(resolve => setTimeout(resolve, 600));
-        } else {
-          // Item not matched — keep displayed for manual action
         }
+
+        setResolvedIds(newResolved);
+        setMatchedItems(matched);
+        setUnmatchedNames(unmatched);
+
+        // Toast for individual success
+        if (matched.length > 0 && expectedItems.length === 0) {
+          showToast('success', `${matched.length} prix mis à jour sur Supabase !`);
+        }
+
+        // Final toast when all expected items are done
+        if (expectedItems.length > 0 && !recipeDoneRef.current && expectedItems.every(e => newResolved.has(e.expectedId))) {
+          recipeDoneRef.current = true;
+          showToast('success', 'Prix mis à jour');
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
     }
 
@@ -332,15 +387,11 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
     }
   };
 
-  const handleRetry = () => {
-    if (typeof (window as any).__scannerRetry === 'function') {
-      (window as any).__scannerRetry();
-    }
-  };
-
   if (!isOpen) return null;
 
   const queueCount = queue.length;
+  const resolvedCount = resolvedIds.size;
+  const totalExpected = expectedItems.length;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
@@ -353,7 +404,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
             </div>
             <div>
               <h2 className="text-sm font-bold text-white">Scan HDV</h2>
-              <p className="text-[10px] text-slate-400">Import par capture d'écran</p>
+              <p className="text-[10px] text-slate-400">{totalExpected > 0 ? 'Scan de recette' : 'Import par capture d\'écran'}</p>
             </div>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors border border-white/10">
@@ -363,6 +414,42 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
 
         {/* Content */}
         <div className="p-5 space-y-4">
+          {/* Recipe progress checklist */}
+          {totalExpected > 0 && (
+            <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <ListChecks className="h-4 w-4 text-cyan-400" />
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Items de la recette ({resolvedCount}/{totalExpected})</span>
+              </div>
+              <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
+                {expectedItems.map(item => {
+                  const done = resolvedIds.has(item.expectedId);
+                  return (
+                    <div key={item.expectedId} className="flex items-center gap-1.5 text-[11px]">
+                      {done ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                      ) : (
+                        <div className="h-3.5 w-3.5 rounded-full border border-slate-600 shrink-0" />
+                      )}
+                      <span className={done ? 'text-emerald-300 line-through opacity-60 flex-1 truncate' : 'text-slate-300 flex-1 truncate'}>{item.expectedName}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.expectedName); setCopiedId(item.expectedId); setTimeout(() => setCopiedId(null), 1500); }}
+                        className="opacity-30 hover:opacity-100 transition-opacity shrink-0 p-0.5"
+                        title="Copier le nom"
+                      >
+                        {copiedId === item.expectedId ? (
+                          <Check className="h-3 w-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3 w-3 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Queue status */}
           {(queueCount > 0 || isProcessing) && (
             <div className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold ${
@@ -379,7 +466,7 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
             </div>
           )}
 
-          {/* Drop zone — only when no image and nothing in progress */}
+          {/* Drop zone */}
           {!imageData && !isLoading && queueCount === 0 && (
             <div
               ref={dropRef}
@@ -451,9 +538,6 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
                 <p className="text-xs font-semibold text-rose-300">Erreur d'analyse</p>
                 <p className="text-[11px] text-rose-400/80 mt-0.5 max-h-40 overflow-y-auto break-words whitespace-pre-wrap select-text">{error}</p>
               </div>
-              <button onClick={handleRetry} className="text-[10px] font-bold text-rose-400 hover:text-rose-300 shrink-0">
-                Réessayer
-              </button>
             </div>
           )}
 
@@ -461,44 +545,52 @@ export default function HdvScannerModal({ isOpen, onClose }: HdvScannerModalProp
           {result && !isLoading && (
             <div className="space-y-3">
               <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Item détecté</span>
-                  {matchedItem && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-                </div>
-                <p className="text-sm font-bold text-white mt-1">{result.item_name}</p>
-                {matchedItem && (
-                  <p className="text-[11px] text-emerald-400 mt-0.5">✓ Auto-sauvegardé — {matchedItem.name}</p>
-                )}
-                {matchAttempted && !matchedItem && (
-                  <p className="text-[11px] text-amber-400 mt-0.5 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Aucune correspondance trouvée sur DofusDB
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {(['x1', 'x10', 'x100', 'x1000'] as const).map(lot => (
-                  <div key={lot} className="flex flex-col items-center p-2 rounded-lg bg-[#070a12] border border-white/5">
-                    <span className="text-[8px] text-slate-500 font-bold uppercase">{lot.replace('x', '×')}</span>
-                    <span className="text-sm font-extrabold text-white mt-0.5">
-                      {result.prices[lot]?.toLocaleString() || '0'}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    {result.items.length} item{result.items.length > 1 ? 's' : ''} détecté{result.items.length > 1 ? 's' : ''}
+                  </span>
+                  {matchedItems.length > 0 && (
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      {matchedItems.length} enregistré{matchedItems.length > 1 ? 's' : ''}
                     </span>
-                  </div>
-                ))}
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                  {result.items.map((item, idx) => {
+                    const matched = matchedItems.find(m => m.item === item);
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-[#070a12] border border-white/5">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {matched ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                          )}
+                          <span className="text-xs text-white truncate">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {(['x1', 'x10', 'x100', 'x1000'] as const).map(lot => (
+                            <span key={lot} className="text-[9px] font-bold text-slate-400">
+                              {item.prices[lot]?.toLocaleString() || '0'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {!matchedItem && (
-                <button
-                  onClick={() => {
-                    if (typeof (window as any).__scannerQueueRetry === 'function') {
-                      (window as any).__scannerQueueRetry();
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-lg shadow-cyan-500/20"
-                >
-                  <Upload className="h-4 w-4" />
-                  Passer au suivant
-                </button>
+              {unmatchedNames.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-300">
+                  <p className="font-semibold mb-1">{unmatchedNames.length} item{unmatchedNames.length > 1 ? 's' : ''} non reconnu{unmatchedNames.length > 1 ? 's' : ''} :</p>
+                  <ul className="list-disc list-inside text-[10px] text-amber-400/80 space-y-0.5">
+                    {unmatchedNames.map((name, i) => (
+                      <li key={i}>{name}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}

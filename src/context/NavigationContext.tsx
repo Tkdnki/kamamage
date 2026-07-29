@@ -5,6 +5,11 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'breaking' | 'elevage' | 'shopping' | 'profile';
 
+export interface ScannerQueueItem {
+  expectedName: string;
+  expectedId: string;
+}
+
 export interface CartEntry {
   item: DofusItem;
   quantityNeeded: number;
@@ -16,6 +21,10 @@ type ShoppingCart = Record<string, CartEntry>;
 interface NavigationContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
+  isScannerOpen: boolean;
+  openScanner: (recipeItems?: ScannerQueueItem[]) => void;
+  closeScanner: () => void;
+  scannerInitialQueue: ScannerQueueItem[];
   pendingHdvItem: Partial<DofusItem> | null;
   navigateToHdvItem: (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => void;
   clearPendingHdvItem: () => void;
@@ -48,6 +57,16 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [activeView, setActiveView] = useState<ViewType>('hdv');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerInitialQueue, setScannerInitialQueue] = useState<ScannerQueueItem[]>([]);
+  const openScanner = (recipeItems?: ScannerQueueItem[]) => {
+    if (recipeItems) setScannerInitialQueue(recipeItems);
+    setIsScannerOpen(true);
+  };
+  const closeScanner = () => {
+    setIsScannerOpen(false);
+    setScannerInitialQueue([]);
+  };
   const [pendingHdvItem, setPendingHdvItem] = useState<Partial<DofusItem> | null>(null);
   const [previousView, setPreviousView] = useState<ViewType | null>(null);
   const [previousItemId, setPreviousItemId] = useState<string | null>(null);
@@ -147,6 +166,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   return (
     <NavigationContext.Provider value={{
       activeView, setActiveView,
+      isScannerOpen, openScanner, closeScanner, scannerInitialQueue,
       pendingHdvItem, navigateToHdvItem, clearPendingHdvItem,
       previousView, clearPreviousView,
       previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,
