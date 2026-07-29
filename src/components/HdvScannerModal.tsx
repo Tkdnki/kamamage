@@ -234,6 +234,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
       try {
         const body: Record<string, any> = { image: entry.base64 };
+        console.log('[scan] Données envoyées:', { expectedName: body.expectedName, imageLength: entry.base64.length });
         // Passer le nom attendu pour guider l'IA et permettre la sauvegarde directe
         const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
         if (unresolvedExpected.length === 1) {
@@ -290,20 +291,19 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         setResult(null);
         setError(scanError);
         setIsLoading(false);
+        console.error('[scan] Erreur d\'analyse, auto-skip dans 10s:', scanError);
+        const skipTimer = setTimeout(() => {
+          (window as any).__scannerSkip = true;
+        }, 10000);
         await new Promise<void>(resolve => {
           const interval = setInterval(() => {
-            if (cancelCurrentRef.current || queueRef.current.length === 0) {
+            if (cancelCurrentRef.current || queueRef.current.length === 0 || (window as any).__scannerSkip) {
               clearInterval(interval);
+              clearTimeout(skipTimer);
+              (window as any).__scannerSkip = false;
               resolve();
             }
           }, 200);
-          const onRetry = () => {
-            clearInterval(interval);
-            queueRef.current = [entry, ...queueRef.current];
-            setQueue([...queueRef.current]);
-            resolve();
-          };
-          (window as any).__scannerRetry = onRetry;
         });
         continue;
       }

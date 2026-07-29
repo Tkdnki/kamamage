@@ -4,13 +4,14 @@ import type { PriceData } from '../context/DofusContext';
 // ─── RPC upsert (contourne RLS via SECURITY DEFINER) ────────────────────
 
 async function upsertPrice(server: string, category: string, itemKey: string, lot: string | null, price: number) {
-  const { error } = await supabase.rpc('upsert_consolidated_price', {
+  const { data, error } = await supabase.rpc('upsert_consolidated_price', {
     p_server_name: server,
     p_category: category,
     p_item_key: itemKey,
     p_lot: lot,
     p_price: price,
   });
+  console.log(`[Sync] Supabase upsert:`, { server, category, itemKey, lot, price, data, error: error?.message });
   if (error) console.warn(`[Sync] upsert_consolidated_price error:`, error.message);
 }
 
