@@ -86,6 +86,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   const [expectedItems, setExpectedItems] = useState<ScannerQueueItem[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const expectedItemsRef = useRef<ScannerQueueItem[]>([]);
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const recipeDoneRef = useRef(false);
 
@@ -132,6 +133,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     setError(null);
     setToast(null);
     setExpectedItems([]);
+    expectedItemsRef.current = [];
     setResolvedIds(new Set());
     resolvedIdsRef.current = new Set();
     setCopiedId(null);
@@ -141,12 +143,14 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   useEffect(() => {
     if (isOpen && initialQueue && initialQueue.length > 0) {
       setExpectedItems(initialQueue);
+      expectedItemsRef.current = initialQueue;
       setResolvedIds(new Set());
       resolvedIdsRef.current = new Set();
       setCopiedId(null);
       recipeDoneRef.current = false;
     } else if (isOpen) {
       setExpectedItems([]);
+      expectedItemsRef.current = [];
       setResolvedIds(new Set());
       resolvedIdsRef.current = new Set();
       setCopiedId(null);
@@ -327,7 +331,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
               item.prices.x1000,
             );
             // Mark as resolved if this item is in the expected recipe queue
-            if (expectedItems.some(e => e.expectedId === dofusItem!._id)) {
+            if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
               newResolved.add(dofusItem._id);
             }
           } else {
@@ -355,7 +359,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       updateDisplay(null);
 
       // Auto-close si tous les items attendus sont résolus
-      if (expectedItems.length > 0 && !recipeDoneRef.current && expectedItems.every(e => resolvedIdsRef.current.has(e.expectedId))) {
+      if (expectedItemsRef.current.length > 0 && !recipeDoneRef.current && expectedItemsRef.current.every(e => resolvedIdsRef.current.has(e.expectedId))) {
         recipeDoneRef.current = true;
         showToast('success', 'Prix de la recette mis à jour sur Supabase !');
         setTimeout(() => onClose(), 1200);
