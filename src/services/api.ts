@@ -298,7 +298,7 @@ export async function fetchRecipeForItem(dofusdbId: number): Promise<NormalizedR
 
     const recipe = data.data[0];
 
-    return recipe.ingredients.map((ing, idx) => ({
+    return (recipe.ingredients ?? []).map((ing, idx) => ({
       id: String(ing.id),
       name: ing.name.fr,
       quantity: recipe.quantities[idx] ?? 1,

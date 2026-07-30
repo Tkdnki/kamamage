@@ -156,7 +156,7 @@ export default function LevelingAdvisor() {
 
       let craftCost = 0;
       let missingIngredients = false;
-      for (const ing of item.ingredients) {
+      for (const ing of item.recipeIngredients ?? []) {
         const cost = getOptimalCost(hdvPrices[ing.id], ing.quantity);
         if (cost !== null) {
           craftCost += cost;
@@ -565,7 +565,7 @@ export default function LevelingAdvisor() {
                     type="button"
                     onClick={() => openScanner([
                       { expectedName: selectedItem.name, expectedId: selectedItem._id },
-                      ...selectedItem.ingredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
+                      ...selectedItem.recipeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
                     ])}
                     className="shrink-0 flex items-center gap-1.5 bg-[#151f32] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-500/20 text-slate-300 hover:text-cyan-400 text-[10px] font-bold py-2 px-2.5 rounded-lg transition-all"
                     title="Scanner les prix de cette recette"
@@ -710,7 +710,7 @@ export default function LevelingAdvisor() {
                     Ingrédients requis
                   </label>
                   <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
-                    {selectedItem.ingredients.map(ing => {
+                    {(selectedItem.recipeIngredients ?? []).map(ing => {
                       const priceData = hdvPrices[ing.id];
                       const currentPrice = priceData?.unitAverage ?? 0;
                       const currentX1 = priceData?.x1 ?? 0;

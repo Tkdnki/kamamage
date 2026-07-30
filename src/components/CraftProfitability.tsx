@@ -138,23 +138,23 @@ export default function CraftProfitability() {
     list = [...list].sort((a, b) => {
       switch (sortBy) {
         case 'profit-desc': {
-          const pA = getCraftStats(a, a.ingredients).benefit;
-          const pB = getCraftStats(b, b.ingredients).benefit;
+          const pA = getCraftStats(a, a.recipeIngredients).benefit;
+          const pB = getCraftStats(b, b.recipeIngredients).benefit;
           return (pB || 0) - (pA || 0);
         }
         case 'profit-asc': {
-          const pA = getCraftStats(a, a.ingredients).benefit;
-          const pB = getCraftStats(b, b.ingredients).benefit;
+          const pA = getCraftStats(a, a.recipeIngredients).benefit;
+          const pB = getCraftStats(b, b.recipeIngredients).benefit;
           return (pA || 0) - (pB || 0);
         }
         case 'roi-desc': {
-          const rA = getCraftStats(a, a.ingredients).roi;
-          const rB = getCraftStats(b, b.ingredients).roi;
+          const rA = getCraftStats(a, a.recipeIngredients).roi;
+          const rB = getCraftStats(b, b.recipeIngredients).roi;
           return (rB || 0) - (rA || 0);
         }
         case 'roi-asc': {
-          const rA = getCraftStats(a, a.ingredients).roi;
-          const rB = getCraftStats(b, b.ingredients).roi;
+          const rA = getCraftStats(a, a.recipeIngredients).roi;
+          const rB = getCraftStats(b, b.recipeIngredients).roi;
           return (rA || 0) - (rB || 0);
         }
         case 'volume-desc': {
@@ -196,7 +196,7 @@ export default function CraftProfitability() {
     ? craftItems.find(item => item._id === selectedItemId) ?? craftItems[0] ?? null
     : craftItems[0] ?? null;
 
-  const activeIngredients: NormalizedRecipeIngredient[] = selectedItem?.ingredients ?? [];
+  const activeIngredients: NormalizedRecipeIngredient[] = selectedItem?.recipeIngredients ?? [];
 
   const handleJobChange = (jobName: string) => {
     setActiveJob(jobName);
@@ -356,7 +356,7 @@ export default function CraftProfitability() {
               <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto pr-1">
                 {displayedItems.map(item => {
                   const isSelected = selectedItem?._id === item._id;
-                  const itemStats = getCraftStats(item, item.ingredients);
+                  const itemStats = getCraftStats(item, item.recipeIngredients);
 
                   return (
                     <div
