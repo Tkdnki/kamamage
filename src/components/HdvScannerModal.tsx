@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
-import { searchItems } from '../services/api';
+import { searchItems, normalize } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks } from 'lucide-react';
@@ -30,23 +30,6 @@ interface HdvScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialQueue?: ScannerQueueItem[];
-}
-
-/**
- * Normalise une chaîne de caractères pour comparaison stricte :
- * - Passage en minuscules
- * - Suppression des accents (É -> e, etc.)
- * - Normalisation des apostrophes et tirets
- * - Suppression des espaces superflus
- */
-function normalize(str: string): string {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[‘’`']/g, "'")
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim();
 }
 
 const compressImage = (base64Str: string): Promise<string> => {
@@ -324,19 +307,19 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         const unresolvedExpected = expectedItemsRef.current.filter(e => !newResolved.has(e.expectedId));
 
         for (const item of scanResult.items) {
-          const normalizedInput = normalize(item.name);
+          const normalizedOcr = normalize(item.name);
           let matchedExpected: ScannerQueueItem | undefined;
 
           // =========================================================================
-          // CORRESPONDANCE STRICTE ET SÉCURISÉE (SANS FALLBACK HASARDEUX)
+          // CORRESPONDANCE STRICTE PAR NORMALISATION BILATÉRALE OBLIGATOIRE
           // =========================================================================
 
-          // 1. Recherche stricte dans la file d'attente d'items attendus (expectedItems)
+          // 1. File d'attente d'items attendus (expectedItems)
           if (unresolvedExpected.length > 0) {
-            // Correspondance exacte sur le nom normalisé (ignore casse, accents et apostrophes)
-            matchedExpected = unresolvedExpected.find(e => normalize(e.expectedName) === normalizedInput);
+            // Comparaison bilatérale : normalize(expectedName) === normalize(ocrName)
+            matchedExpected = unresolvedExpected.find(e => normalize(e.expectedName) === normalizedOcr);
 
-            // Si un seul item est attendu dans la file, l'image scannée lui correspond directement
+            // S'il n'y a qu'un SEUL item attendu restant dans la file, l'image scannée lui correspond impérativement
             if (!matchedExpected && unresolvedExpected.length === 1) {
               matchedExpected = unresolvedExpected[0];
               console.log(`[scan] 🎯 Item unique attendu restant : OCR "${item.name}" -> Nom exact "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`);
@@ -344,8 +327,8 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           }
 
           if (matchedExpected) {
-            // Sauvegarde directe avec l'expectedId et l'expectedName EXACTS
-            console.log(`[scan] ✅ Match exact item attendu : OCR "${item.name}" -> "${matchedExpected.expectedName}" (${matchedExpected.expectedId})`, item.prices);
+            // Sauvegarde directe avec l'expectedId et l'expectedName EXACTS de la file
+            console.log(`[scan] ✅ Match bilatéral réussi (file d'attente): OCR "${item.name}" -> Nom exact "${matchedExpected.expectedName}" (ID "${matchedExpected.expectedId}")`, item.prices);
             
             setHdvPrice(matchedExpected.expectedId, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
             newResolved.add(matchedExpected.expectedId);
@@ -353,33 +336,33 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
             const dofusItem = { _id: matchedExpected.expectedId, name: matchedExpected.expectedName } as DofusItem;
             matched.push({ item, dofusItem });
           } else {
-            // 2. Recherche stricte sur DofusDB (pour les scans hors file d'attente)
-            console.log(`[scan] 🔍 Recherche DofusDB stricte pour OCR "${item.name}"...`);
+            // 2. Recherche DofusDB
+            console.log(`[scan] 🔍 Recherche DofusDB pour OCR "${item.name}" (nom normalisé: "${normalizedOcr}")...`);
             let dofusItem: DofusItem | undefined;
 
             try {
               const dbItems = await searchItems(item.name);
-              const searchNormalized = normalize(item.name);
 
-              // Correspondance stricte : le nom de l'item DofusDB normalisé doit correspondre EXACTEMENT
-              dofusItem = dbItems.find(i => normalize(i.name) === searchNormalized);
+              // Normalisation bilatérale stricte : normalize(dbItem.name) === normalize(ocrName)
+              dofusItem = dbItems.find(i => normalize(i.name) === normalizedOcr);
 
               if (!dofusItem) {
-                console.warn(`[scan] ⚠️ Aucun match exact dans DofusDB pour "${item.name}" (${dbItems.length} résultat(s) ignoré(s)). Aucune action effectuée.`);
+                console.warn(`[scan] ⚠️ Aucun match exact par normalisation bilatérale dans DofusDB pour "${item.name}". Résultats retournés:`, dbItems.map(i => `${i.name} (norm: ${normalize(i.name)})`));
               }
             } catch (err) {
               console.error(`[scan] ❌ Erreur recherche DofusDB pour "${item.name}":`, err);
             }
 
             if (dofusItem) {
-              console.log(`[scan] ✅ Match DofusDB exact trouvé : OCR "${item.name}" -> "${dofusItem.name}" (ID "${dofusItem._id}")`, item.prices);
+              // Intégrité des données : On conserve l'objet complet avec son nom d'origine issu de DofusDB (ex: "Casque de l'Écumouth")
+              console.log(`[scan] ✅ Match bilatéral DofusDB réussi : OCR "${item.name}" -> Nom DofusDB exact "${dofusItem.name}" (ID "${dofusItem._id}")`, item.prices);
               setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
               if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
                 newResolved.add(dofusItem._id);
               }
               matched.push({ item, dofusItem });
             } else {
-              console.warn(`[scan] 🛑 Item non reconnu avec certitude : "${item.name}". Ignoré pour éviter toute écriture erronée.`);
+              console.warn(`[scan] 🛑 Item non reconnu avec certitude : "${item.name}". Ignoré pour éviter toute écriture erronée en base.`);
               unmatched.push(item.name);
             }
           }

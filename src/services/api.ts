@@ -22,6 +22,27 @@ export const DOFUSDB_JOB_IDS: Record<string, number> = {
   'Tailleur': 27,
 };
 
+// ─── Normalisation unifiée des chaînes pour comparaison bilatérale ────────────
+
+/**
+ * Normalise une chaîne pour comparaison bilatérale stricte :
+ * - Passage en minuscules
+ * - Suppression des accents et diacritiques (É -> e, etc.)
+ * - Uniformisation des apostrophes
+ * - Nettoyage des espaces superflus
+ */
+export function normalize(str: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[‘’`']/g, "'")
+    .replace(/[^a-z0-9\s-']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function dofusdbGet<T>(path: string): Promise<T> {
@@ -76,45 +97,42 @@ export interface CraftItem {
   recipeIngredients: NormalizedRecipeIngredient[];
 }
 
+// ─── Generateur de Regex diacritique pour DofusDB ────────────────────────────
+
+function buildDiacriticInsensitiveRegex(query: string): string {
+  const clean = query.replace(/[‘’`']/g, "'");
+  const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escaped
+    .replace(/[aàáâãäAÀÁÂÃÄ]/g, '[aàáâãäAÀÁÂÃÄ]')
+    .replace(/[eéèêëEÉÈÊË]/g, '[eéèêëEÉÈÊË]')
+    .replace(/[iíìîïIÍÌÎÏ]/g, '[iíìîïIÍÌÎÏ]')
+    .replace(/[oóòôõöOÓÒÔÕÖ]/g, '[oóòôõöOÓÒÔÕÖ]')
+    .replace(/[uúùûüUÚÙÛÜ]/g, '[uúùûüUÚÙÛÜ]')
+    .replace(/[cçCÇ]/g, '[cçCÇ]');
+}
+
 // ─── Recherche d'items ────────────────────────────────────────────────────────
 
 /**
  * Recherche des items par nom sur DofusDB.
- * Ne fait AUCUN fallback sur un seul mot-clé pour éviter de retourner des résultats sans rapport.
+ * Utilise une regex diacritique-insensible pour trouver les items avec ou sans accents en BDD.
  */
 export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery || cleanQuery.length < 3) return [];
 
-  const normalizeQuery = (s: string) => s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[‘’`']/g, "'")
-    .trim()
-    .toLowerCase();
-
-  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
   const trySearch = async (q: string): Promise<DofusItem[]> => {
-    const clean = q.replace(/[‘’`']/g, "'");
-    const encoded = encodeURIComponent(escapeRegex(clean));
+    const regexPattern = buildDiacriticInsensitiveRegex(q);
+    const encoded = encodeURIComponent(regexPattern);
     const path = `/items?name.fr[$regex]=${encoded}&name.fr[$options]=i&$limit=25`;
     const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbItem>>(path);
     return (data.data ?? []).map(normalizeDofusDbItem);
   };
 
   try {
-    console.log('[searchItems] Recherche DofusDB stricte:', cleanQuery);
-    let items = await trySearch(cleanQuery);
-
-    if (items.length === 0) {
-      const normalized = normalizeQuery(cleanQuery);
-      if (normalized !== cleanQuery) {
-        console.log('[searchItems] Recherche DofusDB (sans accents):', normalized);
-        items = await trySearch(normalized);
-      }
-    }
-
+    console.log('[searchItems] Recherche DofusDB (insensible aux accents):', cleanQuery);
+    const items = await trySearch(cleanQuery);
+    console.log(`[searchItems] DofusDB a retourné ${items.length} résultat(s)`);
     return items;
   } catch (err) {
     console.warn('[KamaMage] searchItems — DofusDB inaccessible :', err);
