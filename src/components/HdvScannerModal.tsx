@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { searchItems, normalize } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
-import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks } from 'lucide-react';
+import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key } from 'lucide-react';
 
 interface ScanItem {
   name: string;
@@ -17,8 +17,15 @@ interface ScanItem {
   };
 }
 
+interface TokenInfo {
+  remaining: number;
+  limit: number;
+  used: number;
+}
+
 interface ScanRecipeResult {
   items: ScanItem[];
+  tokens?: TokenInfo;
 }
 
 interface QueueEntry {
@@ -70,6 +77,11 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   const [matchedItems, setMatchedItems] = useState<{ item: ScanItem; dofusItem: DofusItem }[]>([]);
   const [unmatchedNames, setUnmatchedNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
+  const [groqKey, setGroqKey] = useState(() => {
+    try { return localStorage.getItem('user_groq_key') || ''; } catch { return ''; }
+  });
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -128,6 +140,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     setResolvedIds(new Set());
     resolvedIdsRef.current = new Set();
     setCopiedId(null);
+    setTokenInfo(null);
   }, []);
 
   useEffect(() => {
@@ -231,7 +244,10 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
         const response = await fetch('/api/scan-hdv', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(groqKey.trim() ? { 'x-custom-groq-key': groqKey.trim() } : {}),
+          },
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -258,6 +274,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
           if (data.items && Array.isArray(data.items)) {
             scanResult = data as ScanRecipeResult;
+            setTokenInfo(data.tokens || null);
           } else if (data.item_name && data.prices) {
             scanResult = { items: [{ name: data.item_name, prices: data.prices }] };
           } else {
@@ -421,11 +438,16 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     e.stopPropagation();
     setIsDragging(false);
 
-    for (const file of Array.from(e.dataTransfer.files)) {
-      if (file.type.startsWith('image/')) {
-        addToQueue(file);
+for (const file of Array.from(e.dataTransfer.files)) {
+        if (file.type.startsWith('image/')) {
+          addToQueue(file);
+        }
       }
-    }
+  };
+
+  const handleSaveGroqKey = (value: string) => {
+    setGroqKey(value);
+    try { localStorage.setItem('user_groq_key', value); } catch {}
   };
 
   if (!isOpen) return null;
@@ -455,6 +477,57 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
         {/* Content */}
         <div className="p-5 space-y-4">
+          {/* Token quota gauge */}
+          {tokenInfo && tokenInfo.limit > 0 && (() => {
+            const pct = (tokenInfo.remaining / tokenInfo.limit) * 100;
+            const color = pct < 5 ? 'bg-rose-500' : pct < 20 ? 'bg-amber-500' : 'bg-cyan-500';
+            const textColor = pct < 5 ? 'text-rose-300' : pct < 20 ? 'text-amber-300' : 'text-cyan-300';
+            const barColor = pct < 5 ? 'bg-rose-400' : pct < 20 ? 'bg-amber-400' : 'bg-cyan-400';
+            return (
+              <div className={`flex items-center gap-2.5 p-2.5 rounded-xl border ${color}/10 ${textColor}`}>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Tokens Groq</span>
+                    <span className="text-[10px] font-mono">{tokenInfo.remaining.toLocaleString()} / {tokenInfo.limit.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: pct + '%' }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Groq API Key */}
+          <div className="rounded-xl border border-white/5">
+            <button
+              onClick={() => setShowKeyInput(!showKeyInput)}
+              className="flex items-center gap-2 w-full p-2.5 text-left hover:bg-white/5 rounded-xl transition-colors"
+            >
+              <Key className="h-3.5 w-3.5 text-slate-500" />
+              <span className="text-[11px] text-slate-400 flex-1">
+                {groqKey.trim() ? 'Clé API personnelle active' : 'Utiliser votre propre clé API Groq'}
+              </span>
+              {groqKey.trim() && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+            </button>
+            {showKeyInput && (
+              <div className="px-2.5 pb-2.5">
+                <input
+                  type="password"
+                  value={groqKey}
+                  onChange={(e) => handleSaveGroqKey(e.target.value)}
+                  placeholder="gsk_... (optionnel — vide = clé par défaut)"
+                  className="w-full bg-[#070a12] border border-white/10 rounded-lg py-2 px-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/40 transition-colors font-mono"
+                />
+                <p className="text-[10px] text-slate-600 mt-1.5">
+                  {groqKey.trim()
+                    ? 'Votre clé personnelle est utilisée. Les quotas partagés ne seront pas impactés.'
+                    : 'Si vide, la clé par défaut du serveur sera utilisée.'}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Recipe progress checklist */}
           {totalExpected > 0 && (
             <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">

@@ -31,7 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const customKey = req.headers['x-custom-groq-key'] as string | undefined;
+  const apiKey = customKey?.trim() || process.env.GROQ_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ 
       error: 'La clé GROQ_API_KEY est manquante sur Vercel. Ajoutez-la dans Environment Variables.' 
@@ -113,6 +114,11 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
             const parsedData = JSON.parse(content);
             console.log('[scan-hdv] IA brute:', JSON.stringify(parsedData));
             const sanitized = sanitizeResponse(parsedData);
+            sanitized.tokens = {
+              remaining: parseInt(response.headers.get('x-ratelimit-remaining-tokens') || '0', 10),
+              limit: parseInt(response.headers.get('x-ratelimit-limit-tokens') || '0', 10),
+              used: parseInt(response.headers.get('x-ratelimit-used-tokens') || '0', 10),
+            };
             console.log('[scan-hdv] Sanitized:', JSON.stringify(sanitized));
             return res.status(200).json(sanitized);
           }
