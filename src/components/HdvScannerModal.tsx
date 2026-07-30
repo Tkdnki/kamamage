@@ -232,7 +232,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       let scanError: string | null = null;
       let isRateLimited = false;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       try {
         const body: Record<string, any> = { image: entry.base64 };
@@ -251,7 +251,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           body: JSON.stringify(body),
           signal: controller.signal,
         });
-        clearTimeout(timeoutId);
 
         if (response.status === 429) {
           const retryAfter = response.headers.get('Retry-After');
@@ -284,6 +283,8 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
       } catch (err) {
         scanError = err instanceof Error ? err.message : 'Erreur inconnue';
         console.error('[scan] ❌ Erreur fetch scan-hdv:', scanError);
+      } finally {
+        clearTimeout(timeoutId);
       }
 
       if (cancelCurrentRef.current) {

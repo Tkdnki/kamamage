@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const normalizeItemName = (name: string): string => {
   return name
-    .replace(/[`'`']/g, "'")
-.trim();
+    .replace(/['''`']/g, "'")
+    .trim();
 };
 
 function cleanPrice(val: any): number {

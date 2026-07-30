@@ -133,6 +133,16 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   const { user } = useAuth();
 
+  // Re-sync : quand un utilisateur se connecte, pousser les prix localStorage
+  // qui n'ont jamais été sync (ex: scan fait hors-ligne, ou onglet fermé avant le flush)
+  useEffect(() => {
+    if (!user) return;
+    const localCache = loadCache(storageKey);
+    const localKeys = Object.keys(localCache);
+    if (localKeys.length === 0) return;
+    pushHdvPricesToServer(selectedServer, localCache).catch(() => {});
+  }, [user, selectedServer, storageKey]);
+
   // Sauvegarde : push immédiat à Supabase + update local
   const pendingPush = useRef<Record<string, PriceData>>({});
   const pushTimer = useRef<ReturnType<typeof setTimeout>>();
