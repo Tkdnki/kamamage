@@ -12,7 +12,6 @@ export function getItemImageUrl(item: { imgUrl?: string; dofusdbId?: number; _id
     if (item.imgUrl.startsWith('items/')) return `${DOFUSDB_IMG_BASE}${item.imgUrl.replace('items/', '')}`;
     return `${DOFUSDB_IMG_BASE}${item.imgUrl}`;
   }
-  if (item.dofusdbId) return `${DOFUSDB_IMG_BASE}${item.dofusdbId}.png`;
   return '';
 }
 

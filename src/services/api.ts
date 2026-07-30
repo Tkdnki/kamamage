@@ -288,6 +288,75 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   }
 }
 
+// ─── Cache des types d'items DofusDB ──────────────────────────────────────────
+
+interface ItemType { id: number; name: { fr: string } }
+let itemTypesCache: Map<string, number> | null = null;
+
+async function getItemTypeId(typeName: string): Promise<number | null> {
+  // 1. Cache des types
+  if (!itemTypesCache) {
+    itemTypesCache = new Map();
+    let skip = 0;
+    const LIMIT = 200;
+    while (true) {
+      const data = await dofusdbGet<DofusDbPaginatedResponse<ItemType>>(`/item-types?$limit=${LIMIT}&$skip=${skip}`);
+      const types = data.data ?? [];
+      if (types.length === 0) break;
+      for (const t of types) {
+        const name = t.name.fr;
+        itemTypesCache.set(name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), t.id);
+        itemTypesCache.set(name, t.id);
+      }
+      skip += LIMIT;
+    }
+  }
+  const key = typeName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const cached = itemTypesCache.get(key) ?? itemTypesCache.get(typeName) ?? null;
+  if (cached !== null) return cached;
+
+  // 2. Fallback direct sur l'API item-types (regex exacte, case-sensitive — les noms DofusDB sont en français correct)
+  try {
+    const encoded = encodeURIComponent(`^${typeName}$`);
+    const path = `/item-types?name.fr[$regex]=${encoded}&$limit=1`;
+    const data = await dofusdbGet<DofusDbPaginatedResponse<ItemType>>(path);
+    if (data.data && data.data.length > 0) {
+      const t = data.data[0];
+      itemTypesCache.set(key, t.id);
+      itemTypesCache.set(typeName, t.id);
+      return t.id;
+    }
+  } catch { /* échec du fallback */ }
+
+  console.warn(`[getItemTypeId] Type "${typeName}" introuvable dans DofusDB`);
+  return null;
+}
+
+// ─── Récupération d'items par type (pour le catalogue HDV) ────────────────────
+
+export async function fetchItemsByTypeName(typeName: string): Promise<DofusItem[]> {
+  const typeId = await getItemTypeId(typeName);
+  if (typeId === null) {
+    console.warn(`[fetchItemsByTypeName] Type "${typeName}" introuvable dans DofusDB`);
+    return [];
+  }
+  const allItems: DofusItem[] = [];
+  const PAGE_LIMIT = 50;
+  let skip = 0;
+
+  while (true) {
+    const path = `/items?typeId=${typeId}&$limit=${PAGE_LIMIT}&$skip=${skip}`;
+    const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbItem>>(path);
+    const items = (data.data ?? []).map(normalizeDofusDbItem);
+    if (items.length === 0) break;
+    allItems.push(...items);
+    if (allItems.length >= data.total) break;
+    skip += PAGE_LIMIT;
+  }
+
+  return allItems;
+}
+
 // ─── Récupération de recette par item ─────────────────────────────────────────
 
 export async function fetchRecipeForItem(dofusdbId: number): Promise<NormalizedRecipeIngredient[] | null> {
