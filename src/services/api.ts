@@ -37,10 +37,85 @@ export function normalize(str: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[‘’`']/g, "'")
+    .replace(/[''`']/g, "'")
     .replace(/[^a-z0-9\s-']/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ─── Distance de Levenshtein + Fuzzy matching OCR ────────────────────────────
+
+/**
+ * Calcule la distance de Levenshtein entre deux chaînes.
+ * Représente le nombre minimum de caractères à insérer, supprimer ou remplacer
+ * pour transformer `a` en `b`.
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  const la = a.length;
+  const lb = b.length;
+  if (la === 0) return lb;
+  if (lb === 0) return la;
+
+  const matrix: number[][] = Array.from({ length: la + 1 }, () => Array(lb + 1).fill(0));
+  for (let i = 0; i <= la; i++) matrix[i][0] = i;
+  for (let j = 0; j <= lb; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= la; i++) {
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return matrix[la][lb];
+}
+
+/**
+ * Longueur minimale de nom pour autoriser le fuzzy matching (évite les faux positifs sur les noms courts).
+ */
+const FUZZY_MIN_NAME_LENGTH = 6;
+
+/**
+ * Seuil maximal de distance de Levenshtein toléré.
+ * - 1 caractère de différence pour les noms de 6-10 caractères.
+ * - 2 caractères de différence pour les noms de plus de 10 caractères.
+ */
+function getMaxFuzzyDistance(normalizedName: string): number {
+  if (normalizedName.length > 10) return 2;
+  return 1;
+}
+
+/**
+ * Recherche un item fuzzy dans une liste en utilisant la distance de Levenshtein.
+ * Retourne l'item correspondant si et seulement si :
+ * - Le nom normalisé fait plus de `FUZZY_MIN_NAME_LENGTH` caractères
+ * - La distance de Levenshtein est ≤ le seuil autorisé
+ * - Un seul item unique correspond dans cette marge
+ *
+ * @returns L'item DofusItem correspondant, ou undefined si aucun ou multiple matches.
+ */
+export function fuzzyFindItem(
+  candidates: DofusItem[],
+  ocrNormalized: string,
+): { item: DofusItem; distance: number } | undefined {
+  if (ocrNormalized.length < FUZZY_MIN_NAME_LENGTH) return undefined;
+
+  const maxDist = getMaxFuzzyDistance(ocrNormalized);
+
+  const matches: { item: DofusItem; distance: number }[] = [];
+  for (const candidate of candidates) {
+    const candidateNormalized = normalize(candidate.name);
+    const distance = levenshteinDistance(ocrNormalized, candidateNormalized);
+    if (distance > 0 && distance <= maxDist) {
+      matches.push({ item: candidate, distance });
+    }
+  }
+
+  if (matches.length === 1) return matches[0];
+  return undefined;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

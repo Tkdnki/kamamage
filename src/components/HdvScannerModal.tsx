@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
-import { searchItems, normalize } from '../services/api';
+import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key } from 'lucide-react';
@@ -362,6 +362,15 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
               // Normalisation bilatérale stricte : normalize(dbItem.name) === normalize(ocrName)
               dofusItem = dbItems.find(i => normalize(i.name) === normalizedOcr);
+
+              // Fallback : tolérance Levenshtein (1-2 fautes max, noms > 6 caractères)
+              if (!dofusItem) {
+                const fuzzyResult = fuzzyFindItem(dbItems, normalizedOcr);
+                if (fuzzyResult) {
+                  console.warn(`[scan] ⚠️ Correction automatique d'une faute OCR : "${item.name}" -> "${fuzzyResult.item.name}" (distance: ${fuzzyResult.distance})`);
+                  dofusItem = fuzzyResult.item;
+                }
+              }
 
               if (!dofusItem) {
                 console.warn(`[scan] ⚠️ Aucun match exact par normalisation bilatérale dans DofusDB pour "${item.name}". Résultats retournés:`, dbItems.map(i => `${i.name} (norm: ${normalize(i.name)})`));
