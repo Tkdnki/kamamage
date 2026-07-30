@@ -9,11 +9,12 @@ const TIMEOUT_MS = 5000;
 export const DOFUSDB_JOB_IDS: Record<string, number> = {
   'Alchimiste': 26,
   'Bijoutier': 16,
-  'Bricoleur': 60,
+  'Bricoleur': 65,
   'Bûcheron': 2,
   'Chasseur': 41,
   'Cordonnier': 15,
-  'Façonneur': 65,
+  'Éleveur': 79,
+  'Façonneur': 60,
   'Forgeron': 11,
   'Mineur': 24,
   'Paysan': 28,
@@ -322,12 +323,25 @@ export async function fetchCraftsByJob(jobName: string): Promise<CraftItem[]> {
   }
 
   try {
-    const path = `/recipes?jobId=${jobId}&$limit=50`;
-    const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+      const PAGE_LIMIT = 50;
+      const allRecipes: DofusDbRecipe[] = [];
 
-    if (!data.data) return [];
+      const fetchPage = async (skip: number): Promise<boolean> => {
+        const path = `/recipes?jobId=${jobId}&$limit=${PAGE_LIMIT}&$skip=${skip}`;
+        const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+        if (!data.data || data.data.length === 0) return false;
+        allRecipes.push(...data.data);
+        return allRecipes.length < data.total;
+      };
 
-    return data.data.map(recipe => {
+      let skip = 0;
+      let hasMore = true;
+      while (hasMore) {
+        hasMore = await fetchPage(skip);
+        skip += PAGE_LIMIT;
+      }
+
+      return allRecipes.map(recipe => {
       const resultItem = recipe.result;
       const ingredients: NormalizedRecipeIngredient[] = (recipe.ingredients ?? []).map((ing, idx) => ({
         id: String(ing.id),
@@ -357,9 +371,25 @@ export async function fetchCraftsByJob(jobName: string): Promise<CraftItem[]> {
 
 export async function fetchRecipesByJob(jobId: number): Promise<DofusDbRecipe[]> {
   try {
-    const path = `/recipes?jobId=${jobId}&$limit=50`;
-    const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
-    return data.data ?? [];
+    const PAGE_LIMIT = 50;
+    const allRecipes: DofusDbRecipe[] = [];
+
+    const fetchPage = async (skip: number): Promise<boolean> => {
+      const path = `/recipes?jobId=${jobId}&$limit=${PAGE_LIMIT}&$skip=${skip}`;
+      const data = await dofusdbGet<DofusDbPaginatedResponse<DofusDbRecipe>>(path);
+      if (!data.data || data.data.length === 0) return false;
+      allRecipes.push(...data.data);
+      return allRecipes.length < data.total;
+    };
+
+    let skip = 0;
+    let hasMore = true;
+    while (hasMore) {
+      hasMore = await fetchPage(skip);
+      skip += PAGE_LIMIT;
+    }
+
+    return allRecipes;
   } catch (err) {
     console.warn(`[KamaMage] fetchRecipesByJob(${jobId}) — DofusDB inaccessible :`, err);
     return [];
