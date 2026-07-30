@@ -189,8 +189,58 @@ function buildDiacriticInsensitiveRegex(query: string): string {
 // ─── Recherche d'items ────────────────────────────────────────────────────────
 
 /**
+ * Mots courants à ignorer lors de l'extraction du mot significatif
+ * (articles, prépositions, préfixes de marque, etc.)
+ */
+const STOP_WORDS = new Set([
+  "de", "du", "des", "la", "le", "les", "l", "un", "une",
+  "au", "aux", "en", "et", "ou", "par", "pour", "sur",
+  "casque", "épée", "epee", "cape", "anneau", "ceinture", "bottes", "bouclier",
+  "amulette", "tout", "tous",
+]);
+
+/**
+ * Extrait le mot le plus significatif d'un nom d'item OCR.
+ * Ignore les articles, prépositions et termes génériques d'équipement.
+ * Priorise le mot le plus long restant (le plus spécifique).
+ *
+ * Exemples :
+ * - "Casque de l'Obsidiantre" → "obsidiantre"
+ * - "Épée du Chaos" → "chaos"
+ * - "Obsidianstre" → "obsidianstre"
+ * - "La petite épée" → "petite"
+ */
+export function extractSignificantWord(query: string): string {
+  const normalized = query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[''`']/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const words = normalized.split(' ').filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+  if (words.length === 0) return '';
+  return words.reduce((a, b) => (a.length >= b.length ? a : b));
+}
+
+/**
+ * Tronque un mot à la racine la plus significative possible pour élargir la recherche.
+ * Enlève les 2 derniers caractères si le mot fait > 6 caractères, pour compenser
+ * les fautes OCR courantes en fin de mot (ex: "Obsidianstre" → "Obsidian").
+ */
+export function truncateForSearch(word: string): string {
+  if (word.length > 6) return word.slice(0, -2);
+  if (word.length > 4) return word.slice(0, -1);
+  return word;
+}
+
+/**
  * Recherche des items par nom sur DofusDB.
  * Utilise une regex diacritique-insensible pour trouver les items avec ou sans accents en BDD.
+ * En cas de 0 résultat, relance une recherche élargie sur le mot significatif le plus long
+ * pour alimenter le fuzzy matching.
  */
 export async function searchItems(query: string): Promise<DofusItem[]> {
   const cleanQuery = query.trim();
@@ -205,9 +255,31 @@ export async function searchItems(query: string): Promise<DofusItem[]> {
   };
 
   try {
+    // 1. Recherche stricte avec le nom complet
     console.log('[searchItems] Recherche DofusDB (insensible aux accents):', cleanQuery);
-    const items = await trySearch(cleanQuery);
+    let items = await trySearch(cleanQuery);
     console.log(`[searchItems] DofusDB a retourné ${items.length} résultat(s)`);
+
+    // 2. Si 0 résultat, élargir avec le mot significatif (pour alimenter le fuzzy matching)
+    if (items.length === 0) {
+      const significantWord = extractSignificantWord(cleanQuery);
+      if (significantWord && significantWord !== cleanQuery.toLowerCase().replace(/[^a-z0-9]/g, '')) {
+        console.log(`[searchItems] Élargissement sur mot significatif: "${significantWord}"`);
+        items = await trySearch(significantWord);
+        console.log(`[searchItems] Recherche élargie: ${items.length} résultat(s)`);
+
+        // 3. Si toujours 0, tronquer la racine pour encore plus de résultats
+        if (items.length === 0) {
+          const root = truncateForSearch(significantWord);
+          if (root.length >= 3 && root !== significantWord) {
+            console.log(`[searchItems] Recherche par racine tronquée: "${root}"`);
+            items = await trySearch(root);
+            console.log(`[searchItems] Recherche racine: ${items.length} résultat(s)`);
+          }
+        }
+      }
+    }
+
     return items;
   } catch (err) {
     console.warn('[KamaMage] searchItems — DofusDB inaccessible :', err);
