@@ -312,7 +312,7 @@ export function getHdvName(itemType: string | null | undefined): string | null {
 export function getHdvCategoryForItem(expectedName: string, expectedId: string): string | null {
   let type: string | null = null;
 
-  if (DOFUS_RUNES.some(r => r.id === expectedId)) {
+  if (DOFUS_RUNES.some(r => r.id === expectedId || r.itemId === expectedId)) {
     type = 'Rune de forgemagie';
   } else {
     const item = DOFUS_MOCK_ITEMS.find(i => i._id === expectedId);

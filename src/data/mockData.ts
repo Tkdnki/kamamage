@@ -39,78 +39,84 @@ export interface Rune {
   statEffect: string;
   category: 'Carac' | 'VigSagesse' | 'Dommages' | 'Resistances' | 'Utilitaires' | 'Exotiques';
   imgUrl?: string;
+  /**
+   * ID officiel DofusDB de la rune (item_key utilisé comme clé des prix HDV).
+   * Identique à l'`_id` renvoyé par DofusDB (ex: "Rune Fo" → 1519).
+   * Absent uniquement pour les runes inexistantes en base (ex: "Rune Pa Do").
+   */
+  itemId?: string;
 }
 
 export const DOFUS_RUNES: Rune[] = [
   // Exotiques / Majeurs
-  { id: 'ga_pa', name: 'Rune Ga Pa', code: 'Ga Pa', weight: 100, statEffect: '+1 PA', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78055.png' },
-  { id: 'ga_pme', name: 'Rune Ga Pme', code: 'Ga Pme', weight: 90, statEffect: '+1 PM', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78056.png' },
-  { id: 'po', name: 'Rune Po', code: 'Po', weight: 51, statEffect: '+1 Portée', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78018.png' },
-  { id: 'invoc', name: 'Rune Invoc', code: 'Invoc', weight: 30, statEffect: '+1 Invocation', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78019.png' },
-  
+  { id: 'ga_pa', name: 'Rune Ga Pa', code: 'Ga Pa', weight: 100, statEffect: '+1 PA', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78055.png', itemId: '1557' },
+  { id: 'ga_pme', name: 'Rune Ga Pme', code: 'Ga Pme', weight: 90, statEffect: '+1 PM', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78056.png', itemId: '1558' },
+  { id: 'po', name: 'Rune Po', code: 'Po', weight: 51, statEffect: '+1 Portée', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78018.png', itemId: '7438' },
+  { id: 'invoc', name: 'Rune Invoc', code: 'Invoc', weight: 30, statEffect: '+1 Invocation', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78019.png', itemId: '7442' },
+
   // Sagesse / Prospection / Soin
-  { id: 'ra_sa', name: 'Rune Ra Sa', code: 'Ra Sa', weight: 30, statEffect: '+10 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78051.png' },
-  { id: 'pa_sa', name: 'Rune Pa Sa', code: 'Pa Sa', weight: 9, statEffect: '+3 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78050.png' },
-  { id: 'sa', name: 'Rune Sa', code: 'Sa', weight: 3, statEffect: '+1 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78049.png' },
-  { id: 'pa_so', name: 'Rune Pa So', code: 'Pa So', weight: 30, statEffect: '+3 Soins', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78099.png' },
-  { id: 'so', name: 'Rune So', code: 'So', weight: 10, statEffect: '+1 Soin', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78013.png' },
-  
+  { id: 'ra_sa', name: 'Rune Ra Sa', code: 'Ra Sa', weight: 30, statEffect: '+10 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78051.png', itemId: '1552' },
+  { id: 'pa_sa', name: 'Rune Pa Sa', code: 'Pa Sa', weight: 9, statEffect: '+3 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78050.png', itemId: '1546' },
+  { id: 'sa', name: 'Rune Sa', code: 'Sa', weight: 3, statEffect: '+1 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78049.png', itemId: '1521' },
+  { id: 'pa_so', name: 'Rune Pa So', code: 'Pa So', weight: 30, statEffect: '+3 Soins', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78099.png', itemId: '19337' },
+  { id: 'so', name: 'Rune So', code: 'So', weight: 10, statEffect: '+1 Soin', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78013.png', itemId: '7434' },
+
   // Vitalité
-  { id: 'ra_vi', name: 'Rune Ra Vi', code: 'Ra Vi', weight: 2.5, statEffect: '+10 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78054.png' },
-  { id: 'pa_vi', name: 'Rune Pa Vi', code: 'Pa Vi', weight: 0.75, statEffect: '+3 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78053.png' },
-  { id: 'vi', name: 'Rune Vi', code: 'Vi', weight: 0.25, statEffect: '+1 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78052.png' },
+  { id: 'ra_vi', name: 'Rune Ra Vi', code: 'Ra Vi', weight: 2.5, statEffect: '+10 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78054.png', itemId: '1554' },
+  { id: 'pa_vi', name: 'Rune Pa Vi', code: 'Pa Vi', weight: 0.75, statEffect: '+3 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78053.png', itemId: '1548' },
+  { id: 'vi', name: 'Rune Vi', code: 'Vi', weight: 0.25, statEffect: '+1 Vitalité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78052.png', itemId: '1523' },
 
   // Stats Primaires
-  { id: 'ra_fo', name: 'Rune Ra Fo', code: 'Ra Fo', weight: 10, statEffect: '+10 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78045.png' },
-  { id: 'pa_fo', name: 'Rune Pa Fo', code: 'Pa Fo', weight: 3, statEffect: '+3 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78044.png' },
-  { id: 'fo', name: 'Rune Fo', code: 'Fo', weight: 1, statEffect: '+1 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78043.png' },
-  { id: 'ra_ine', name: 'Rune Ra Ine', code: 'Ra Ine', weight: 10, statEffect: '+10 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78039.png' },
-  { id: 'pa_ine', name: 'Rune Pa Ine', code: 'Pa Ine', weight: 3, statEffect: '+3 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78038.png' },
-  { id: 'ine', name: 'Rune Ine', code: 'Ine', weight: 1, statEffect: '+1 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78037.png' },
-  { id: 'ra_age', name: 'Rune Ra Age', code: 'Ra Age', weight: 10, statEffect: '+10 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78048.png' },
-  { id: 'pa_age', name: 'Rune Pa Age', code: 'Pa Age', weight: 3, statEffect: '+3 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78047.png' },
-  { id: 'age', name: 'Rune Age', code: 'Age', weight: 1, statEffect: '+1 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78046.png' },
-  { id: 'ra_cha', name: 'Rune Ra Cha', code: 'Ra Cha', weight: 10, statEffect: '+10 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78042.png' },
-  { id: 'pa_cha', name: 'Rune Pa Cha', code: 'Pa Cha', weight: 3, statEffect: '+3 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78041.png' },
-  { id: 'cha', name: 'Rune Cha', code: 'Cha', weight: 1, statEffect: '+1 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78040.png' },
+  { id: 'ra_fo', name: 'Rune Ra Fo', code: 'Ra Fo', weight: 10, statEffect: '+10 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78045.png', itemId: '1551' },
+  { id: 'pa_fo', name: 'Rune Pa Fo', code: 'Pa Fo', weight: 3, statEffect: '+3 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78044.png', itemId: '1545' },
+  { id: 'fo', name: 'Rune Fo', code: 'Fo', weight: 1, statEffect: '+1 Force', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78043.png', itemId: '1519' },
+  { id: 'ra_ine', name: 'Rune Ra Ine', code: 'Ra Ine', weight: 10, statEffect: '+10 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78039.png', itemId: '1553' },
+  { id: 'pa_ine', name: 'Rune Pa Ine', code: 'Pa Ine', weight: 3, statEffect: '+3 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78038.png', itemId: '1547' },
+  { id: 'ine', name: 'Rune Ine', code: 'Ine', weight: 1, statEffect: '+1 Intelligence', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78037.png', itemId: '1522' },
+  { id: 'ra_age', name: 'Rune Ra Age', code: 'Ra Age', weight: 10, statEffect: '+10 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78048.png', itemId: '1555' },
+  { id: 'pa_age', name: 'Rune Pa Age', code: 'Pa Age', weight: 3, statEffect: '+3 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78047.png', itemId: '1549' },
+  { id: 'age', name: 'Rune Age', code: 'Age', weight: 1, statEffect: '+1 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78046.png', itemId: '1524' },
+  { id: 'ra_cha', name: 'Rune Ra Cha', code: 'Ra Cha', weight: 10, statEffect: '+10 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78042.png', itemId: '1556' },
+  { id: 'pa_cha', name: 'Rune Pa Cha', code: 'Pa Cha', weight: 3, statEffect: '+3 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78041.png', itemId: '1550' },
+  { id: 'cha', name: 'Rune Cha', code: 'Cha', weight: 1, statEffect: '+1 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78040.png', itemId: '1525' },
 
   // Dommages
   { id: 'pa_do', name: 'Rune Pa Do', code: 'Pa Do', weight: 60, statEffect: '+3 Dommages', category: 'Dommages' },
-  { id: 'do', name: 'Rune Do', code: 'Do', weight: 20, statEffect: '+1 Dommage', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78015.png' },
-  { id: 'do_terre', name: 'Rune Do Terre', code: 'Do Terre', weight: 5, statEffect: '+1 Dommages Terre', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78065.png' },
-  { id: 'do_feu', name: 'Rune Do Feu', code: 'Do Feu', weight: 5, statEffect: '+1 Dommages Feu', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78063.png' },
-  { id: 'do_eau', name: 'Rune Do Eau', code: 'Do Eau', weight: 5, statEffect: '+1 Dommages Eau', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78061.png' },
-  { id: 'do_air', name: 'Rune Do Air', code: 'Do Air', weight: 5, statEffect: '+1 Dommages Air', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78067.png' },
-  { id: 'do_neutre', name: 'Rune Do Neutre', code: 'Do Neutre', weight: 5, statEffect: '+1 Dommages Neutre', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78069.png' },
-  { id: 'do_cri', name: 'Rune Do Cri', code: 'Do Cri', weight: 5, statEffect: '+1 Dommage Critique', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78073.png' },
-  { id: 'do_pou', name: 'Rune Do Pou', code: 'Do Pou', weight: 5, statEffect: '+1 Dommage Poussée', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78081.png' },
-  { id: 'cri', name: 'Rune Cri', code: 'Cri', weight: 10, statEffect: '+1 Coup Critique', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78014.png' },
+  { id: 'do', name: 'Rune Do', code: 'Do', weight: 20, statEffect: '+1 Dommage', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78015.png', itemId: '7435' },
+  { id: 'do_terre', name: 'Rune Do Terre', code: 'Do Terre', weight: 5, statEffect: '+1 Dommages Terre', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78065.png', itemId: '11657' },
+  { id: 'do_feu', name: 'Rune Do Feu', code: 'Do Feu', weight: 5, statEffect: '+1 Dommages Feu', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78063.png', itemId: '11659' },
+  { id: 'do_eau', name: 'Rune Do Eau', code: 'Do Eau', weight: 5, statEffect: '+1 Dommages Eau', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78061.png', itemId: '11661' },
+  { id: 'do_air', name: 'Rune Do Air', code: 'Do Air', weight: 5, statEffect: '+1 Dommages Air', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78067.png', itemId: '11663' },
+  { id: 'do_neutre', name: 'Rune Do Neutre', code: 'Do Neutre', weight: 5, statEffect: '+1 Dommages Neutre', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78069.png', itemId: '11665' },
+  { id: 'do_cri', name: 'Rune Do Cri', code: 'Do Cri', weight: 5, statEffect: '+1 Dommage Critique', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78073.png', itemId: '11653' },
+  { id: 'do_pou', name: 'Rune Do Pou', code: 'Do Pou', weight: 5, statEffect: '+1 Dommage Poussée', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78081.png', itemId: '11649' },
+  { id: 'cri', name: 'Rune Cri', code: 'Cri', weight: 10, statEffect: '+1 Coup Critique', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78014.png', itemId: '7433' },
 
   // Résistances % et Fixes
-  { id: 're_neutre', name: 'Rune Ré Per Neutre', code: 'Ré Per Neutre', weight: 6, statEffect: '+1% Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78057.png' },
-  { id: 're_terre', name: 'Rune Ré Per Terre', code: 'Ré Per Terre', weight: 6, statEffect: '+1% Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78034.png' },
-  { id: 're_feu', name: 'Rune Ré Per Feu', code: 'Ré Per Feu', weight: 6, statEffect: '+1% Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78028.png' },
-  { id: 're_eau', name: 'Rune Ré Per Eau', code: 'Ré Per Eau', weight: 6, statEffect: '+1% Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78030.png' },
-  { id: 're_air', name: 'Rune Ré Per Air', code: 'Ré Per Air', weight: 6, statEffect: '+1% Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78032.png' },
-  { id: 're_f_neutre', name: 'Rune Ré Neutre', code: 'Ré Neutre', weight: 2, statEffect: '+1 Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78058.png' },
-  { id: 're_f_terre', name: 'Rune Ré Terre', code: 'Ré Terre', weight: 2, statEffect: '+1 Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78035.png' },
-  { id: 're_f_feu', name: 'Rune Ré Feu', code: 'Ré Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78029.png' },
-  { id: 're_f_eau', name: 'Rune Ré Eau', code: 'Ré Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78031.png' },
-  { id: 're_f_air', name: 'Rune Ré Air', code: 'Ré Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78033.png' },
-  { id: 're_pm', name: 'Rune Ré PM', code: 'Ré PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78085.png' },
+  { id: 're_neutre', name: 'Rune Ré Per Neutre', code: 'Ré Per Neutre', weight: 6, statEffect: '+1% Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78057.png', itemId: '7460' },
+  { id: 're_terre', name: 'Rune Ré Per Terre', code: 'Ré Per Terre', weight: 6, statEffect: '+1% Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78034.png', itemId: '7459' },
+  { id: 're_feu', name: 'Rune Ré Per Feu', code: 'Ré Per Feu', weight: 6, statEffect: '+1% Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78028.png', itemId: '7457' },
+  { id: 're_eau', name: 'Rune Ré Per Eau', code: 'Ré Per Eau', weight: 6, statEffect: '+1% Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78030.png', itemId: '7560' },
+  { id: 're_air', name: 'Rune Ré Per Air', code: 'Ré Per Air', weight: 6, statEffect: '+1% Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78032.png', itemId: '7458' },
+  { id: 're_f_neutre', name: 'Rune Ré Neutre', code: 'Ré Neutre', weight: 2, statEffect: '+1 Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78058.png', itemId: '7456' },
+  { id: 're_f_terre', name: 'Rune Ré Terre', code: 'Ré Terre', weight: 2, statEffect: '+1 Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78035.png', itemId: '7455' },
+  { id: 're_f_feu', name: 'Rune Ré Feu', code: 'Ré Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78029.png', itemId: '7452' },
+  { id: 're_f_eau', name: 'Rune Ré Eau', code: 'Ré Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78031.png', itemId: '7454' },
+  { id: 're_f_air', name: 'Rune Ré Air', code: 'Ré Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78033.png', itemId: '7453' },
+  { id: 're_pm', name: 'Rune Ré PM', code: 'Ré PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78085.png', itemId: '11643' },
 
   // Utilitaires (Tacle, Fuite, Prospection, Pods, Initiative)
-  { id: 'pa_tac', name: 'Rune Pa Tac', code: 'Pa Tac', weight: 12, statEffect: '+3 Tacle', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78078.png' },
-  { id: 'tac', name: 'Rune Tac', code: 'Tac', weight: 4, statEffect: '+1 Tacle', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78077.png' },
-  { id: 'pa_fui', name: 'Rune Pa Fui', code: 'Pa Fui', weight: 12, statEffect: '+3 Fuite', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78075.png' },
-  { id: 'fui', name: 'Rune Fui', code: 'Fui', weight: 4, statEffect: '+1 Fuite', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78076.png' },
-  { id: 'ra_pod', name: 'Rune Ra Pod', code: 'Ra Pod', weight: 2.5, statEffect: '+100 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78022.png' },
-  { id: 'pa_pod', name: 'Rune Pa Pod', code: 'Pa Pod', weight: 0.75, statEffect: '+30 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78021.png' },
-  { id: 'pod', name: 'Rune Pod', code: 'Pod', weight: 0.25, statEffect: '+10 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78020.png' },
-  { id: 'ra_ini', name: 'Rune Ra Ini', code: 'Ra Ini', weight: 1, statEffect: '+100 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78027.png' },
-  { id: 'pa_ini', name: 'Rune Pa Ini', code: 'Pa Ini', weight: 0.3, statEffect: '+30 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78026.png' },
-  { id: 'ini', name: 'Rune Ini', code: 'Ini', weight: 0.1, statEffect: '+10 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78025.png' },
-  { id: 'prospe', name: 'Rune Prospe', code: 'Prospe', weight: 3, statEffect: '+1 Prospection', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78036.png' },
+  { id: 'pa_tac', name: 'Rune Pa Tac', code: 'Pa Tac', weight: 12, statEffect: '+3 Tacle', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78078.png', itemId: '11640' },
+  { id: 'tac', name: 'Rune Tac', code: 'Tac', weight: 4, statEffect: '+1 Tacle', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78077.png', itemId: '11639' },
+  { id: 'pa_fui', name: 'Rune Pa Fui', code: 'Pa Fui', weight: 12, statEffect: '+3 Fuite', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78075.png', itemId: '11638' },
+  { id: 'fui', name: 'Rune Fui', code: 'Fui', weight: 4, statEffect: '+1 Fuite', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78076.png', itemId: '11637' },
+  { id: 'ra_pod', name: 'Rune Ra Pod', code: 'Ra Pod', weight: 2.5, statEffect: '+100 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78022.png', itemId: '7445' },
+  { id: 'pa_pod', name: 'Rune Pa Pod', code: 'Pa Pod', weight: 0.75, statEffect: '+30 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78021.png', itemId: '7444' },
+  { id: 'pod', name: 'Rune Pod', code: 'Pod', weight: 0.25, statEffect: '+10 Pods', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78020.png', itemId: '7443' },
+  { id: 'ra_ini', name: 'Rune Ra Ini', code: 'Ra Ini', weight: 1, statEffect: '+100 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78027.png', itemId: '7450' },
+  { id: 'pa_ini', name: 'Rune Pa Ini', code: 'Pa Ini', weight: 0.3, statEffect: '+30 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78026.png', itemId: '7449' },
+  { id: 'ini', name: 'Rune Ini', code: 'Ini', weight: 0.1, statEffect: '+10 Initiative', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78025.png', itemId: '7448' },
+  { id: 'prospe', name: 'Rune Prospe', code: 'Prospe', weight: 3, statEffect: '+1 Prospection', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78036.png', itemId: '7451' },
 ];
 
 export const DOFUS_MOCK_ITEMS: DofusItem[] = [

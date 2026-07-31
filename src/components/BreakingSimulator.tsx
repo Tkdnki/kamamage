@@ -15,7 +15,7 @@ import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
 import {
   BREAKING_JOBS, DOFUSDB_BASE_URL, FETCH_TIMEOUT,
-  calculateBreaking,
+  calculateBreaking, getRunePriceKey,
 } from '../lib/breaking';
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
@@ -201,7 +201,9 @@ export default function BreakingSimulator() {
   const pricesByCode = useMemo(() => {
     const m: Record<string, number> = {};
     for (const rune of DOFUS_RUNES) {
-      const userPrice = hdvPrices[rune.id]?.unitAverage;
+      // Les prix des runes sont lus depuis le state global (hdvPrices) avec la
+      // même clé que l'onglet Prix HDV : l'ID DofusDB (item_key de la rune).
+      const userPrice = hdvPrices[getRunePriceKey(rune)]?.unitAverage;
       const communityPrice = runeCommunityPrices[rune.code]?.price ?? 0;
       const price = (userPrice ?? 0) > 0 ? userPrice! : communityPrice;
       if (price > 0) m[rune.code] = price;
@@ -309,7 +311,7 @@ export default function BreakingSimulator() {
     }
     openScanner([
       { expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type },
-      ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: r.id, type: 'Rune de forgemagie' })),
+      ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: getRunePriceKey(r), type: 'Rune de forgemagie' })),
     ]);
   }, [selectedItem, breaking, openScanner]);
 
@@ -740,7 +742,7 @@ export default function BreakingSimulator() {
                                         <div>
                                           <button
                                             onClick={() => navigateToHdvItem({
-                                              _id: l.rune.id,
+                                              _id: getRunePriceKey(l.rune),
                                               name: l.rune.name,
                                               type: 'Rune',
                                               level: 1,
@@ -782,11 +784,11 @@ export default function BreakingSimulator() {
                                         </span>
                                       )}
                                       <QuickPriceInput
-                                        x1={hdvPrices[l.rune.id]?.x1 ?? 0}
-                                        x10={hdvPrices[l.rune.id]?.x10 ?? 0}
-                                        x100={hdvPrices[l.rune.id]?.x100 ?? 0}
-                                        x1000={hdvPrices[l.rune.id]?.x1000 ?? 0}
-                                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(l.rune.id, x1, x10, x100, x1000)}
+                                        x1={hdvPrices[getRunePriceKey(l.rune)]?.x1 ?? 0}
+                                        x10={hdvPrices[getRunePriceKey(l.rune)]?.x10 ?? 0}
+                                        x100={hdvPrices[getRunePriceKey(l.rune)]?.x100 ?? 0}
+                                        x1000={hdvPrices[getRunePriceKey(l.rune)]?.x1000 ?? 0}
+                                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(getRunePriceKey(l.rune), x1, x10, x100, x1000)}
                                         disabled={!user}
                                         warnEmpty
                                       />
@@ -826,7 +828,7 @@ export default function BreakingSimulator() {
                                       <div>
                                         <button
                                           onClick={() => navigateToHdvItem({
-                                            _id: exo.rune.id,
+                                            _id: getRunePriceKey(exo.rune),
                                             name: exo.rune.name,
                                             type: 'Rune',
                                             level: 1,

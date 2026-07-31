@@ -7,6 +7,15 @@ export const FETCH_TIMEOUT = 5000;
 export const FOCUS_MULTIPLIER = 2;
 export const FOCUS_PENALTY = 0.5;
 
+/**
+ * Clé de prix HDV (item_key Supabase) d'une rune : l'ID DofusDB officiel
+ * (`itemId`), qui est la même clé que celle utilisée par l'onglet Prix HDV.
+ * Retombe sur l'ID local uniquement pour les runes sans item DofusDB.
+ */
+export function getRunePriceKey(rune: { itemId?: string; id: string }): string {
+  return rune.itemId ?? rune.id;
+}
+
 /** Traduction des noms de stats (config → rune) */
 const STAT_NAME_TO_RUNE_NAME: Record<string, string> = {
   'Critique': 'Coup Critique',
