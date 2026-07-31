@@ -175,6 +175,12 @@ export interface BreakingResult {
   totalValueStd: number;
   totalValueFocus: number;
   craftCost: number;
+  /** Vrai si le prix de l'item ou le prix d'une rune produite est manquant (≤ 0). */
+  hasMissingPrices: boolean;
+  /** Vrai si le prix d'achat de l'item est manquant (≤ 0). */
+  missingItemPrice: boolean;
+  /** Codes des runes produites sans prix connu (à saisir pour un calcul fiable). */
+  missingRuneCodes: string[];
   netProfitStd: number;
   netProfitFocus: number;
   roiStd: number;
@@ -279,6 +285,7 @@ export function calculateBreaking(
     price: number;
   };
   const lineData: LineData[] = [];
+  const missingRuneCodes: string[] = [];
 
   for (let i = 0; i < possibleEffects.length; i++) {
     const effect = possibleEffects[i];
@@ -305,6 +312,9 @@ export function calculateBreaking(
     const qty = calculateBreakingQuantity(pdbStd, matched.weight, coefficient);
     if (qty <= 0) continue;
 
+    const price = runePrices[matched.code] ?? 0;
+    if (price <= 0) missingRuneCodes.push(matched.code);
+
     lineData.push({
       effectIndex: i,
       effectId: effect.effectId,
@@ -315,7 +325,7 @@ export function calculateBreaking(
       unit: cfg.unit,
       rune: matched,
       pdbStd,
-      price: runePrices[matched.code] ?? 0,
+      price,
     });
   }
 
@@ -368,6 +378,7 @@ export function calculateBreaking(
     const rune = DOFUS_RUNES.find(r => r.id === exo.runeId);
     if (!rune) continue;
     const unitPrice = runePrices[rune.code] ?? 0;
+    if (unitPrice <= 0) missingRuneCodes.push(rune.code);
     const val = exo.quantity * unitPrice;
     exoLines.push({ rune, quantity: exo.quantity, unitPrice, valueStd: val, valueFocus: val });
   }
@@ -379,11 +390,17 @@ export function calculateBreaking(
   const roiStd = craftCost > 0 ? (netProfitStd / craftCost) * 100 : 0;
   const roiFocus = craftCost > 0 ? (netProfitFocus / craftCost) * 100 : 0;
 
+  const missingItemPrice = !(craftCost > 0);
+  const hasMissingPrices = missingItemPrice || missingRuneCodes.length > 0;
+
   return {
     itemLevel, itemName, itemImg,
     lines, exoLines,
     totalValueStd, totalValueFocus,
     craftCost,
+    hasMissingPrices,
+    missingItemPrice,
+    missingRuneCodes: [...new Set(missingRuneCodes)],
     netProfitStd, netProfitFocus,
     roiStd, roiFocus,
   };

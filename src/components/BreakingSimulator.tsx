@@ -214,10 +214,10 @@ export default function BreakingSimulator() {
   // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
   // ou les coefficients changent → le tri se met à jour automatiquement.
   const itemsWithProfit = useMemo(() => {
-    const list: { item: CraftItem; profit: number; hasStats: boolean }[] = [];
+    const list: { item: CraftItem; profit: number; status: 'ok' | 'no-stats' | 'missing-price' }[] = [];
     for (const item of craftItems) {
       if (!item.possibleEffects || item.possibleEffects.length === 0) {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, hasStats: false });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'no-stats' });
         continue;
       }
       const coeff = selectedItemId === item._id ? coefficient : (coeffMap[item._id] ?? 100);
@@ -233,9 +233,14 @@ export default function BreakingSimulator() {
           item.name,
           item.imgUrl,
         );
-        list.push({ item, profit: b.netProfitStd, hasStats: true });
+        if (b.hasMissingPrices) {
+          // Un prix indispensable (item ou rune) est manquant → le profit serait faux.
+          list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'missing-price' });
+        } else {
+          list.push({ item, profit: b.netProfitStd, status: 'ok' });
+        }
       } catch {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, hasStats: false });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'no-stats' });
       }
     }
     return list;
@@ -244,6 +249,12 @@ export default function BreakingSimulator() {
   const profitById = useMemo(() => {
     const m: Record<string, number> = {};
     for (const p of itemsWithProfit) m[p.item._id] = p.profit;
+    return m;
+  }, [itemsWithProfit]);
+
+  const statusById = useMemo(() => {
+    const m: Record<string, 'ok' | 'no-stats' | 'missing-price'> = {};
+    for (const p of itemsWithProfit) m[p.item._id] = p.status;
     return m;
   }, [itemsWithProfit]);
 
@@ -396,7 +407,7 @@ export default function BreakingSimulator() {
               const priceData = hdvPrices[item._id];
               const hasPrice = priceData && priceData.unitAverage > 0;
               const profit = profitById[item._id] ?? Number.NEGATIVE_INFINITY;
-              const hasProfit = profit !== Number.NEGATIVE_INFINITY;
+              const status = statusById[item._id] ?? 'no-stats';
               return (
                 <button
                   key={item._id}
@@ -419,9 +430,13 @@ export default function BreakingSimulator() {
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      {hasProfit ? (
+                      {status === 'ok' ? (
                         <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {profit >= 0 ? '+' : ''}{Math.round(profit).toLocaleString()} K
+                        </span>
+                      ) : status === 'missing-price' ? (
+                        <span className="text-[9px] font-semibold text-amber-500/90 flex items-center gap-0.5 justify-end">
+                          <AlertTriangle className="h-3 w-3" /> Prix manquant
                         </span>
                       ) : (
                         <span className="text-[9px] text-slate-600">—</span>
@@ -594,39 +609,71 @@ export default function BreakingSimulator() {
                           const v = parseInt(e.target.value);
                           if (!isNaN(v) && v >= 0) setHdvPrice(selectedItem._id, v, 0, 0, 0);
                         }}
-                        className="w-full bg-transparent text-center text-lg font-extrabold text-slate-300 focus:outline-none focus:text-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className={`w-full bg-transparent text-center text-lg font-extrabold focus:outline-none focus:text-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          breaking.missingItemPrice ? 'text-rose-400 border border-red-500/50 rounded py-0.5' : 'text-slate-300'
+                        }`}
                       />
                     </div>
                     <div className={`bg-slate-900/40 rounded-xl p-3 text-center ${hasFocus ? 'border border-purple-500/20' : ''}`}>
                       <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
                         Bénéfice net{hasFocus ? ' (Std)' : ''}
                       </p>
-                      <p className={`text-lg font-extrabold ${breaking.netProfitStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {formatKamas(breaking.netProfitStd)}
-                      </p>
+                      {breaking.hasMissingPrices ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix manquant
+                        </p>
+                      ) : (
+                        <p className={`text-lg font-extrabold ${breaking.netProfitStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {formatKamas(breaking.netProfitStd)}
+                        </p>
+                      )}
                     </div>
                     <div className={`bg-slate-900/40 rounded-xl p-3 text-center ${hasFocus ? 'border border-purple-500/20' : ''}`}>
                       <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">
                         ROI{hasFocus ? ' (Std)' : ''}
                       </p>
-                      <p className={`text-lg font-extrabold ${breaking.roiStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {breaking.roiStd >= 0 ? '+' : ''}{breaking.roiStd.toFixed(1)}%
-                      </p>
+                      {breaking.hasMissingPrices ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix manquant
+                        </p>
+                      ) : (
+                        <p className={`text-lg font-extrabold ${breaking.roiStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {breaking.roiStd >= 0 ? '+' : ''}{breaking.roiStd.toFixed(1)}%
+                        </p>
+                      )}
                     </div>
                   </div>
+                  {breaking.hasMissingPrices && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 -mt-1">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      Renseignez les prix manquants (item ou runes) ou utilisez « Scan HDV » pour calculer la rentabilité.
+                    </div>
+                  )}
                   {hasFocus && (
                     <div className="grid grid-cols-2 gap-3 -mt-1">
                       <div className="bg-purple-900/5 rounded-xl p-2 text-center border border-purple-500/20">
                         <p className="text-[8px] text-purple-400 uppercase tracking-wider">Bénéfice net (Focus)</p>
-                        <p className={`text-sm font-bold ${breaking.netProfitFocus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {formatKamas(breaking.netProfitFocus)}
-                        </p>
+                        {breaking.hasMissingPrices ? (
+                          <p className="text-[11px] font-bold text-amber-400/90 flex items-center justify-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Prix manquant
+                          </p>
+                        ) : (
+                          <p className={`text-sm font-bold ${breaking.netProfitFocus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {formatKamas(breaking.netProfitFocus)}
+                          </p>
+                        )}
                       </div>
                       <div className="bg-purple-900/5 rounded-xl p-2 text-center border border-purple-500/20">
                         <p className="text-[8px] text-purple-400 uppercase tracking-wider">ROI (Focus)</p>
-                        <p className={`text-sm font-bold ${breaking.roiFocus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {breaking.roiFocus >= 0 ? '+' : ''}{breaking.roiFocus.toFixed(1)}%
-                        </p>
+                        {breaking.hasMissingPrices ? (
+                          <p className="text-[11px] font-bold text-amber-400/90 flex items-center justify-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Prix manquant
+                          </p>
+                        ) : (
+                          <p className={`text-sm font-bold ${breaking.roiFocus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {breaking.roiFocus >= 0 ? '+' : ''}{breaking.roiFocus.toFixed(1)}%
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -730,7 +777,9 @@ export default function BreakingSimulator() {
                                       {effectiveUnitPrice > 0 ? (
                                         <span className="text-[10px] text-amber-400 font-mono">{Math.round(effectiveUnitPrice).toLocaleString()} K</span>
                                       ) : (
-                                        <span className="text-[10px] text-slate-600 font-mono">—</span>
+                                        <span className="text-[10px] text-amber-500/80 font-mono flex items-center gap-1">
+                                          <AlertTriangle className="h-3 w-3" /> Prix manquant
+                                        </span>
                                       )}
                                       <QuickPriceInput
                                         x1={hdvPrices[l.rune.id]?.x1 ?? 0}
@@ -739,6 +788,7 @@ export default function BreakingSimulator() {
                                         x1000={hdvPrices[l.rune.id]?.x1000 ?? 0}
                                         onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(l.rune.id, x1, x10, x100, x1000)}
                                         disabled={!user}
+                                        warnEmpty
                                       />
                                     </div>
                                   </td>
@@ -746,13 +796,13 @@ export default function BreakingSimulator() {
                                     {l.quantityStd.toFixed(2)}
                                   </td>
                                   <td className={`text-right py-2 px-3 font-mono font-bold ${l.valueStd > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
-                                    {Math.round(l.valueStd).toLocaleString()} K
+                                    {effectiveUnitPrice > 0 ? `${Math.round(l.valueStd).toLocaleString()} K` : '—'}
                                   </td>
                                   <td className="text-right py-2 px-3 font-mono text-purple-300">
                                     {hasFocus ? l.quantityFocus.toFixed(2) : '—'}
                                   </td>
                                   <td className={`text-right py-2 px-3 font-mono font-bold ${hasFocus && l.valueFocus > 0 ? 'text-purple-400' : 'text-slate-500'}`}>
-                                    {hasFocus ? `${Math.round(l.valueFocus).toLocaleString()} K` : '—'}
+                                    {hasFocus && effectiveUnitPrice > 0 ? `${Math.round(l.valueFocus).toLocaleString()} K` : '—'}
                                   </td>
                                 </tr>
                               );
@@ -797,17 +847,21 @@ export default function BreakingSimulator() {
                                   {effectiveUnitPrice > 0 ? (
                                     <span className="text-amber-400">{Math.round(effectiveUnitPrice).toLocaleString()} K</span>
                                   ) : (
-                                    <span className="text-slate-600">—</span>
+                                    <span className="text-amber-500/80 flex items-center justify-end gap-1">
+                                      <AlertTriangle className="h-3 w-3" /> Prix manquant
+                                    </span>
                                   )}
                                 </td>
                                 <td className="text-right py-2 px-3 font-mono text-cyan-300">
                                   {exo.quantity.toFixed(2)}
                                 </td>
                                 <td className="text-right py-2 px-3 font-mono font-bold text-cyan-300">
-                                  {Math.round(exo.valueStd).toLocaleString()} K
+                                  {effectiveUnitPrice > 0 ? `${Math.round(exo.valueStd).toLocaleString()} K` : '—'}
                                 </td>
                                 <td className="text-right py-2 px-3 font-mono text-cyan-300">{hasFocus ? exo.quantity.toFixed(2) : '—'}</td>
-                                <td className="text-right py-2 px-3 font-mono font-bold text-cyan-300">{hasFocus ? `${Math.round(exo.valueFocus).toLocaleString()} K` : '—'}</td>
+                                <td className="text-right py-2 px-3 font-mono font-bold text-cyan-300">
+                                  {hasFocus && effectiveUnitPrice > 0 ? `${Math.round(exo.valueFocus).toLocaleString()} K` : '—'}
+                                </td>
                               </tr>
                             );
                           })}
@@ -817,11 +871,11 @@ export default function BreakingSimulator() {
                               Total Kamas
                             </td>
                             <td className="text-right py-2.5 px-3 font-mono font-bold text-amber-400">
-                              {Math.round(breaking.totalValueStd).toLocaleString()} K
+                              {breaking.hasMissingPrices ? '—' : `${Math.round(breaking.totalValueStd).toLocaleString()} K`}
                             </td>
                             <td className="text-right py-2.5 px-3 font-mono text-purple-400">—</td>
                             <td className="text-right py-2.5 px-3 font-mono font-bold text-purple-400">
-                              {hasFocus ? `${Math.round(breaking.totalValueFocus).toLocaleString()} K` : '—'}
+                              {hasFocus && !breaking.hasMissingPrices ? `${Math.round(breaking.totalValueFocus).toLocaleString()} K` : '—'}
                             </td>
                           </tr>
                           {breaking.lines.filter(l => l.quantityStd > 0.01 || l.quantityFocus > 0.01).length === 0 && breaking.exoLines.length === 0 && (

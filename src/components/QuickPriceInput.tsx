@@ -9,9 +9,11 @@ interface QuickPriceInputProps {
   x1000?: number | null;
   onSetPrices: (x1: number, x10: number, x100: number, x1000: number) => void;
   disabled?: boolean;
+  /** Surligne en rouge les champs dont le prix est à 0 (prix manquant). */
+  warnEmpty?: boolean;
 }
 
-const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSetPrices, disabled }) => {
+const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSetPrices, disabled, warnEmpty }) => {
   const [values, setValues] = useState({
     x1: x1 ?? 0,
     x10: x10 ?? 0,
@@ -82,7 +84,9 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
             onKeyDown={handleKeyDown}
             disabled={disabled}
             title={disabled ? 'Connectez-vous pour modifier les prix' : ''}
-            className="w-14 bg-[#070a12] border border-white/10 rounded px-1 py-0.5 text-[10px] text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-900/50"
+            className={`w-14 bg-[#070a12] border rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-900/50 ${
+              warnEmpty && values[lot] <= 0 ? 'border-red-500/60 text-rose-300' : 'border-white/10 text-white'
+            }`}
           />
         </div>
       ))}
