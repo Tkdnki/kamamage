@@ -8,6 +8,11 @@ import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key } from 'lucide-react';
 
+// Cooldown systématique entre chaque scan d'image : le modèle Vision Groq
+// (qwen/qwen3.6-27b, tier on_demand) est limité à 8000 TPM. À ~3000 tokens par
+// image, on ne peut envoyer que ~2,5 requêtes/minute => ~25s entre deux envois.
+const SCAN_COOLDOWN_SECONDS = 25;
+
 interface ScanItem {
   name: string;
   prices: {
@@ -103,6 +108,19 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  // Attend `seconds` secondes en affichant un compte à rebours dans `pauseMessage`.
+  // Retourne false si la file a été annulée pendant l'attente (fermeture du modal).
+  const waitWithCountdown = useCallback(async (seconds: number, baseMessage: string): Promise<boolean> => {
+    const total = Math.max(1, Math.round(seconds));
+    for (let i = total; i >= 1; i--) {
+      if (cancelCurrentRef.current) return false;
+      setPauseMessage(`${baseMessage} ${i}s...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    setPauseMessage(null);
+    return true;
   }, []);
 
   const updateDisplay = useCallback((entry: QueueEntry | null) => {
@@ -231,7 +249,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
       let scanResult: ScanRecipeResult | null = null;
       let scanError: string | null = null;
-      let isRateLimited = false;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -253,14 +270,22 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           signal: controller.signal,
         });
 
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('Retry-After');
-          const waitSeconds = retryAfter ? parseInt(retryAfter, 10) : 15;
-          isRateLimited = true;
+        if (response.status === 429 || response.status === 503) {
+          let retryAfter: number | undefined;
+          try {
+            const errData = await response.json();
+            if (typeof errData?.retryAfter === 'number') retryAfter = errData.retryAfter;
+          } catch { /* corps non JSON */ }
+          if (retryAfter === undefined) {
+            const header = response.headers.get('Retry-After');
+            const parsed = header ? parseFloat(header) : NaN;
+            if (!Number.isNaN(parsed)) retryAfter = parsed;
+          }
+          const waitSeconds = retryAfter ?? 15;
           setIsLoading(false);
-          setPauseMessage(`Limite de débit atteinte — pause de ${waitSeconds}s...`);
-          await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
-          setPauseMessage(null);
+          const waited = await waitWithCountdown(waitSeconds, 'Limite atteinte. Reprise automatique dans');
+          if (!waited) break;
+          // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
           queueRef.current = [entry, ...queueRef.current];
           setQueue([...queueRef.current]);
           continue;
@@ -292,8 +317,6 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         setIsLoading(false);
         break;
       }
-
-      if (isRateLimited) continue;
 
       if (scanError) {
         setResult(null);
@@ -409,7 +432,11 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           showToast('error', `${unmatched.length} item${unmatched.length > 1 ? 's' : ''} non trouvé${unmatched.length > 1 ? 's' : ''} — passage au suivant`);
         }
 
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Cooldown systématique entre chaque image pour rester sous le quota
+        // Groq (~8000 TPM). Attendu uniquement s'il reste des images à traiter.
+        if (queueRef.current.length > 0) {
+          await waitWithCountdown(SCAN_COOLDOWN_SECONDS, 'Pause entre deux scans — prochain scan dans');
+        }
       }
     }
 

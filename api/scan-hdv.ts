@@ -83,6 +83,23 @@ interface GroqVisionResult {
   isJsonValidationError: boolean;
 }
 
+// "Rate limit reached. Please try again in 10.5s" (Groq inclut souvent le délai recommandé).
+const RETRY_AFTER_RE = /(?:try again in|retry in|wait)\s+(\d+(?:\.\d+)?)\s*s?/i;
+
+// Extrait le délai d'attente (en secondes) conseillé par Groq depuis le message
+// d'erreur ou l'en-tête `Retry-After` de la réponse.
+function extractRetryAfter(result: GroqVisionResult): number | undefined {
+  const message = result.body?.error?.message || result.rawText || '';
+  const match = message.match(RETRY_AFTER_RE);
+  if (match) return parseFloat(match[1]);
+  const header = result.headers.get('retry-after');
+  if (header) {
+    const parsed = parseFloat(header);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 async function callGroqVision(apiKey: string, model: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -185,6 +202,18 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
         try {
           const result = await callGroqVision(apiKey, model, promptText, imageUrl);
+
+          // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : remontées
+          // telles quelles au frontend avec le délai d'attente recommandé, au lieu
+          // de tester un autre modèle ou de renvoyer un 500. Inutile de réessayer
+          // immédiatement, le quota ne se libère pas tout de suite.
+          if (result.status === 429 || result.status === 503) {
+            console.warn(`[scan-hdv] Quota Groq (${result.status}) : ${(result.body?.error?.message || result.rawText).slice(0, 200)}`);
+            return res.status(result.status).json({
+              error: result.status === 429 ? 'Rate limit' : 'Service Unavailable',
+              retryAfter: extractRetryAfter(result) ?? 15,
+            });
+          }
 
           if (result.ok) {
             const content = result.body?.choices?.[0]?.message?.content;
