@@ -13,6 +13,9 @@ import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as 
 // image, on ne peut envoyer que ~2,5 requêtes/minute => ~25s entre deux envois.
 const SCAN_COOLDOWN_SECONDS = 25;
 
+// Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
+const MAX_RETRIES = 3;
+
 interface ScanItem {
   name: string;
   prices: {
@@ -238,6 +241,9 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   };
 
   const processQueue = async () => {
+    // Compteur de réessais (429/503) de l'image COURANTE : persiste à travers
+    // les re-queues de la même image, remis à zéro après un succès.
+    let retries = 0;
     while (queueRef.current.length > 0 && !cancelCurrentRef.current) {
       const entry = queueRef.current[0];
       queueRef.current = queueRef.current.slice(1);
@@ -281,9 +287,21 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
             const parsed = header ? parseFloat(header) : NaN;
             if (!Number.isNaN(parsed)) retryAfter = parsed;
           }
-          const waitSeconds = retryAfter ?? 15;
+          retries += 1;
+          const waitSeconds = Math.max(retryAfter ?? 15, 5);
           setIsLoading(false);
-          const waited = await waitWithCountdown(waitSeconds, 'Limite atteinte. Reprise automatique dans');
+
+          // Trop d'échecs consécutifs pour cette image : on l'abandonne et on
+          // force le passage à la suivante (auto-skip) au lieu de boucler.
+          if (retries >= MAX_RETRIES) {
+            retries = 0;
+            setError('API indisponible, passage à l\'image suivante.');
+            console.error('[scan] 🛑 API indisponible après', MAX_RETRIES, 'tentatives — image abandonnée.');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            continue;
+          }
+
+          const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;
           // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
           queueRef.current = [entry, ...queueRef.current];
@@ -317,6 +335,10 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         setIsLoading(false);
         break;
       }
+
+      // Ici l'image courante est consommée (succès ou erreur non-quota) :
+      // la prochaine itération concerne une nouvelle image.
+      retries = 0;
 
       if (scanError) {
         setResult(null);
