@@ -16,6 +16,10 @@ const SCAN_COOLDOWN_SECONDS = 25;
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
 
+// Pause asynchrone bloquante : l'appelant DOIT faire `await sleep(ms)` pour
+// que la boucle d'envoi attende réellement la fin du délai avant de relancer.
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 interface ScanItem {
   name: string;
   prices: {
@@ -120,7 +124,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     for (let i = total; i >= 1; i--) {
       if (cancelCurrentRef.current) return false;
       setPauseMessage(`${baseMessage} ${i}s...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await sleep(1000);
     }
     setPauseMessage(null);
     return true;
@@ -291,16 +295,20 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
           const waitSeconds = Math.max(retryAfter ?? 15, 5);
           setIsLoading(false);
 
-          // Trop d'échecs consécutifs pour cette image : on l'abandonne et on
-          // force le passage à la suivante (auto-skip) au lieu de boucler.
+          // Coupe-circuit anti-boucle infinie : après MAX_RETRIES échecs
+          // (429/503) consécutifs sur la MÊME image, on l'abandonne et on
+          // force le passage à la suivante (auto-skip) au lieu de re-spammer.
           if (retries >= MAX_RETRIES) {
             retries = 0;
+            console.error('Nombre maximum de tentatives atteint. Passage à l\'image suivante.');
             setError('API indisponible, passage à l\'image suivante.');
-            console.error('[scan] 🛑 API indisponible après', MAX_RETRIES, 'tentatives — image abandonnée.');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await sleep(3000); // laisse le temps de lire le message
             continue;
           }
 
+          // Pause asynchrone bloquante AVANT de relancer la même image :
+          // le thread attend réellement `waitSeconds` (retryAfter backend ou 15s),
+          // il ne relance JAMAIS immédiatement.
           const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;
           // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
