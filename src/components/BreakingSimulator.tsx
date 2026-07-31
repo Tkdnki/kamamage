@@ -20,7 +20,7 @@ import {
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
-import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient } from '../lib/sync';
+import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients } from '../lib/sync';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -45,6 +45,9 @@ export default function BreakingSimulator() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   const [runeCommunityPrices, setRuneCommunityPrices] = useState<Record<string, { price: number; author: string | null }>>({});
+
+  // Coefficients persistés en base, indexés par itemKey (pour le tri par rentabilité)
+  const [coeffMap, setCoeffMap] = useState<Record<string, number>>({});
 
   // Focus
   const [focusEffectIndex, setFocusEffectIndex] = useState<number | null>(null);
@@ -88,6 +91,15 @@ export default function BreakingSimulator() {
 
   useEffect(() => {
     fetchRunePricesWithAuthor(selectedServer).then(data => setRuneCommunityPrices(data));
+  }, [selectedServer]);
+
+  // Charge les coefficients enregistrés du serveur pour estimer la rentabilité de la liste.
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllItemCoefficients(selectedServer)
+      .then(map => { if (!cancelled) setCoeffMap(map); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [selectedServer]);
 
   const selectedItem = useMemo(
@@ -186,12 +198,6 @@ export default function BreakingSimulator() {
     if (selectedItem?.dofusdbId) fetchItemStats(selectedItem.dofusdbId);
   }, [selectedItem?.dofusdbId, fetchItemStats]);
 
-  const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return craftItems;
-    const q = searchQuery.toLowerCase();
-    return craftItems.filter(i => i.name.toLowerCase().includes(q));
-  }, [craftItems, searchQuery]);
-
   const pricesByCode = useMemo(() => {
     const m: Record<string, number> = {};
     for (const rune of DOFUS_RUNES) {
@@ -202,6 +208,57 @@ export default function BreakingSimulator() {
     }
     return m;
   }, [hdvPrices, runeCommunityPrices]);
+
+  // ─── Rentabilité estimée de chaque item (tri de la liste) ───────────────
+  // (Valeur totale estimée des runes obtenues × coefficient) − Prix d'achat.
+  // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
+  // ou les coefficients changent → le tri se met à jour automatiquement.
+  const itemsWithProfit = useMemo(() => {
+    const list: { item: CraftItem; profit: number; hasStats: boolean }[] = [];
+    for (const item of craftItems) {
+      if (!item.possibleEffects || item.possibleEffects.length === 0) {
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, hasStats: false });
+        continue;
+      }
+      const coeff = selectedItemId === item._id ? coefficient : (coeffMap[item._id] ?? 100);
+      const craftCost = hdvPrices[item._id]?.unitAverage ?? 0;
+      try {
+        const b = calculateBreaking(
+          item.possibleEffects,
+          item.level,
+          coeff,
+          'avg',
+          pricesByCode,
+          craftCost,
+          item.name,
+          item.imgUrl,
+        );
+        list.push({ item, profit: b.netProfitStd, hasStats: true });
+      } catch {
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, hasStats: false });
+      }
+    }
+    return list;
+  }, [craftItems, coefficient, selectedItemId, coeffMap, pricesByCode, hdvPrices]);
+
+  const profitById = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of itemsWithProfit) m[p.item._id] = p.profit;
+    return m;
+  }, [itemsWithProfit]);
+
+  // Filtre par recherche puis tri décroissant par rentabilité (du plus au moins rentable).
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const base = !q ? [...craftItems] : craftItems.filter(i => i.name.toLowerCase().includes(q));
+    base.sort((a, b) => {
+      const pa = profitById[a._id] ?? Number.NEGATIVE_INFINITY;
+      const pb = profitById[b._id] ?? Number.NEGATIVE_INFINITY;
+      if (pa === pb) return a.name.localeCompare(b.name, 'fr');
+      return pb - pa;
+    });
+    return base;
+  }, [craftItems, searchQuery, profitById]);
 
   const breaking = useMemo<BreakingResult | null>(() => {
     if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0) return null;
@@ -240,8 +297,8 @@ export default function BreakingSimulator() {
       if (!e.rune.id.startsWith('synthetic-')) runesById.set(e.rune.id, e.rune);
     }
     openScanner([
-      { expectedName: selectedItem.name, expectedId: selectedItem._id },
-      ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: r.id })),
+      { expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type },
+      ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: r.id, type: 'Rune de forgemagie' })),
     ]);
   }, [selectedItem, breaking, openScanner]);
 
@@ -327,11 +384,19 @@ export default function BreakingSimulator() {
             </div>
           )}
 
+          {!isLoadingItems && filteredItems.length > 0 && (
+            <p className="text-[9px] text-slate-600 uppercase tracking-wider">
+              Trié par rentabilité estimée (prix HDV + runes)
+            </p>
+          )}
+
           <div className="flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto pr-1">
             {filteredItems.map(item => {
               const isSelected = selectedItemId === item._id;
               const priceData = hdvPrices[item._id];
               const hasPrice = priceData && priceData.unitAverage > 0;
+              const profit = profitById[item._id] ?? Number.NEGATIVE_INFINITY;
+              const hasProfit = profit !== Number.NEGATIVE_INFINITY;
               return (
                 <button
                   key={item._id}
@@ -352,6 +417,15 @@ export default function BreakingSimulator() {
                         Niveau {item.level}
                         {hasPrice && <span className="ml-2 text-amber-400/70">{Math.round(priceData!.unitAverage).toLocaleString()} K</span>}
                       </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {hasProfit ? (
+                        <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {profit >= 0 ? '+' : ''}{Math.round(profit).toLocaleString()} K
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-600">—</span>
+                      )}
                     </div>
                   </div>
                 </button>

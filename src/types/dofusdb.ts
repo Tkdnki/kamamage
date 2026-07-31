@@ -43,6 +43,8 @@ export interface DofusDbItem {
   recipesThatUse?: number[];
   /** IDs des recettes de cet item lui-même (rarement populé dans /items) */
   recipeIds?: number[];
+  /** Effets brisables (effectId/diceNum/diceSide) — présent dans les items embarqués des recettes */
+  possibleEffects?: Array<{ effectId: number; diceNum: number; diceSide: number }>;
 }
 
 /** Structure d'un job (métier) retourné dans /recipes */

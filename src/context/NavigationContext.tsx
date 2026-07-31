@@ -8,6 +8,8 @@ export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'breaking'
 export interface ScannerQueueItem {
   expectedName: string;
   expectedId: string;
+  /** Type DofusDB de l'item (ex: "Épée", "Minerai") pour afficher l'HDV cible */
+  type?: string;
 }
 
 export interface CartEntry {

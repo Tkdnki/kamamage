@@ -1,5 +1,6 @@
 import type { DofusDbItem, DofusDbRecipe, DofusDbPaginatedResponse } from '../types/dofusdb';
 import type { DofusItem } from '../data/mockData';
+import type { DofusDbEffect } from '../lib/breaking';
 
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const TIMEOUT_MS = 5000;
@@ -189,6 +190,8 @@ export interface CraftItem {
   job?: string;
   /** Ratio XP de craft de l'item (ou de son type si l'item est à −1) */
   craftXpRatio?: number;
+  /** Effets brisables embarqués dans la recette (utilisés pour l'estimation de rentabilité) */
+  possibleEffects?: DofusDbEffect[];
   recipeIngredients: NormalizedRecipeIngredient[];
 }
 
@@ -449,6 +452,7 @@ export async function fetchCraftsByJob(jobName: string): Promise<CraftItem[]> {
         dofusdbId: resultItem.id,
         job: jobName,
         craftXpRatio: getCraftXpRatio(resultItem, recipe.resultType),
+        possibleEffects: resultItem.possibleEffects,
         recipeIngredients: ingredients,
       };
     });

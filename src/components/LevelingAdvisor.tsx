@@ -563,8 +563,8 @@ export default function LevelingAdvisor() {
                   <button
                     type="button"
                     onClick={() => openScanner([
-                      { expectedName: selectedItem.name, expectedId: selectedItem._id },
-                      ...selectedItem.recipeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
+                      { expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type },
+                      ...selectedItem.recipeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id, type: ing.type }))
                     ])}
                     className="shrink-0 flex items-center gap-1.5 bg-[#151f32] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-500/20 text-slate-300 hover:text-cyan-400 text-[10px] font-bold py-2 px-2.5 rounded-lg transition-all"
                     title="Scanner les prix de cette recette"

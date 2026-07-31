@@ -542,8 +542,8 @@ export default function CraftProfitability() {
                   </button>
                   <button
                     onClick={() => openScanner([
-                      { expectedName: selectedItem.name, expectedId: selectedItem._id },
-                      ...activeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id }))
+                      { expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type },
+                      ...activeIngredients.map(ing => ({ expectedName: ing.name, expectedId: ing.id, type: ing.type }))
                     ])}
                     className="bg-[#151f32] hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-500/20 text-slate-300 hover:text-cyan-400 text-xs font-bold py-2 px-3 rounded-lg transition-all self-start sm:self-auto"
                   >

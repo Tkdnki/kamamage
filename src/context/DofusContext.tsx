@@ -50,6 +50,56 @@ function saveCache(storageKey: string, prices: HdvPrices) {
   window.localStorage.setItem(storageKey, JSON.stringify(prices));
 }
 
+/** Intervalle de rafraîchissement des prix en arrière-plan (ms). */
+const PRICE_POLL_INTERVAL_MS = 30000;
+
+/**
+ * Fusionne une valeur distante dans un objet de prix (muté en place).
+ * - L'utilisateur n'a pas l'item en local → on prend la valeur distante.
+ * - La valeur distante est strictement plus récente (updatedAt) → elle remplace.
+ * - Sinon on conserve les lots locaux et on comble les trous avec le distant.
+ * @returns true si l'objet a été modifié.
+ */
+function applyRemotePrice(merged: HdvPrices, key: string, val: PriceData): boolean {
+  const local = merged[key];
+  if (!local) {
+    merged[key] = val;
+    return true;
+  }
+
+  const remoteIsNewer =
+    !!val.updatedAt && (local.updatedAt ? new Date(val.updatedAt) > new Date(local.updatedAt) : true);
+
+  if (remoteIsNewer) {
+    merged[key] = {
+      x1: val.x1,
+      x10: val.x10,
+      x100: val.x100,
+      x1000: val.x1000,
+      unitAverage: val.unitAverage,
+      author: val.author ?? local.author ?? null,
+      authorId: val.authorId ?? local.authorId ?? null,
+      updatedAt: val.updatedAt ?? local.updatedAt ?? null,
+      monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
+    };
+    return true;
+  }
+
+  const before = JSON.stringify(merged[key]);
+  merged[key] = {
+    x1: local.x1 || val.x1 || 0,
+    x10: local.x10 || val.x10 || 0,
+    x100: local.x100 || val.x100 || 0,
+    x1000: local.x1000 || val.x1000 || 0,
+    unitAverage: local.unitAverage || val.unitAverage || 0,
+    author: local.author ?? val.author ?? null,
+    authorId: local.authorId ?? val.authorId ?? null,
+    updatedAt: local.updatedAt ?? val.updatedAt ?? null,
+    monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
+  };
+  return before !== JSON.stringify(merged[key]);
+}
+
 export function DofusProvider({ children }: { children: ReactNode }) {
   const { selectedServer } = useServer();
   const storageKey = `hdvPrices_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
@@ -76,6 +126,18 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     serverRef.current = selectedServer;
     let cancelled = false;
 
+    const mergeVolumes = (prev: HdvPrices, remoteVolumes: Record<string, number>) => {
+      let changed = false;
+      const merged = { ...prev };
+      for (const [key, volume] of Object.entries(remoteVolumes)) {
+        if (merged[key]?.monthlySalesVolume !== volume) {
+          changed = true;
+          merged[key] = { ...merged[key], monthlySalesVolume: volume };
+        }
+      }
+      return changed ? merged : prev;
+    };
+
     const loadFromServer = async () => {
       const [remote, remoteVolumes] = await Promise.all([
         fetchHdvPricesFromServer(selectedServer),
@@ -87,48 +149,48 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       if (remote && Object.keys(remote).length > 0) {
         setHdvPrices(prev => {
           const merged = { ...prev };
+          let changed = false;
           for (const [key, val] of Object.entries(remote)) {
-            if (!merged[key]) {
-              // L'utilisateur n'a pas ce item en local → on prend la valeur distante
-              merged[key] = val;
-            } else {
-              // L'utilisateur a déjà ce item en local → on conserve ses lots, on comble les trous
-              const local = merged[key];
-              merged[key] = {
-                x1: local.x1 || val.x1 || 0,
-                x10: local.x10 || val.x10 || 0,
-                x100: local.x100 || val.x100 || 0,
-                x1000: local.x1000 || val.x1000 || 0,
-                unitAverage: local.unitAverage || val.unitAverage || 0,
-                author: local.author ?? val.author ?? null,
-                authorId: local.authorId ?? val.authorId ?? null,
-                updatedAt: local.updatedAt ?? val.updatedAt ?? null,
-                monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
-              };
-            }
+            changed = applyRemotePrice(merged, key, val) || changed;
           }
-          if (JSON.stringify(prev) === JSON.stringify(merged)) return prev;
-          return merged;
+          return changed ? merged : prev;
         });
       }
 
       if (remoteVolumes && Object.keys(remoteVolumes).length > 0) {
-        setHdvPrices(prev => {
-          let changed = false;
-          const merged = { ...prev };
-          for (const [key, volume] of Object.entries(remoteVolumes)) {
-            if (merged[key]?.monthlySalesVolume !== volume) {
-              changed = true;
-              merged[key] = { ...merged[key], monthlySalesVolume: volume };
-            }
-          }
-          return changed ? merged : prev;
-        });
+        setHdvPrices(prev => mergeVolumes(prev, remoteVolumes));
       }
     };
 
     loadFromServer();
     return () => { cancelled = true; };
+  }, [selectedServer]);
+
+  // Rafraîchissement automatique des prix en arrière-plan : les prix distants
+  // (Supabase) alimentent le state global de manière réactive sans attendre un
+  // focus utilisateur ni un refetch manuel. Le tri du brisage se met à jour seul.
+  useEffect(() => {
+    let cancelled = false;
+
+    const poll = async () => {
+      const remote = await fetchHdvPricesFromServer(selectedServer);
+      if (cancelled || !remote || Object.keys(remote).length === 0) return;
+      setHdvPrices(prev => {
+        const merged = { ...prev };
+        let changed = false;
+        for (const [key, val] of Object.entries(remote)) {
+          changed = applyRemotePrice(merged, key, val) || changed;
+        }
+        return changed ? merged : prev;
+      });
+    };
+
+    poll();
+    const intervalId = setInterval(poll, PRICE_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [selectedServer]);
 
   const { user } = useAuth();
@@ -163,7 +225,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     if (x100 > 0) { sum += x100 / 100; count++; }
     if (x1000 > 0) { sum += x1000 / 1000; count++; }
     const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
-    const entry: PriceData = { x1, x10, x100, x1000, unitAverage };
+    const entry: PriceData = { x1, x10, x100, x1000, unitAverage, updatedAt: new Date().toISOString() };
 
     // Mise à jour locale immédiate
     setHdvPrices(prev => ({ ...prev, [itemId]: entry }));

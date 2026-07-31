@@ -11,7 +11,7 @@ import { HDV_DEFINITIONS, matchesHdv } from '../data/hdvCategories';
 import type { HdvDef } from '../data/hdvCategories';
 import {
   Search, Plus, Trash2, X, Coins, TrendingDown, Sparkles, Star,
-  ChevronDown, ChevronUp, Shield, FlaskConical, Gem, Package, Ghost,
+  ChevronDown, ChevronUp, Shield, FlaskConical, Gem, Package, Ghost, PawPrint,
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 
@@ -21,6 +21,7 @@ const HDV_ICONS: Record<string, typeof Shield> = {
   runes: Gem,
   ressources: Package,
   ames: Ghost,
+  creature: PawPrint,
 };
 
 export default function HdvPrices() {

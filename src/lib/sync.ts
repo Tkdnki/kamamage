@@ -161,6 +161,28 @@ export async function fetchItemCoefficient(server: string, itemKey: string): Pro
   return data?.coefficient ?? null;
 }
 
+/**
+ * Récupère tous les coefficients de brisage du serveur en une requête,
+ * indexés par itemKey. Utilisé pour l'estimation de rentabilité de la liste.
+ */
+export async function fetchAllItemCoefficients(server: string): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('item_coefficients')
+    .select('item_key, coefficient')
+    .eq('server_name', server);
+
+  if (error) {
+    console.warn('[Sync] ❌ fetchAllItemCoefficients error:', error.message);
+    return {};
+  }
+
+  const coefficients: Record<string, number> = {};
+  for (const row of data ?? []) {
+    if (row.coefficient > 0) coefficients[row.item_key] = row.coefficient;
+  }
+  return coefficients;
+}
+
 export async function pushItemCoefficient(server: string, itemKey: string, coefficient: number): Promise<void> {
   if (!coefficient || coefficient <= 0) {
     console.warn(`[Sync] ⚠️ Upsert ignoré pour "${itemKey}": coefficient invalide (${coefficient})`);

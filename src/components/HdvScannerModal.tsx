@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
+import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key } from 'lucide-react';
 
 interface ScanItem {
@@ -465,6 +466,8 @@ for (const file of Array.from(e.dataTransfer.files)) {
   const queueCount = queue.length;
   const resolvedCount = resolvedIds.size;
   const totalExpected = expectedItems.length;
+  const remainingExpected = expectedItems.filter(item => !resolvedIds.has(item.expectedId));
+  const remainingCount = remainingExpected.length;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
@@ -543,33 +546,45 @@ for (const file of Array.from(e.dataTransfer.files)) {
             <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <ListChecks className="h-4 w-4 text-cyan-400" />
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Items de la recette ({resolvedCount}/{totalExpected})</span>
+                {remainingCount > 0 ? (
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Items de la recette (scannés : {resolvedCount}/{totalExpected} — restants : {remainingCount})</span>
+                ) : (
+                  <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Recette terminée ({resolvedCount}/{totalExpected})
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
-                {expectedItems.map(item => {
-                  const done = resolvedIds.has(item.expectedId);
-                  return (
-                    <div key={item.expectedId} className="flex items-center gap-1.5 text-[11px]">
-                      {done ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                      ) : (
+                {remainingCount === 0 ? (
+                  <p className="text-[11px] text-slate-500 italic">Tous les items de la recette ont été scannés.</p>
+                ) : (
+                  remainingExpected.map(item => {
+                    const category = getHdvName(item.type) ?? getHdvCategoryForItem(item.expectedName, item.expectedId);
+                    return (
+                      <div key={item.expectedId} className="flex items-center gap-1.5 text-[11px]">
                         <div className="h-3.5 w-3.5 rounded-full border border-slate-600 shrink-0" />
-                      )}
-                      <span className={done ? 'text-emerald-300 line-through opacity-60 flex-1 truncate' : 'text-slate-300 flex-1 truncate'}>{item.expectedName}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.expectedName); setCopiedId(item.expectedId); setTimeout(() => setCopiedId(null), 1500); }}
-                        className="opacity-30 hover:opacity-100 transition-opacity shrink-0 p-0.5"
-                        title="Copier le nom"
-                      >
-                        {copiedId === item.expectedId ? (
-                          <Check className="h-3 w-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="h-3 w-3 text-slate-400" />
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-slate-300 truncate block">{item.expectedName}</span>
+                          {category && (
+                            <span className="text-[9px] text-slate-500 truncate block">{category}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.expectedName); setCopiedId(item.expectedId); setTimeout(() => setCopiedId(null), 1500); }}
+                          className="opacity-30 hover:opacity-100 transition-opacity shrink-0 p-0.5"
+                          title="Copier le nom"
+                        >
+                          {copiedId === item.expectedId ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3 text-slate-400" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

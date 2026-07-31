@@ -1,3 +1,5 @@
+import { DOFUS_MOCK_ITEMS, DOFUS_RUNES } from './mockData';
+
 export interface HdvSubCategoryDef {
   id: string;
   label: string;
@@ -195,6 +197,25 @@ export const HDV_DEFINITIONS: HdvDef[] = [
       { id: 'ame_pierre', label: "Pierre d'âme", match: includes("Pierre d'âme") },
     ],
   },
+  {
+    id: 'creature',
+    label: 'HDV Créature',
+    icon: 'PawPrint',
+    subCategories: [
+      { id: 'crea_dragodinde', label: 'Dragodinde', match: exact('Dragodinde') },
+      { id: 'crea_familier', label: 'Familier', match: exact('Familier') },
+      { id: 'crea_montilier', label: 'Montilier', match: exact('Montilier') },
+      { id: 'crea_muldo', label: 'Muldo', match: exact('Muldo') },
+      { id: 'crea_volkorne', label: 'Volkorne', match: exact('Volkorne') },
+      { id: 'crea_filet_capture', label: 'Filet de capture', match: exact('Filet de capture') },
+      { id: 'crea_carburant', label: "Carburant d'enclos", match: exact("Carburant d'enclos") },
+      { id: 'crea_caution', label: 'Caution', match: exact('Caution') },
+      { id: 'crea_makina', label: 'Makina', match: exact('Makina') },
+      { id: 'crea_nourriture', label: 'Nourriture pour familier', match: exact('Nourriture pour familier') },
+      { id: 'crea_monture_domptee', label: 'Monture domptée', match: exact('Monture domptée') },
+      { id: 'crea_potion_monture', label: 'Potion de monture', match: exact('Potion de monture') },
+    ],
+  },
 ];
 
 export function getHdvByItemType(type: string): string | null {
@@ -243,4 +264,68 @@ export function matchesSubCategory(item: { type: string }, subId: string): boole
     }
   }
   return false;
+}
+
+const HDV_LABELS: Record<string, string> = {};
+for (const hdv of HDV_DEFINITIONS) HDV_LABELS[hdv.id] = hdv.label;
+
+/**
+ * Dictionnaire de mapping : types génériques / super-types DofusDB → HDV officielle.
+ * Les types précis (Armes, Chapeaux, Capes, Minerais, Bois, Plantes, Pains,
+ * Potions, Parchemins, Runes, Familiers, Dragodindes…) sont résolus par
+ * `HDV_DEFINITIONS` via `getHdvByItemType` ; ce dictionnaire couvre les types
+ * qui n'apparaissent pas dans les sous-catégories.
+ */
+const GENERIC_HDV_BY_TYPE: Record<string, string> = {
+  'Équipement': 'HDV Équipement',
+  'Ressource': 'HDV Ressources',
+  'Consommable': 'HDV Consommable',
+  'Rune': 'HDV Runes',
+  'Créature': 'HDV Créature',
+};
+
+/**
+ * Retourne le nom de l'HDV officielle correspondant au type/catégorie d'un item.
+ * Utilise le dictionnaire générique puis les définitions HDV (sous-catégories).
+ *
+ * @param itemType - Type DofusDB de l'item (ex: "Épée", "Minerai", "Potion").
+ * @returns Le libellé d'HDV (ex: "HDV Équipement") ou null si introuvable.
+ */
+export function getHdvName(itemType: string | null | undefined): string | null {
+  if (!itemType) return null;
+  const t = itemType.trim();
+  if (!t) return null;
+
+  const generic = GENERIC_HDV_BY_TYPE[t];
+  if (generic) return generic;
+
+  const hdvId = getHdvByItemType(t);
+  if (hdvId && HDV_LABELS[hdvId]) return HDV_LABELS[hdvId];
+
+  return null;
+}
+
+/**
+ * Détermine le libellé d'HDV d'un item de file de scan (par ID connu en base,
+ * sinon par fallback textuel sur le nom).
+ */
+export function getHdvCategoryForItem(expectedName: string, expectedId: string): string | null {
+  let type: string | null = null;
+
+  if (DOFUS_RUNES.some(r => r.id === expectedId)) {
+    type = 'Rune de forgemagie';
+  } else {
+    const item = DOFUS_MOCK_ITEMS.find(i => i._id === expectedId);
+    if (item) type = item.type;
+  }
+
+  if (type) {
+    const name = getHdvName(type);
+    if (name) return name;
+  }
+
+  // Fallback textuel : toute rune doit s'acheter à l'HDV Runes.
+  if (expectedName.includes('Rune')) return HDV_LABELS['runes'] ?? 'HDV Runes';
+
+  return null;
 }
