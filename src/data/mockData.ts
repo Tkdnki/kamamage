@@ -72,7 +72,7 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 'age', name: 'Rune Age', code: 'Age', weight: 1, statEffect: '+1 Agilité', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78046.png' },
   { id: 'ra_cha', name: 'Rune Ra Cha', code: 'Ra Cha', weight: 10, statEffect: '+10 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78042.png' },
   { id: 'pa_cha', name: 'Rune Pa Cha', code: 'Pa Cha', weight: 3, statEffect: '+3 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78041.png' },
-  { id: 'cha', name: 'Rune Chance', code: 'Cha', weight: 1, statEffect: '+1 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78040.png' },
+  { id: 'cha', name: 'Rune Cha', code: 'Cha', weight: 1, statEffect: '+1 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78040.png' },
 
   // Dommages
   { id: 'pa_do', name: 'Rune Pa Do', code: 'Pa Do', weight: 60, statEffect: '+3 Dommages', category: 'Dommages' },
@@ -87,16 +87,16 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 'cri', name: 'Rune Cri', code: 'Cri', weight: 10, statEffect: '+1 Coup Critique', category: 'Dommages', imgUrl: 'https://api.dofusdb.fr/img/items/78014.png' },
 
   // Résistances % et Fixes
-  { id: 're_neutre', name: 'Rune Re Neutre %', code: 'Re Neutre %', weight: 6, statEffect: '+1% Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78057.png' },
-  { id: 're_terre', name: 'Rune Re Terre %', code: 'Re Terre %', weight: 6, statEffect: '+1% Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78034.png' },
-  { id: 're_feu', name: 'Rune Re Feu %', code: 'Re Feu %', weight: 6, statEffect: '+1% Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78028.png' },
-  { id: 're_eau', name: 'Rune Re Eau %', code: 'Re Eau %', weight: 6, statEffect: '+1% Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78030.png' },
-  { id: 're_air', name: 'Rune Re Air %', code: 'Re Air %', weight: 6, statEffect: '+1% Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78032.png' },
-  { id: 're_f_neutre', name: 'Rune Re Neutre (fixe)', code: 'Re Neutre', weight: 2, statEffect: '+1 Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78058.png' },
-  { id: 're_f_terre', name: 'Rune Re Terre (fixe)', code: 'Re Terre', weight: 2, statEffect: '+1 Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78035.png' },
-  { id: 're_f_feu', name: 'Rune Re Feu (fixe)', code: 'Re Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78029.png' },
-  { id: 're_f_eau', name: 'Rune Re Eau (fixe)', code: 'Re Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78031.png' },
-  { id: 're_f_air', name: 'Rune Re Air (fixe)', code: 'Re Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78033.png' },
+  { id: 're_neutre', name: 'Rune Ré Per Neutre', code: 'Ré Per Neutre', weight: 6, statEffect: '+1% Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78057.png' },
+  { id: 're_terre', name: 'Rune Ré Per Terre', code: 'Ré Per Terre', weight: 6, statEffect: '+1% Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78034.png' },
+  { id: 're_feu', name: 'Rune Ré Per Feu', code: 'Ré Per Feu', weight: 6, statEffect: '+1% Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78028.png' },
+  { id: 're_eau', name: 'Rune Ré Per Eau', code: 'Ré Per Eau', weight: 6, statEffect: '+1% Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78030.png' },
+  { id: 're_air', name: 'Rune Ré Per Air', code: 'Ré Per Air', weight: 6, statEffect: '+1% Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78032.png' },
+  { id: 're_f_neutre', name: 'Rune Ré Neutre', code: 'Ré Neutre', weight: 2, statEffect: '+1 Résistance Neutre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78058.png' },
+  { id: 're_f_terre', name: 'Rune Ré Terre', code: 'Ré Terre', weight: 2, statEffect: '+1 Résistance Terre', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78035.png' },
+  { id: 're_f_feu', name: 'Rune Ré Feu', code: 'Ré Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78029.png' },
+  { id: 're_f_eau', name: 'Rune Ré Eau', code: 'Ré Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78031.png' },
+  { id: 're_f_air', name: 'Rune Ré Air', code: 'Ré Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78033.png' },
   { id: 're_pm', name: 'Rune Ré PM', code: 'Ré PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78085.png' },
 
   // Utilitaires (Tacle, Fuite, Prospection, Pods, Initiative)
@@ -115,36 +115,35 @@ export const DOFUS_RUNES: Rune[] = [
 
 export const DOFUS_MOCK_ITEMS: DofusItem[] = [
   // INGRÉDIENTS & RESSOURCES DE BASE (Pour le lookup des prix et les crafts)
-  { _id: 'ing_frene', name: 'Bois de Frêne', type: 'Bois', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/303.png' },
-  { _id: 'ing_chataignier', name: 'Bois de Châtaignier', type: 'Bois', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/304.png' },
-  { _id: 'ing_chene', name: 'Bois de Chêne', type: 'Bois', level: 40, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/305.png' },
-  { _id: 'ing_fer', name: 'Minerai de Fer', type: 'Minerai', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/311.png' },
-  { _id: 'ing_cuivre', name: 'Minerai de Cuivre', type: 'Minerai', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/312.png' },
-  { _id: 'ing_bronze', name: 'Minerai de Bronze', type: 'Minerai', level: 40, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/313.png' },
-  { _id: 'ing_laine_bouftou', name: 'Laine de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/460.png' },
-  { _id: 'ing_laine_bouftou_guerre', name: 'Laine de Bouftou Chef de Guerre', type: 'Ressource', level: 15, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2115.png' },
-  { _id: 'ing_corne_bouftou', name: 'Corne de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2113.png' },
-  { _id: 'ing_cuir_bouftou', name: 'Cuir de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2067.png' },
-  { _id: 'ing_plume_piou_bleu', name: 'Plume de Piou Bleu', type: 'Plume', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2208.png' },
-  { _id: 'ing_bec_piou', name: 'Bec de Piou', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2200.png' },
-  { _id: 'ing_trefle', name: 'Trèfle à 5 feuilles', type: 'Fleur', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/422.png' },
-  { _id: 'ing_eau', name: 'Eau de source', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/310.png' },
-  { _id: 'ing_riz', name: 'Riz grain', type: 'Céréale', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1004.png' },
-  { _id: 'ing_fiole', name: 'Fiole de Pandapils', type: 'Ressource', level: 10, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2180.png' },
-  { _id: 'ing_orge', name: 'Orge brute', type: 'Céréale', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/290.png' },
-  { _id: 'ing_seigle', name: 'Seigle sauvage', type: 'Céréale', level: 40, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/291.png' },
-  { _id: 'ing_goujon', name: 'Goujon frais', type: 'Poisson', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/598.png' },
-  { _id: 'ing_truite', name: 'Truite arc-en-ciel', type: 'Poisson', level: 20, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/600.png' },
-  { _id: 'ing_viande_intangible', name: 'Viande Intangible', type: 'Viande', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/16200.png' },
-  { _id: 'ing_viande_bouftou', name: 'Viande de Bouftou', type: 'Viande', level: 10, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/16205.png' },
-  { _id: 'ing_sel', name: 'Pincée de Sel', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1000.png' },
-  { _id: 'ing_sabot_bouftou', name: 'Sabot de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2114.png' },
-  { _id: 'ing_silicate', name: 'Silicate cristallin', type: 'Minerai', level: 50, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1012.png' },
-  { _id: 'ing_or', name: 'Minerai d\'Or', type: 'Minerai', level: 100, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/314.png' },
-  { _id: 'ing_etain', name: 'Minerai d\'Étain', type: 'Minerai', level: 60, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/316.png' },
-  { _id: 'ing_bauxite', name: 'Minerai de Bauxite', type: 'Minerai', level: 80, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/317.png' },
-  { _id: 'ing_seve_tremble', name: 'Sève de Tremble', type: 'Sève', level: 180, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/11054.png' },
-  { _id: 'ing_huile_friture', name: 'Huile de Friture', type: 'Ressource', level: 1, imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/315.png' },
+  { _id: 'ing_frene', name: 'Bois de Frêne', type: 'Bois', level: 1, dofusdbId: 303, imgUrl: 'https://api.dofusdb.fr/img/items/38017.png' },
+  { _id: 'ing_chataignier', name: 'Bois de Châtaignier', type: 'Bois', level: 20, dofusdbId: 473, imgUrl: 'https://api.dofusdb.fr/img/items/38086.png' },
+  { _id: 'ing_chene', name: 'Bois de Chêne', type: 'Bois', level: 40, dofusdbId: 460, imgUrl: 'https://api.dofusdb.fr/img/items/38092.png' },
+  { _id: 'ing_cuivre', name: 'Minerai de Cuivre', type: 'Minerai', level: 20, dofusdbId: 441, imgUrl: 'https://api.dofusdb.fr/img/items/39108.png' },
+  { _id: 'ing_bronze', name: 'Minerai de Bronze', type: 'Minerai', level: 40, dofusdbId: 442, imgUrl: 'https://api.dofusdb.fr/img/items/39109.png' },
+  { _id: 'ing_laine_bouftou', name: 'Laine de Bouftou', type: 'Ressource', level: 5, dofusdbId: 384, imgUrl: 'https://api.dofusdb.fr/img/items/57056.png' },
+  { _id: 'ing_laine_bouftou_guerre', name: 'Laine de Bouftou Chef de Guerre', type: 'Ressource', level: 15, imgUrl: 'https://api.dofusdb.fr/img/items/57056.png' },
+  { _id: 'ing_corne_bouftou', name: 'Corne de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://api.dofusdb.fr/img/items/47055.png' },
+  { _id: 'ing_cuir_bouftou', name: 'Cuir de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://api.dofusdb.fr/img/items/56016.png' },
+  { _id: 'ing_plume_piou_bleu', name: 'Plume de Piou Bleu', type: 'Plume', level: 1, dofusdbId: 6897, imgUrl: 'https://api.dofusdb.fr/img/items/53114.png' },
+  { _id: 'ing_bec_piou', name: 'Bec de Piou', type: 'Ressource', level: 1, imgUrl: 'https://api.dofusdb.fr/img/items/47037.png' },
+  { _id: 'ing_trefle', name: 'Trèfle à 5 feuilles', type: 'Fleur', level: 1, dofusdbId: 395, imgUrl: 'https://api.dofusdb.fr/img/items/36067.png' },
+  { _id: 'ing_eau', name: 'Eau de source', type: 'Ressource', level: 1, dofusdbId: 311, imgUrl: 'https://api.dofusdb.fr/img/items/15026.png' },
+  { _id: 'ing_riz', name: 'Riz grain', type: 'Céréale', level: 20, dofusdbId: 7018, imgUrl: 'https://api.dofusdb.fr/img/items/34010.png' },
+  { _id: 'ing_fiole', name: 'Fiole de Pandapils', type: 'Ressource', level: 10, dofusdbId: 7047, imgUrl: 'https://api.dofusdb.fr/img/items/79179.png' },
+  { _id: 'ing_orge', name: 'Orge brute', type: 'Céréale', level: 20, dofusdbId: 400, imgUrl: 'https://api.dofusdb.fr/img/items/34082.png' },
+  { _id: 'ing_seigle', name: 'Seigle sauvage', type: 'Céréale', level: 40, dofusdbId: 532, imgUrl: 'https://api.dofusdb.fr/img/items/34083.png' },
+  { _id: 'ing_goujon', name: 'Goujon frais', type: 'Poisson', level: 1, dofusdbId: 1782, imgUrl: 'https://api.dofusdb.fr/img/items/41294.png' },
+  { _id: 'ing_truite', name: 'Truite arc-en-ciel', type: 'Poisson', level: 20, dofusdbId: 1844, imgUrl: 'https://api.dofusdb.fr/img/items/41394.png' },
+  { _id: 'ing_viande_intangible', name: 'Viande Intangible', type: 'Viande', level: 1, dofusdbId: 16663, imgUrl: 'https://api.dofusdb.fr/img/items/63407.png' },
+  { _id: 'ing_viande_bouftou', name: 'Viande de Bouftou', type: 'Viande', level: 10, imgUrl: 'https://api.dofusdb.fr/img/items/69112.png' },
+  { _id: 'ing_sel', name: 'Pincée de Sel', type: 'Ressource', level: 1, dofusdbId: 11143, imgUrl: 'https://api.dofusdb.fr/img/items/24833.png' },
+  { _id: 'ing_sabot_bouftou', name: 'Sabot de Bouftou', type: 'Ressource', level: 5, imgUrl: 'https://api.dofusdb.fr/img/items/47539.png' },
+  { _id: 'ing_silicate', name: 'Silicate cristallin', type: 'Minerai', level: 50, dofusdbId: 7032, imgUrl: 'https://api.dofusdb.fr/img/items/39111.png' },
+  { _id: 'ing_or', name: 'Minerai d\'Or', type: 'Minerai', level: 100, dofusdbId: 313, imgUrl: 'https://api.dofusdb.fr/img/items/39022.png' },
+  { _id: 'ing_etain', name: 'Minerai d\'Étain', type: 'Minerai', level: 60, dofusdbId: 444, imgUrl: 'https://api.dofusdb.fr/img/items/39078.png' },
+  { _id: 'ing_bauxite', name: 'Minerai de Bauxite', type: 'Minerai', level: 80, dofusdbId: 446, imgUrl: 'https://api.dofusdb.fr/img/items/39076.png' },
+  { _id: 'ing_seve_tremble', name: 'Sève de Tremble', type: 'Sève', level: 180, dofusdbId: 16926, imgUrl: 'https://api.dofusdb.fr/img/items/179018.png' },
+  { _id: 'ing_huile_friture', name: 'Huile de Friture', type: 'Ressource', level: 1, imgUrl: 'https://api.dofusdb.fr/img/items/60061.png' },
 
   // ITEMS CRAFTABLES PAR MÉTIER
 
@@ -154,11 +153,12 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Épée de Boisaille',
     type: 'Épée',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1001.png',
+    dofusdbId: 44,
+    imgUrl: 'https://api.dofusdb.fr/img/items/6007.png',
     job: 'Forgeron',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '2' } },
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '2' } }
+      { 'Fer': { id: '312', quantity: '2' } }
     ]
   },
   {
@@ -166,11 +166,11 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Hache de Boisaille',
     type: 'Hache',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1501.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/6007.png',
     job: 'Forgeron',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '5' } },
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '5' } },
+      { 'Fer': { id: '312', quantity: '5' } },
       { 'Minerai de Cuivre': { id: 'ing_cuivre', quantity: '2' } }
     ]
   },
@@ -181,7 +181,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Baguette de Boisaille',
     type: 'Baguette',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1201.png',
+    dofusdbId: 134,
+    imgUrl: 'https://api.dofusdb.fr/img/items/3008.png',
     job: 'Sculpteur',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '4' } }
@@ -192,7 +193,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Arc de Boisaille',
     type: 'Arc',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1301.png',
+    dofusdbId: 91,
+    imgUrl: 'https://api.dofusdb.fr/img/items/2001.png',
     job: 'Sculpteur',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '6' } },
@@ -206,7 +208,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Coiffe de l\'Aventurier',
     type: 'Chapeau',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2411.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/16041.png',
     job: 'Tailleur',
     recipe: [
       { 'Plume de Piou Bleu': { id: 'ing_plume_piou_bleu', quantity: '1' } }
@@ -217,7 +219,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Coiffe du Bouftou',
     type: 'Chapeau',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/2416.png',
+    dofusdbId: 2411,
+    imgUrl: 'https://api.dofusdb.fr/img/items/16041.png',
     job: 'Tailleur',
     recipe: [
       { 'Laine de Bouftou': { id: 'ing_laine_bouftou', quantity: '10' } },
@@ -231,10 +234,10 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Anneau de l\'Aventurier',
     type: 'Anneau',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1009.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/1048.png',
     job: 'Bijoutier',
     recipe: [
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '1' } }
+      { 'Fer': { id: '312', quantity: '1' } }
     ]
   },
   {
@@ -242,7 +245,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Amulette du Bouftou',
     type: 'Amulette',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1003.png',
+    dofusdbId: 2425,
+    imgUrl: 'https://api.dofusdb.fr/img/items/1048.png',
     job: 'Bijoutier',
     recipe: [
       { 'Laine de Bouftou': { id: 'ing_laine_bouftou', quantity: '15' } },
@@ -256,7 +260,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Ceinture de l\'Aventurier',
     type: 'Ceinture',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1013.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/56016.png',
     job: 'Cordonnier',
     recipe: [
       { 'Cuir de Bouftou': { id: 'ing_cuir_bouftou', quantity: '1' } }
@@ -267,7 +271,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Bottes de Bouftou',
     type: 'Bottes',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1010.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/11010.png',
     job: 'Cordonnier',
     recipe: [
       { 'Cuir de Bouftou': { id: 'ing_cuir_bouftou', quantity: '10' } },
@@ -281,10 +285,11 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Aluminite',
     type: 'Alliage',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/1011.png',
+    dofusdbId: 747,
+    imgUrl: 'https://api.dofusdb.fr/img/items/40660.png',
     job: 'Mineur',
     recipe: [
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '10' } },
+      { 'Fer': { id: '312', quantity: '10' } },
       { 'Minerai de Cuivre': { id: 'ing_cuivre', quantity: '10' } },
       { 'Minerai de Bronze': { id: 'ing_bronze', quantity: '10' } }
     ]
@@ -294,7 +299,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Pyrute',
     type: 'Alliage',
     level: 100,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/999.png',
+    dofusdbId: 7035,
+    imgUrl: 'https://api.dofusdb.fr/img/items/40708.png',
     job: 'Mineur',
     recipe: [
       { 'Silicate cristallin': { id: 'ing_silicate', quantity: '10' } },
@@ -310,7 +316,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Planche de Salut',
     type: 'Planche',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/306.png',
+    dofusdbId: 16499,
+    imgUrl: 'https://api.dofusdb.fr/img/items/95023.png',
     job: 'Bûcheron',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '20' } },
@@ -322,7 +329,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Substrat de Sylvestre',
     type: 'Substrat',
     level: 40,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/10006.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/26017.png',
     job: 'Bûcheron',
     recipe: [
       { 'Sève de Tremble': { id: 'ing_seve_tremble', quantity: '2' } },
@@ -337,7 +344,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Potion de Rappel',
     type: 'Potion',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/518.png',
+    dofusdbId: 548,
+    imgUrl: 'https://api.dofusdb.fr/img/items/12017.png',
     job: 'Alchimiste',
     recipe: [
       { 'Trèfle à 5 feuilles': { id: 'ing_trefle', quantity: '4' } },
@@ -349,7 +357,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Potion de Cité : Bonta',
     type: 'Potion',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/512.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/12017.png',
     job: 'Alchimiste',
     recipe: [
       { 'Riz grain': { id: 'ing_riz', quantity: '5' } },
@@ -363,7 +371,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Briochette',
     type: 'Pain',
     level: 40,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/534.png',
+    dofusdbId: 2024,
+    imgUrl: 'https://api.dofusdb.fr/img/items/33015.png',
     job: 'Paysan',
     recipe: [
       { 'Orge brute': { id: 'ing_orge', quantity: '10' } },
@@ -377,7 +386,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Goujon Frit',
     type: 'Poisson préparé',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/601.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/49083.png',
     job: 'Pêcheur',
     recipe: [
       { 'Goujon frais': { id: 'ing_goujon', quantity: '4' } },
@@ -389,7 +398,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Poisson Pané',
     type: 'Poisson préparé',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/603.png',
+    dofusdbId: 1750,
+    imgUrl: 'https://api.dofusdb.fr/img/items/41269.png',
     job: 'Pêcheur',
     recipe: [
       { 'Truite arc-en-ciel': { id: 'ing_truite', quantity: '4' } }
@@ -402,7 +412,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Viande Conservée',
     type: 'Viande préparée',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/16220.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/49083.png',
     job: 'Chasseur',
     recipe: [
       { 'Viande Intangible': { id: 'ing_viande_intangible', quantity: '4' } }
@@ -413,7 +423,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Steak de Bouftou Cuit',
     type: 'Viande préparée',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/16225.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/49083.png',
     job: 'Chasseur',
     recipe: [
       { 'Viande de Bouftou': { id: 'ing_viande_bouftou', quantity: '4' } },
@@ -427,7 +437,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Clef du Donjon d\'Incarnam',
     type: 'Clef',
     level: 10,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/10201.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/6007.png',
     job: 'Bricoleur',
     recipe: [
       { 'Plume de Piou Bleu': { id: 'ing_plume_piou_bleu', quantity: '5' } },
@@ -439,7 +449,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Clef du Donjon des Bouftous',
     type: 'Clef',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/10200.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/6007.png',
     job: 'Bricoleur',
     recipe: [
       { 'Laine de Bouftou': { id: 'ing_laine_bouftou', quantity: '10' } },
@@ -454,7 +464,7 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Bouclier en Bois',
     type: 'Bouclier',
     level: 1,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/9001.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/82020.png',
     job: 'Façonneur',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '10' } }
@@ -465,7 +475,8 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Bouclier du Bouftou',
     type: 'Bouclier',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/9002.png',
+    dofusdbId: 18666,
+    imgUrl: 'https://api.dofusdb.fr/img/items/82020.png',
     job: 'Façonneur',
     recipe: [
       { 'Cuir de Bouftou': { id: 'ing_cuir_bouftou', quantity: '10' } },
@@ -479,11 +490,11 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Abreuvoir en Frêne',
     type: 'Objet d\'élevage',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/6801.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/95023.png',
     job: 'Éleveur',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '20' } },
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '10' } }
+      { 'Fer': { id: '312', quantity: '10' } }
     ]
   },
   {
@@ -491,12 +502,12 @@ export const DOFUS_MOCK_ITEMS: DofusItem[] = [
     name: 'Foudroyeur en Frêne',
     type: 'Objet d\'élevage',
     level: 20,
-    imgUrl: 'https://s.ankama.com/www/static.ankama.com/dofus/www/game/items/200/6802.png',
+    imgUrl: 'https://api.dofusdb.fr/img/items/95023.png',
     job: 'Éleveur',
     recipe: [
       { 'Bois de Frêne': { id: 'ing_frene', quantity: '20' } },
       { 'Bois de Châtaignier': { id: 'ing_chataignier', quantity: '10' } },
-      { 'Minerai de Fer': { id: 'ing_fer', quantity: '5' } }
+      { 'Fer': { id: '312', quantity: '5' } }
     ]
   }
 ];

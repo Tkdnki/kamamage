@@ -9,7 +9,7 @@ import type { CraftItem } from '../services/api';
 import {
   Gem, Scissors, Shield, Flame, Wand2, Heart,
   Loader2, Search, AlertTriangle, Coins, Info, Hammer, GraduationCap, Crosshair, Plus,
-  Copy, ExternalLink,
+  Copy, ExternalLink, Camera,
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -20,7 +20,7 @@ import {
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
-import { fetchRunePricesWithAuthor } from '../lib/sync';
+import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient } from '../lib/sync';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -31,7 +31,7 @@ export default function BreakingSimulator() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { selectedServer } = useServer();
   const { user } = useAuth();
-  const { navigateToCraftsItem, navigateToLevelingItem, navigateToHdvItem, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
+  const { navigateToCraftsItem, navigateToLevelingItem, navigateToHdvItem, openScanner, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState('Forgeron');
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
@@ -94,6 +94,69 @@ export default function BreakingSimulator() {
     () => craftItems.find(i => i._id === selectedItemId) ?? null,
     [craftItems, selectedItemId],
   );
+
+  // ─── Coefficient de brisage : persistance (Supabase item_coefficients) ───
+
+  const COEFFICIENT_DEBOUNCE_MS = 700;
+  const coeffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingCoeffRef = useRef<{ itemKey: string; server: string; value: number } | null>(null);
+  const coeffFetchItemRef = useRef<string | null>(null);
+  const coeffEditedRef = useRef(false);
+
+  // Vide la file d'attente d'upsert restante (au changement d'item/serveur ou au démontage).
+  const flushPendingCoefficient = useCallback(() => {
+    if (coeffTimerRef.current) {
+      clearTimeout(coeffTimerRef.current);
+      coeffTimerRef.current = null;
+    }
+    const pending = pendingCoeffRef.current;
+    pendingCoeffRef.current = null;
+    if (pending && pending.value >= 1) {
+      pushItemCoefficient(pending.server, pending.itemKey, pending.value).catch(err =>
+        console.warn('[Brisage] ❌ Sauvegarde du coefficient en erreur:', err),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => flushPendingCoefficient();
+  }, [flushPendingCoefficient]);
+
+  // Au chargement d'un item : reset à 100 puis lecture de la valeur sauvegardée pour le serveur actuel.
+  useEffect(() => {
+    if (!selectedItem?._id) return;
+    const itemKey = selectedItem._id;
+    flushPendingCoefficient();
+    setCoefficient(100);
+    coeffFetchItemRef.current = itemKey;
+    coeffEditedRef.current = false;
+    fetchItemCoefficient(selectedServer, itemKey)
+      .then(value => {
+        if (coeffFetchItemRef.current !== itemKey) return;
+        if (coeffEditedRef.current) return;
+        if (value !== null && value >= 1) setCoefficient(value);
+      })
+      .catch(() => {});
+  }, [selectedItem?._id, selectedServer, flushPendingCoefficient]);
+
+  // Écriture immédiate dans le state local + upsert différé (debounce) vers Supabase.
+  const handleCoefficientChange = useCallback((value: number) => {
+    setCoefficient(value);
+    coeffEditedRef.current = true;
+    if (!selectedItem) return;
+    pendingCoeffRef.current = { itemKey: selectedItem._id, server: selectedServer, value };
+    if (coeffTimerRef.current) clearTimeout(coeffTimerRef.current);
+    coeffTimerRef.current = setTimeout(() => {
+      coeffTimerRef.current = null;
+      const pending = pendingCoeffRef.current;
+      pendingCoeffRef.current = null;
+      if (pending) {
+        pushItemCoefficient(pending.server, pending.itemKey, pending.value).catch(err =>
+          console.warn('[Brisage] ❌ Sauvegarde du coefficient en erreur:', err),
+        );
+      }
+    }, COEFFICIENT_DEBOUNCE_MS);
+  }, [selectedItem, selectedServer]);
 
   const fetchItemStats = useCallback(async (dofusdbId: number) => {
     if (fetchAbort.current) fetchAbort.current.abort();
@@ -163,6 +226,24 @@ export default function BreakingSimulator() {
     const sign = n >= 0 ? '+' : '';
     return `${sign}${Math.round(n).toLocaleString()} K`;
   };
+
+  // Ouvre le scanner HDV avec la file : item brisé + runes générées.
+  // Les prix scannés sont écrits dans hdvPrices (contexte global) sous les IDs
+  // du présent calculateur → recalcul immédiat de la rentabilité.
+  const scanBreakingPrices = useCallback(() => {
+    if (!selectedItem || !breaking) return;
+    const runesById = new Map<string, Rune>();
+    for (const l of breaking.lines) {
+      if (!l.rune.id.startsWith('synthetic-')) runesById.set(l.rune.id, l.rune);
+    }
+    for (const e of breaking.exoLines) {
+      if (!e.rune.id.startsWith('synthetic-')) runesById.set(e.rune.id, e.rune);
+    }
+    openScanner([
+      { expectedName: selectedItem.name, expectedId: selectedItem._id },
+      ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: r.id })),
+    ]);
+  }, [selectedItem, breaking, openScanner]);
 
   const addExo = () => {
     if (!exoSelectRuneId || exoQuantity <= 0) return;
@@ -387,8 +468,8 @@ export default function BreakingSimulator() {
                       value={coefficient}
                       onChange={e => {
                         const v = parseInt(e.target.value);
-                        if (!isNaN(v) && v >= 1) setCoefficient(v);
-                        if (e.target.value === '') setCoefficient(1);
+                        if (!isNaN(v) && v >= 1) handleCoefficientChange(v);
+                        if (e.target.value === '') handleCoefficientChange(1);
                       }}
                       className="w-16 bg-[#070a12] border border-white/10 rounded px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
@@ -478,15 +559,24 @@ export default function BreakingSimulator() {
 
                   {/* Rune table */}
                   <div className="glass-panel rounded-xl border border-white/5 overflow-hidden">
-                    <div className="p-3 border-b border-white/5 flex items-center justify-between">
+                    <div className="p-3 border-b border-white/5 flex items-center justify-between gap-2">
                       <h3 className="text-[11px] uppercase tracking-widest text-slate-300 font-bold">
                         Lignes de stats ({breaking.lines.length + breaking.exoLines.length})
                       </h3>
-                      {hasFocus && (
-                      <span className="text-[9px] text-purple-400 font-semibold">
-                        Focus : cible +50% des autres lignes
-                      </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {hasFocus && (
+                        <span className="text-[9px] text-purple-400 font-semibold">
+                          Focus : cible +50% des autres lignes
+                        </span>
+                        )}
+                        <button
+                          onClick={scanBreakingPrices}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all"
+                          title="Scanner l'item et les runes générées en HDV pour mettre à jour les prix"
+                        >
+                          <Camera className="h-3 w-3" /> Scan HDV
+                        </button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">

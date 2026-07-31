@@ -38,8 +38,6 @@ const STAT_CONFIG_LOCAL: Record<number, { name: string; weight: number; unit: st
   111: { name: 'PA', weight: 100, unit: '' },
   127: { name: 'PM', weight: 90, unit: '' },
   128: { name: 'PM', weight: 90, unit: '' },
-  113: { name: 'Portée', weight: 51, unit: '' },
-  114: { name: 'Invocations', weight: 30, unit: '' },
   182: { name: 'Invocations', weight: 30, unit: '' },
   // -- Combat --
   115: { name: 'Critique', weight: 10, unit: '' },
@@ -57,8 +55,9 @@ const STAT_CONFIG_LOCAL: Record<number, { name: string; weight: number; unit: st
   // -- Prospection / Initiative / Pods --
   176: { name: 'Prospection', weight: 3, unit: '' },
   177: { name: 'Prospection', weight: 3, unit: '' },
-  168: { name: 'Pods', weight: 0.25, unit: '' },
-  169: { name: 'Initiative', weight: 0.1, unit: '' },
+  158: { name: 'Pods', weight: 0.25, unit: '' },
+  168: { name: 'PA', weight: 100, unit: '' },
+  169: { name: 'PM', weight: 90, unit: '' },
   174: { name: 'Initiative', weight: 0.1, unit: '' },
   175: { name: 'Initiative', weight: 0.1, unit: '' },
   // -- Soins --

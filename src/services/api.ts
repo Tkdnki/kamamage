@@ -4,6 +4,23 @@ import type { DofusItem } from '../data/mockData';
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const TIMEOUT_MS = 5000;
 
+// ─── Ratio XP de craft ────────────────────────────────────────────────────────
+
+/**
+ * Résout le ratio XP de craft d'une recette selon la règle DofusDB :
+ * on prend d'abord le craftXpRatio de l'item produit ; s'il vaut −1 (non renseigné),
+ * on retombe sur celui du type d'item ; sinon défaut 1.
+ */
+export function getCraftXpRatio(resultItem?: DofusDbItem, resultType?: { craftXpRatio?: number }): number {
+  if (resultItem && resultItem.craftXpRatio !== undefined && resultItem.craftXpRatio > -1) {
+    return resultItem.craftXpRatio;
+  }
+  if (resultType && resultType.craftXpRatio !== undefined && resultType.craftXpRatio > -1) {
+    return resultType.craftXpRatio;
+  }
+  return 1;
+}
+
 // ─── Map des Métiers DofusDB ──────────────────────────────────────────────────
 
 export const DOFUSDB_JOB_IDS: Record<string, number> = {
@@ -170,6 +187,8 @@ export interface CraftItem {
   imgUrl: string;
   dofusdbId?: number;
   job?: string;
+  /** Ratio XP de craft de l'item (ou de son type si l'item est à −1) */
+  craftXpRatio?: number;
   recipeIngredients: NormalizedRecipeIngredient[];
 }
 
@@ -429,6 +448,7 @@ export async function fetchCraftsByJob(jobName: string): Promise<CraftItem[]> {
         imgUrl: resultItem.img ?? '',
         dofusdbId: resultItem.id,
         job: jobName,
+        craftXpRatio: getCraftXpRatio(resultItem, recipe.resultType),
         recipeIngredients: ingredients,
       };
     });

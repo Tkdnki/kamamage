@@ -19,6 +19,8 @@ export interface DofusDbItemType {
   name: I18nString;
   superTypeId?: number;
   categoryId?: number;
+  /** Ratio XP de craft propre au type (10 pour les ressources, etc.) */
+  craftXpRatio?: number;
 }
 
 /** Structure complète d'un item retourné par /items */
@@ -35,6 +37,8 @@ export interface DofusDbItem {
   slug?: I18nString;
   hasRecipe: boolean;
   type?: DofusDbItemType;
+  /** Ratio XP de craft propre à l'item (−1 si non renseigné → utiliser celui du type) */
+  craftXpRatio?: number;
   /** Liste des IDs de recettes qui utilisent cet item comme ingrédient */
   recipesThatUse?: number[];
   /** IDs des recettes de cet item lui-même (rarement populé dans /items) */

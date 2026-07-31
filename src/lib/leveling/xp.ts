@@ -1,43 +1,36 @@
 /**
- * Formule officielle Dofus :
- *   XP = floor(baseXp / (1 + 0.1 × delta^1.1))
+ * Formule officielle Dofus (outil XP Métier de dofusdb.fr) :
+ *   si jobLevel − 100 > recipeLevel  →  0 XP
+ *   base = 20 × recipeLevel / (delta^1.1 / 10 + 1)
+ *   xp   = floor(floor(base) × craftXpRatio / 100)
  *
  * où delta = max(0, jobLevel − recipeLevel)
+ *
+ * Exemple vérifié : recette niveau 150, métier niveau 168 (delta 18),
+ * craftXpRatio 10 (Agathe) → 88 XP ; craftXpRatio 50 (Artefact Pandawushu) → 440 XP.
  */
 
-const XP_MULTIPLIERS: Record<string, number> = {
-  // Métiers de récolte pure
-  Chasseur: 2, Paysan: 1, Éleveur: 1,
-  // Transformation
-  Alchimiste: 4, Bûcheron: 4, Mineur: 6, Pêcheur: 4,
-  // Artisanat / équipements
-  Bijoutier: 20, Bricoleur: 20, Cordonnier: 20, Façonneur: 20, Forgeron: 20, Sculpteur: 20, Tailleur: 20,
-};
-
-/** Exceptions item-level qui surchargent le multiplicateur du métier. */
-const ITEM_EXCEPTIONS: Record<string, Record<string, number>> = {
-  Paysan: { 'Gâteau Royal': 20 },
-  Pêcheur: { 'Anguille Rôtie': 1, 'Anguille Souroche Rôtie': 1, 'Kralamoure Grillé': 1, 'Kralamoure Unique Grillé': 1 },
-};
-
-export function getBaseMultiplier(jobName: string, itemName?: string): number {
-  if (itemName && ITEM_EXCEPTIONS[jobName]?.[itemName] !== undefined) {
-    return ITEM_EXCEPTIONS[jobName][itemName];
-  }
-  return XP_MULTIPLIERS[jobName] ?? 2;
+/**
+ * Résout le ratio XP de craft effectif d'une recette.
+ * Le craftXpRatio vient de l'item produit (ou du type d'item à défaut) :
+ * une valeur à −1 ou absente signifie "non renseigné" → défaut 1.
+ */
+export function getCraftXpRatio(craftXpRatio?: number): number {
+  return craftXpRatio !== undefined && craftXpRatio > -1 ? craftXpRatio : 1;
 }
 
 export function getCalculatedXp(
   recipeLevel: number,
   jobLevel: number,
-  jobName: string = '',
   globalBonus: number = 1,
-  itemName?: string,
+  craftXpRatio?: number,
 ): number {
-  const baseXp = recipeLevel * getBaseMultiplier(jobName, itemName);
+  if (jobLevel - 100 > recipeLevel) return 0;
   const delta = Math.max(0, jobLevel - recipeLevel);
-  const penalty = 1 + 0.1 * Math.pow(delta, 1.1);
-  return Math.floor(baseXp * globalBonus / penalty);
+  const base = (20 * recipeLevel) / (Math.pow(delta, 1.1) / 10 + 1);
+  const ratio = getCraftXpRatio(craftXpRatio) / 100;
+  const xp = Math.floor(base * ratio) * globalBonus;
+  return Number.isNaN(xp) ? 0 : Math.floor(xp);
 }
 
 export const JOB_XP_LEVELS = [
@@ -64,9 +57,8 @@ export function calculateCraftsToTarget(
   currentLevel: number,
   targetLevel: number,
   currentXp: number,
-  jobName: string,
-  itemName: string | undefined,
   costPerCraft: number,
+  craftXpRatio?: number,
 ): LevelGoalResult | null {
   if (targetLevel <= currentLevel || recipeLevel > targetLevel) return null;
 
@@ -80,7 +72,7 @@ export function calculateCraftsToTarget(
     if (level === currentLevel) xpNeeded = Math.max(0, xpNeeded - currentXp);
     if (xpNeeded <= 0) continue;
 
-    const xpPerCraft = getCalculatedXp(recipeLevel, level, jobName, 1, itemName);
+    const xpPerCraft = getCalculatedXp(recipeLevel, level, 1, craftXpRatio);
     if (xpPerCraft <= 0) continue;
 
     const crafts = Math.ceil(xpNeeded / xpPerCraft);

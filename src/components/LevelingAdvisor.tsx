@@ -152,7 +152,7 @@ export default function LevelingAdvisor() {
 
   const rows = useMemo<LevelRow[]>(() => {
     return filteredItems.map(item => {
-      const xpGained = getCalculatedXp(item.level, jobLevel, activeJob, 1, item.name);
+      const xpGained = getCalculatedXp(item.level, jobLevel, 1, item.craftXpRatio);
 
       let craftCost = 0;
       let missingIngredients = false;
@@ -231,9 +231,8 @@ export default function LevelingAdvisor() {
       jobLevel,
       Math.max(jobLevel + 1, Math.min(200, targetLevel)),
       currentXp,
-      activeJob,
-      selectedRow.item.name,
       selectedRow.craftCost,
+      selectedRow.item.craftXpRatio,
     );
   }, [selectedRow, jobLevel, targetLevel, currentXp, activeJob]);
 

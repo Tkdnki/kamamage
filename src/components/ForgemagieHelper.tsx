@@ -16,102 +16,95 @@ import ItemImage from './ItemImage';
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const FETCH_TIMEOUT = 5000;
 
-// Dofus 2.0 Unity effectId → characteristic mapping (vérifié via api.dofusdb.fr/effects et /characteristics)
+// Dofus 2.0 effectId → characteristic mapping (vérifié un à un via api.dofusdb.fr/effects)
+// Les entrées préfixées « - » sont les malus (ex: 157 = -Force).
 const STAT_CONFIG: Record<number, { name: string; weight: number; unit: string }> = {
-  110: { name: 'Soin', weight: 5, unit: '' },
-  111: { name: 'PA', weight: 100, unit: '' },
-  112: { name: 'Dommages', weight: 5, unit: '' },
-  113: { name: 'Portée', weight: 51, unit: '' },
-  114: { name: 'Invocations', weight: 30, unit: '' },
-  115: { name: 'Critique', weight: 10, unit: '' },
+  // -- Caractéristiques principales --
   118: { name: 'Force', weight: 1, unit: '' },
   119: { name: 'Agilité', weight: 1, unit: '' },
   123: { name: 'Chance', weight: 1, unit: '' },
   124: { name: 'Sagesse', weight: 3, unit: '' },
   125: { name: 'Vitalité', weight: 0.25, unit: '' },
   126: { name: 'Intelligence', weight: 1, unit: '' },
-  127: { name: 'PM', weight: 90, unit: '' },
+  // -- Malus des caractéristiques principales --
+  152: { name: '-Chance', weight: 1, unit: '' },
+  153: { name: '-Vitalité', weight: 0.25, unit: '' },
+  154: { name: '-Agilité', weight: 1, unit: '' },
+  155: { name: '-Intelligence', weight: 1, unit: '' },
+  156: { name: '-Sagesse', weight: 3, unit: '' },
+  157: { name: '-Force', weight: 1, unit: '' },
+  // -- PA / PM / PO / Invocations --
+  111: { name: 'PA', weight: 100, unit: '' },
+  168: { name: '-PA', weight: 100, unit: '' },
   128: { name: 'PM', weight: 90, unit: '' },
+  127: { name: '-PM', weight: 90, unit: '' },
+  169: { name: '-PM', weight: 90, unit: '' },
+  117: { name: 'Portée', weight: 51, unit: '' },
+  116: { name: '-Portée', weight: 51, unit: '' },
+  182: { name: 'Invocations', weight: 30, unit: '' },
+  // -- Combat --
+  112: { name: 'Dommages', weight: 5, unit: '' },
+  115: { name: 'Critique', weight: 10, unit: '' },
   138: { name: 'Puissance', weight: 5, unit: '' },
+  186: { name: '-Puissance', weight: 5, unit: '' },
+  // -- Esquives / Tacle / Fuite --
   160: { name: 'Esquive PA', weight: 4, unit: '' },
   161: { name: 'Esquive PM', weight: 4, unit: '' },
-  168: { name: 'Pods', weight: 0.25, unit: '' },
-  169: { name: 'Initiative', weight: 0.1, unit: '' },
-  174: { name: 'Initiative', weight: 0.1, unit: '' },
-  175: { name: 'Initiative', weight: 0.1, unit: '' },
-  176: { name: 'Prospection', weight: 3, unit: '' },
-  177: { name: 'Prospection', weight: 3, unit: '' },
-  178: { name: 'Soins', weight: 5, unit: '' },
-  179: { name: 'Soins', weight: 5, unit: '' },
-  186: { name: 'Puissance', weight: 5, unit: '' },
-  200: { name: 'Résistance Neutre', weight: 6, unit: '%' },
-  201: { name: 'Résistance Terre', weight: 6, unit: '%' },
-  202: { name: 'Résistance Feu', weight: 6, unit: '%' },
-  203: { name: 'Résistance Eau', weight: 6, unit: '%' },
-  204: { name: 'Résistance Air', weight: 6, unit: '%' },
-  205: { name: 'Résistance Neutre (fixe)', weight: 2, unit: '' },
-  206: { name: 'Résistance Terre (fixe)', weight: 2, unit: '' },
-  207: { name: 'Résistance Feu (fixe)', weight: 2, unit: '' },
-  208: { name: 'Résistance Eau (fixe)', weight: 2, unit: '' },
-  209: { name: 'Résistance Air (fixe)', weight: 2, unit: '' },
   752: { name: 'Fuite', weight: 4, unit: '' },
   753: { name: 'Tacle', weight: 4, unit: '' },
-  754: { name: 'Fuite', weight: 4, unit: '' },
-  755: { name: 'Tacle', weight: 4, unit: '' },
-};
-
-// Noms d'effets supplémentaires pour les IDs non couverts par STAT_CONFIG
-const EFFECT_MAP: Record<number, string> = {
-  210: 'Résistance Neutre (%)',
-  211: 'Résistance Terre (%)',
-  212: 'Résistance Feu (%)',
-  213: 'Résistance Eau (%)',
-  214: 'Résistance Air (%)',
-  215: 'Résistance Neutre (fixe)',
-  216: 'Résistance Terre (fixe)',
-  217: 'Résistance Feu (fixe)',
-  218: 'Résistance Eau (fixe)',
-  219: 'Résistance Air (fixe)',
-  220: 'Résistance Neutre (PI)',
-  221: 'Résistance Terre (PI)',
-  222: 'Résistance Feu (PI)',
-  223: 'Résistance Eau (PI)',
-  224: 'Résistance Air (PI)',
-  240: 'Dommages Neutre',
-  241: 'Dommages Terre',
-  242: 'Dommages Feu',
-  243: 'Dommages Eau',
-  244: 'Dommages Air',
-  245: 'Dommages Neutre (%)',
-  246: 'Dommages Terre (%)',
-  247: 'Dommages Feu (%)',
-  248: 'Dommages Eau (%)',
-  249: 'Dommages Air (%)',
-  250: 'Dommages Pièces',
-  252: 'Retrait PA',
-  253: 'Retrait PM',
-  254: 'Retrait PA',
-  255: 'Retrait PM',
-  256: 'Esquive PA',
-  257: 'Esquive PM',
-  260: 'Vol Neutre',
-  261: 'Vol Terre',
-  262: 'Vol Feu',
-  263: 'Vol Eau',
-  264: 'Vol Air',
+  754: { name: '-Fuite', weight: 4, unit: '' },
+  755: { name: '-Tacle', weight: 4, unit: '' },
+  // -- Prospection / Initiative / Pods --
+  176: { name: 'Prospection', weight: 3, unit: '' },
+  177: { name: '-Prospection', weight: 3, unit: '' },
+  174: { name: 'Initiative', weight: 0.1, unit: '' },
+  175: { name: '-Initiative', weight: 0.1, unit: '' },
+  158: { name: 'Pods', weight: 0.25, unit: '' },
+  159: { name: '-Pods', weight: 0.25, unit: '' },
+  // -- Soins --
+  110: { name: 'Soin', weight: 5, unit: '' },
+  178: { name: 'Soins', weight: 5, unit: '' },
+  179: { name: '-Soins', weight: 5, unit: '' },
+  // -- Résistances % --
+  210: { name: 'Résistance Terre (%)', weight: 6, unit: '%' },
+  211: { name: 'Résistance Eau (%)', weight: 6, unit: '%' },
+  212: { name: 'Résistance Air (%)', weight: 6, unit: '%' },
+  213: { name: 'Résistance Feu (%)', weight: 6, unit: '%' },
+  214: { name: 'Résistance Neutre (%)', weight: 6, unit: '%' },
+  // -- Résistances fixes --
+  240: { name: 'Résistance Terre (fixe)', weight: 2, unit: '' },
+  241: { name: 'Résistance Eau (fixe)', weight: 2, unit: '' },
+  242: { name: 'Résistance Air (fixe)', weight: 2, unit: '' },
+  243: { name: 'Résistance Feu (fixe)', weight: 2, unit: '' },
+  244: { name: 'Résistance Neutre (fixe)', weight: 2, unit: '' },
+  // -- Retrait --
+  410: { name: 'Retrait PA', weight: 7, unit: '' },
+  412: { name: 'Retrait PM', weight: 7, unit: '' },
+  // -- Dommages élémentaires et divers --
+  414: { name: 'Dommages Poussée', weight: 5, unit: '' },
+  418: { name: 'Dommages Critiques', weight: 5, unit: '' },
+  422: { name: 'Dommages Terre', weight: 5, unit: '' },
+  424: { name: 'Dommages Feu', weight: 5, unit: '' },
+  426: { name: 'Dommages Eau', weight: 5, unit: '' },
+  428: { name: 'Dommages Air', weight: 5, unit: '' },
+  430: { name: 'Dommages Neutre', weight: 5, unit: '' },
+  225: { name: 'Dommage Pièges', weight: 5, unit: '' },
+  226: { name: 'Puissance Pièges', weight: 2, unit: '' },
+  220: { name: 'Dommages Renvoyés', weight: 5, unit: '' },
+  795: { name: 'Chasse', weight: 5, unit: '' },
 };
 
 const EXOTIC_EFFECTS = [
   { effectId: 111, name: 'PA', weight: 100 },
-  { effectId: 127, name: 'PM', weight: 90 },
-  { effectId: 113, name: 'Portée', weight: 51 },
-  { effectId: 114, name: 'Invocations', weight: 30 },
+  { effectId: 128, name: 'PM', weight: 90 },
+  { effectId: 117, name: 'Portée', weight: 51 },
+  { effectId: 182, name: 'Invocations', weight: 30 },
   { effectId: 125, name: 'Vitalité', weight: 0.25 },
-  { effectId: 200, name: 'Résistance Neutre', weight: 6 },
-  { effectId: 201, name: 'Résistance Terre', weight: 6 },
-  { effectId: 202, name: 'Résistance Feu', weight: 6 },
-  { effectId: 203, name: 'Résistance Eau', weight: 6 },
-  { effectId: 204, name: 'Résistance Air', weight: 6 },
+  { effectId: 210, name: 'Résistance Terre', weight: 6 },
+  { effectId: 211, name: 'Résistance Eau', weight: 6 },
+  { effectId: 212, name: 'Résistance Air', weight: 6 },
+  { effectId: 213, name: 'Résistance Feu', weight: 6 },
+  { effectId: 214, name: 'Résistance Neutre', weight: 6 },
 ];
 
 
@@ -198,8 +191,8 @@ async function fetchItemFull(dofusdbId: number): Promise<DofusDbItemFull | null>
 function getEffectConfig(effectId: number): { name: string; weight: number; unit: string } {
   const cfg = STAT_CONFIG[effectId];
   if (!cfg) {
-    console.warn(`[ForgemagieHelper] effectId ${effectId} non reconnu — ajoute-le à STAT_CONFIG`);
-    return { name: `Effet #${effectId}`, weight: 1, unit: '' };
+    console.warn(`[ForgemagieHelper] effectId ${effectId} non reconnu`);
+    return { name: 'Effet Inconnu', weight: 1, unit: '' };
   }
   return cfg;
 }
@@ -280,7 +273,7 @@ function getMageAdvice(
   const hasVit = stats.some(s => s.effectId === 125 && !s.isExotic);
   const hasPa = stats.some(s => s.effectId === 111 && !s.isExotic);
   const hasPm = stats.some(s => (s.effectId === 127 || s.effectId === 128) && !s.isExotic);
-  const hasPo = stats.some(s => s.effectId === 113 && !s.isExotic);
+  const hasPo = stats.some(s => s.effectId === 117 && !s.isExotic);
 
   const goals: MageAdviceGoal[] = [];
   goals.push({ id: 'perfect', label: '🌟 Jet Parfait', description: 'Toutes les stats au max' });
@@ -395,8 +388,8 @@ function getSuggestionsForItem(
   }
 
   // ── Exo Portée (armes, bagues) — niveau >= 60 ──
-  const hasNativePo = stats.some(s => s.effectId === 113 && !s.isExotic);
-  const canExoPo = !stats.some(s => s.isExotic && s.effectId === 113);
+  const hasNativePo = stats.some(s => s.effectId === 117 && !s.isExotic);
+  const canExoPo = !stats.some(s => s.isExotic && s.effectId === 117);
   if (itemLevel >= 60 && !hasNativePo && canExoPo && (type.includes('anneau') || type.includes('baguette') || type.includes('arc') || type.includes('épée') || type.includes('hache') || type.includes('bâton') || type.includes('dague'))) {
     presets.push({
       id: 'exo-po',
@@ -406,11 +399,11 @@ function getSuggestionsForItem(
       action: () => applyPreset((setSt, setGm, _ovi, _ovt, setExo) => {
         setGm('exotic');
         setExo([{
-          effectId: 113, name: 'Portée', weight: 51, unit: '',
+          effectId: 117, name: 'Portée', weight: 51, unit: '',
           baseMin: 0, baseMax: 1, currentValue: 0, targetValue: 1, isExotic: true,
         }]);
         setSt(prev => [...prev, {
-          effectId: 113, name: 'Portée', weight: 51, unit: '',
+          effectId: 117, name: 'Portée', weight: 51, unit: '',
           baseMin: 0, baseMax: 1, currentValue: 0, targetValue: 1, isExotic: true,
         }]);
       }),
@@ -1061,7 +1054,7 @@ export default function ForgemagieHelper() {
                       <div key={stat.isExotic ? `exo-${stat.effectId}` : `stat-${stat.effectId}`} className={`p-2.5 rounded-xl border flex flex-col gap-1.5 ${stat.isExotic ? 'bg-amber-500/5 border-amber-500/20' : 'bg-[#090d16]/30 border-white/5'}`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-white">{EFFECT_MAP[stat.effectId] || stat.name}</span>
+                            <span className="text-xs font-bold text-white">{stat.name}</span>
                             {stat.isExotic && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">EXO</span>}
                           </div>
                           <span className="text-[9px] text-slate-500 font-semibold">Poids {stat.weight}</span>

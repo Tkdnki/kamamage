@@ -143,6 +143,46 @@ export async function fetchHdvPricesWithAuthor(server: string): Promise<Record<s
   return result ?? {};
 }
 
+// ─── Coefficient de brisage ────────────────────────────────────────
+
+export async function fetchItemCoefficient(server: string, itemKey: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('item_coefficients')
+    .select('coefficient')
+    .eq('server_name', server)
+    .eq('item_key', itemKey)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[Sync] ❌ fetchItemCoefficient error:', error.message);
+    return null;
+  }
+
+  return data?.coefficient ?? null;
+}
+
+export async function pushItemCoefficient(server: string, itemKey: string, coefficient: number): Promise<void> {
+  if (!coefficient || coefficient <= 0) {
+    console.warn(`[Sync] ⚠️ Upsert ignoré pour "${itemKey}": coefficient invalide (${coefficient})`);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('item_coefficients')
+    .upsert({
+      server_name: server,
+      item_key: itemKey,
+      coefficient,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error(`[Sync] ❌ Error upsert item_coefficients pour "${itemKey}" (${server}):`, error.message);
+  } else {
+    console.log(`[Sync] 📤 Coefficient sauvegardé: server="${server}", itemKey="${itemKey}", coefficient=${coefficient}`);
+  }
+}
+
 // ─── Volume de ventes mensuel ─────────────────────────────────────
 
 export async function pushMonthlySalesVolumeToServer(server: string, data: Record<string, number>): Promise<void> {

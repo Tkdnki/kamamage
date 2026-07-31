@@ -55,7 +55,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   const storageKey = `hdvPrices_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
 
   const [trackedItemIds, setTrackedItemIds] = useLocalStorage<string[]>('kamamage_tracked_items', [
-    'ing_ble', 'ing_frene', 'ing_fer', 'ing_laine_bouftou'
+    'ing_ble', 'ing_frene', '312', 'ing_laine_bouftou'
   ]);
   const [customItems, setCustomItems] = useLocalStorage<DofusItem[]>('kamamage_custom_items', []);
 
