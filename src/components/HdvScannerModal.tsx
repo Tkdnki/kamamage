@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
@@ -6,7 +6,7 @@ import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
-import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target } from 'lucide-react';
+import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
 // Cooldown systématique entre chaque scan d'image : le modèle Vision Groq
 // (qwen/qwen3.6-27b, tier on_demand) est limité à 8000 TPM. À ~3000 tokens par
@@ -15,6 +15,10 @@ const SCAN_COOLDOWN_SECONDS = 25;
 
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
+
+// Seuil de fraîcheur d'un prix HDV : au-delà de 10 jours, il est considéré
+// comme obsolète et doit être rescanné en mode "Prix à actualiser".
+const STALE_PRICE_MS = 10 * 24 * 60 * 60 * 1000;
 
 // Pause asynchrone bloquante : l'appelant DOIT faire `await sleep(ms)` pour
 // que la boucle d'envoi attende réellement la fin du délai avant de relancer.
@@ -80,7 +84,7 @@ const compressImage = (base64Str: string): Promise<string> => {
 };
 
 export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem }: HdvScannerModalProps) {
-  const { setHdvPrice } = useDofus();
+  const { setHdvPrice, hdvPrices } = useDofus();
   const { user } = useAuth();
 
   const [queue, setQueue] = useState<QueueEntry[]>([]);
@@ -101,11 +105,16 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Double méthode de scan : "full" = tous les items attendus, "stale" = uniquement
+  // les prix manquants ou obsolètes (> 10 jours).
+  const [scanMode, setScanMode] = useState<'full' | 'stale'>('full');
+
   // Suivi des items de recette attendus
   const [expectedItems, setExpectedItems] = useState<ScannerQueueItem[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const expectedItemsRef = useRef<ScannerQueueItem[]>([]);
+  const activeExpectedRef = useRef<ScannerQueueItem[]>([]);
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const recipeDoneRef = useRef(false);
   const targetedItemRef = useRef<ScannerQueueItem | null>(null);
@@ -171,6 +180,8 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     resolvedIdsRef.current = new Set();
     setCopiedId(null);
     setTokenInfo(null);
+    setScanMode('full');
+    activeExpectedRef.current = [];
     targetedItemRef.current = null;
   }, []);
 
@@ -206,6 +217,40 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
       reset();
     }
   }, [isOpen, reset]);
+
+  // Un prix est "à actualiser" s'il est absent, sans lot renseigné, sans date de
+  // mise à jour, ou plus vieux que STALE_PRICE_MS (10 jours).
+  const isPriceStaleOrMissing = useCallback((item: ScannerQueueItem): boolean => {
+    const p = hdvPrices[item.expectedId];
+    if (!p) return true;
+    const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
+    if (!hasAnyPrice) return true;
+    if (!p.updatedAt) return true;
+    const ageMs = Date.now() - new Date(p.updatedAt).getTime();
+    if (Number.isNaN(ageMs)) return true;
+    return ageMs > STALE_PRICE_MS;
+  }, [hdvPrices]);
+
+  const getItemAgeLabel = useCallback((item: ScannerQueueItem): string => {
+    const p = hdvPrices[item.expectedId];
+    if (!p) return 'Prix absent';
+    const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
+    if (!hasAnyPrice) return 'Prix absent';
+    if (!p.updatedAt) return 'Date inconnue';
+    const ageDays = Math.floor((Date.now() - new Date(p.updatedAt).getTime()) / (24 * 60 * 60 * 1000));
+    if (Number.isNaN(ageDays)) return 'Date inconnue';
+    return ageDays <= 0 ? "Aujourd'hui" : `Il y a ${ageDays} j`;
+  }, [hdvPrices]);
+
+  // Liste effective des items à scanner selon la méthode choisie.
+  const activeExpected = useMemo<ScannerQueueItem[]>(
+    () => (scanMode === 'stale' ? expectedItems.filter(isPriceStaleOrMissing) : expectedItems),
+    [expectedItems, scanMode, isPriceStaleOrMissing]
+  );
+
+  useEffect(() => {
+    activeExpectedRef.current = activeExpected;
+  }, [activeExpected]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -287,7 +332,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           body.expectedName = targetedItemRef.current.expectedName;
           console.log('[scan] 🎯 Envoi scan CIBLÉ à /api/scan-hdv :', body.targetedItemName, '(', body.targetedItemId, ')');
         } else {
-          const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
+          const unresolvedExpected = activeExpectedRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
           if (unresolvedExpected.length > 0) {
             body.expectedName = unresolvedExpected[0].expectedName;
           }
@@ -420,7 +465,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
         const matched: { item: ScanItem; dofusItem: DofusItem }[] = [];
         const unmatched: string[] = [];
         const newResolved = new Set(resolvedIdsRef.current);
-        const unresolvedExpected = expectedItemsRef.current.filter(e => !newResolved.has(e.expectedId));
+        const unresolvedExpected = activeExpectedRef.current.filter(e => !newResolved.has(e.expectedId));
 
         for (const item of scanResult.items) {
           const normalizedOcr = normalize(item.name);
@@ -482,7 +527,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
               // Intégrité des données : On conserve l'objet complet avec son nom d'origine issu de DofusDB (ex: "Casque de l'Écumouth")
               console.log(`[scan] ✅ Match bilatéral DofusDB réussi : OCR "${item.name}" -> Nom DofusDB exact "${dofusItem.name}" (ID "${dofusItem._id}")`, item.prices);
               setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
-              if (expectedItemsRef.current.some(e => e.expectedId === dofusItem!._id)) {
+              if (activeExpectedRef.current.some(e => e.expectedId === dofusItem!._id)) {
                 newResolved.add(dofusItem._id);
               }
               matched.push({ item, dofusItem });
@@ -520,7 +565,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
       setIsProcessing(false);
       updateDisplay(null);
 
-      if (expectedItemsRef.current.length > 0 && !recipeDoneRef.current && expectedItemsRef.current.every(e => resolvedIdsRef.current.has(e.expectedId))) {
+      if (activeExpectedRef.current.length > 0 && !recipeDoneRef.current && activeExpectedRef.current.every(e => resolvedIdsRef.current.has(e.expectedId))) {
         recipeDoneRef.current = true;
         showToast('success', targetedItemRef.current
           ? `Prix de "${targetedItemRef.current.expectedName}" mis à jour !`
@@ -568,9 +613,10 @@ for (const file of Array.from(e.dataTransfer.files)) {
   if (!isOpen) return null;
 
   const queueCount = queue.length;
-  const resolvedCount = resolvedIds.size;
-  const totalExpected = expectedItems.length;
-  const remainingExpected = expectedItems.filter(item => !resolvedIds.has(item.expectedId));
+  const staleCount = expectedItems.filter(isPriceStaleOrMissing).length;
+  const totalExpected = activeExpected.length;
+  const resolvedCount = activeExpected.filter(item => resolvedIds.has(item.expectedId)).length;
+  const remainingExpected = activeExpected.filter(item => !resolvedIds.has(item.expectedId));
   const remainingCount = remainingExpected.length;
 
   return createPortal(
@@ -657,6 +703,49 @@ for (const file of Array.from(e.dataTransfer.files)) {
             )}
           </div>
 
+          {/* Double méthode de scan */}
+          {totalExpected > 0 && !targetedItem && (
+            <div className="p-3 rounded-xl bg-slate-800/30 border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Méthode de scan</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setScanMode('full')}
+                  className={`flex flex-col items-start gap-0.5 p-2.5 rounded-lg border text-left transition-colors ${
+                    scanMode === 'full'
+                      ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
+                      : 'bg-[#070a12] border-white/10 text-slate-400 hover:border-slate-500'
+                  }`}
+                >
+                  <span className="text-[11px] font-bold flex items-center gap-1">
+                    <ListChecks className="h-3 w-3" /> Scan complet
+                  </span>
+                  <span className="text-[9px] opacity-80">{totalExpected} item{totalExpected > 1 ? 's' : ''}</span>
+                </button>
+                <button
+                  onClick={() => setScanMode('stale')}
+                  className={`flex flex-col items-start gap-0.5 p-2.5 rounded-lg border text-left transition-colors ${
+                    scanMode === 'stale'
+                      ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                      : 'bg-[#070a12] border-white/10 text-slate-400 hover:border-slate-500'
+                  }`}
+                >
+                  <span className="text-[11px] font-bold flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> Prix à actualiser
+                  </span>
+                  <span className="text-[9px] opacity-80">{staleCount} item{staleCount > 1 ? 's' : ''}</span>
+                </button>
+              </div>
+              {scanMode === 'stale' && staleCount === 0 && (
+                <p className="mt-2 text-[10px] text-emerald-400 font-semibold">
+                  Tous les prix de cette section sont à jour (moins de 10 jours) !
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Recipe progress checklist */}
           {totalExpected > 0 && (
             <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
@@ -673,19 +762,32 @@ for (const file of Array.from(e.dataTransfer.files)) {
               </div>
               <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                 {remainingCount === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">Tous les items de la recette ont été scannés.</p>
+                  scanMode === 'stale' && staleCount === 0 ? (
+                    <p className="text-[11px] text-slate-500 italic">Tous les prix sont déjà à jour (moins de 10 jours).</p>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 italic">Tous les items de la recette ont été scannés.</p>
+                  )
                 ) : (
                   remainingExpected.map(item => {
                     const category = getHdvName(item.type) ?? getHdvCategoryForItem(item.expectedName, item.expectedId);
+                    const stale = isPriceStaleOrMissing(item);
+                    const ageLabel = getItemAgeLabel(item);
                     return (
                       <div key={item.expectedId} className="flex items-center gap-1.5 text-[11px]">
-                        <div className="h-3.5 w-3.5 rounded-full border border-slate-600 shrink-0" />
+                        <div className={`h-3.5 w-3.5 rounded-full border shrink-0 ${stale ? 'border-amber-500/60' : 'border-emerald-500/60'}`} />
                         <div className="flex-1 min-w-0">
                           <span className="text-slate-300 truncate block">{item.expectedName}</span>
                           {category && (
                             <span className="text-[9px] text-slate-500 truncate block">{category}</span>
                           )}
                         </div>
+                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                          stale
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        }`}>
+                          {ageLabel}
+                        </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(item.expectedName); setCopiedId(item.expectedId); setTimeout(() => setCopiedId(null), 1500); }}
                           className="opacity-30 hover:opacity-100 transition-opacity shrink-0 p-0.5"
