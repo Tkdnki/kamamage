@@ -56,7 +56,10 @@ const PRICE_POLL_INTERVAL_MS = 30000;
 /**
  * Fusionne une valeur distante dans un objet de prix (muté en place).
  * - L'utilisateur n'a pas l'item en local → on prend la valeur distante.
- * - La valeur distante est strictement plus récente (updatedAt) → elle remplace.
+ * - La valeur distante est strictement plus récente (updatedAt) → elle prime sur les lots
+ *   qu'elle connaît, MAIS un lot distant à 0/absent (pas de ligne en base) ne peut JAMAIS
+ *   écraser une valeur locale connue : la base ne stocke que les lots > 0, donc un 0
+ *   distant signifie "lot inconnu", pas "prix volontairement à 0".
  * - Sinon on conserve les lots locaux et on comble les trous avec le distant.
  * @returns true si l'objet a été modifié.
  */
@@ -70,33 +73,37 @@ function applyRemotePrice(merged: HdvPrices, key: string, val: PriceData): boole
   const remoteIsNewer =
     !!val.updatedAt && (local.updatedAt ? new Date(val.updatedAt) > new Date(local.updatedAt) : true);
 
-  if (remoteIsNewer) {
-    merged[key] = {
-      x1: val.x1,
-      x10: val.x10,
-      x100: val.x100,
-      x1000: val.x1000,
-      unitAverage: val.unitAverage,
-      author: val.author ?? local.author ?? null,
-      authorId: val.authorId ?? local.authorId ?? null,
-      updatedAt: val.updatedAt ?? local.updatedAt ?? null,
-      monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
-    };
-    return true;
-  }
+  // Fusion lot par lot (non destructif) : la donnée la plus pertinente gagne, mais un lot
+  // distant absent (0) ne supprime jamais un prix local déjà renseigné.
+  const pickLot = (loc: number, rem: number): number => {
+    if (remoteIsNewer) return rem > 0 ? rem : loc;
+    return loc > 0 ? loc : rem;
+  };
 
   const before = JSON.stringify(merged[key]);
-  merged[key] = {
-    x1: local.x1 || val.x1 || 0,
-    x10: local.x10 || val.x10 || 0,
-    x100: local.x100 || val.x100 || 0,
-    x1000: local.x1000 || val.x1000 || 0,
-    unitAverage: local.unitAverage || val.unitAverage || 0,
-    author: local.author ?? val.author ?? null,
-    authorId: local.authorId ?? val.authorId ?? null,
-    updatedAt: local.updatedAt ?? val.updatedAt ?? null,
+  const mergedEntry: PriceData = {
+    x1: pickLot(local.x1, val.x1),
+    x10: pickLot(local.x10, val.x10),
+    x100: pickLot(local.x100, val.x100),
+    x1000: pickLot(local.x1000, val.x1000),
+    unitAverage: 0,
+    author: remoteIsNewer ? (val.author ?? local.author ?? null) : (local.author ?? val.author ?? null),
+    authorId: remoteIsNewer ? (val.authorId ?? local.authorId ?? null) : (local.authorId ?? val.authorId ?? null),
+    updatedAt: remoteIsNewer
+      ? (val.updatedAt ?? local.updatedAt ?? null)
+      : (local.updatedAt ?? val.updatedAt ?? null),
     monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
   };
+  // Recalcule le prix moyen unitaire à partir des lots fusionnés pour rester cohérent.
+  let sum = 0;
+  let count = 0;
+  if (mergedEntry.x1 > 0) { sum += mergedEntry.x1; count++; }
+  if (mergedEntry.x10 > 0) { sum += mergedEntry.x10 / 10; count++; }
+  if (mergedEntry.x100 > 0) { sum += mergedEntry.x100 / 100; count++; }
+  if (mergedEntry.x1000 > 0) { sum += mergedEntry.x1000 / 1000; count++; }
+  mergedEntry.unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
+
+  merged[key] = mergedEntry;
   return before !== JSON.stringify(merged[key]);
 }
 
@@ -180,6 +187,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
         let changed = false;
         for (const [key, val] of Object.entries(remote)) {
           changed = applyRemotePrice(merged, key, val) || changed;
+        }
+        if (changed) {
+          console.log(`[Supabase Poll] ${Object.keys(remote).length} item(s) reçus, ${Object.keys(merged).length} item(s) en état local après fusion`);
         }
         return changed ? merged : prev;
       });

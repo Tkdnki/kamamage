@@ -112,6 +112,8 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
     return null;
   }
 
+  console.log('[Supabase Fetch] Prix reçus de la DB:', data);
+
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
@@ -122,7 +124,13 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
     else if (row.lot === 'x1000') prices[id].x1000 = row.price;
     if ((row as any).profiles?.pseudo) prices[id].author = (row as any).profiles.pseudo;
     if (row.author_id) prices[id].authorId = row.author_id;
-    if (row.updated_at) prices[id].updatedAt = row.updated_at;
+    // updatedAt = timestamp le PLUS RÉCENT parmi les lignes du lot (une ligne obsolète ne
+    // doit jamais rétrograder la fraîcheur de l'entrée).
+    if (row.updated_at) {
+      const t = new Date(row.updated_at).getTime();
+      const cur = prices[id].updatedAt ? new Date(prices[id].updatedAt).getTime() : 0;
+      if (t > cur) prices[id].updatedAt = row.updated_at;
+    }
   }
 
   for (const id of Object.keys(prices)) {
