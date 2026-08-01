@@ -261,12 +261,16 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
                     sanitized.items = [{ name: targetedItemName as string, prices: forcedPrices }];
                   }
 
+                  // Capacité cumulée des N clés (Round-Robin) : on multiplie le
+                  // quota par le nombre de clés pour refléter le plafond réel de
+                  // la file (ex: 2 clés × 8 000 = 16 000 tokens/min).
+                  const keyCount = apiKeys.length;
                   const payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } = {
                     ...sanitized,
                     tokens: {
-                      remaining: parseInt(result.headers.get('x-ratelimit-remaining-tokens') || '0', 10),
-                      limit: parseInt(result.headers.get('x-ratelimit-limit-tokens') || '0', 10),
-                      used: parseInt(result.headers.get('x-ratelimit-used-tokens') || '0', 10),
+                      remaining: (parseInt(result.headers.get('x-ratelimit-remaining-tokens') || '0', 10) * keyCount),
+                      limit: (parseInt(result.headers.get('x-ratelimit-limit-tokens') || '0', 10) * keyCount),
+                      used: (parseInt(result.headers.get('x-ratelimit-used-tokens') || '0', 10) * keyCount),
                     },
                   };
                   console.log('[scan-hdv] Sanitized:', JSON.stringify(payload));
