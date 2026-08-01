@@ -20,26 +20,41 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
     x100: x100 ?? 0,
     x1000: x1000 ?? 0,
   });
+  // Dernière valeur réellement persistée via doSave. Tant que le brouillon local en
+  // diffère, une saisie est "en cours" (WIP) et ne doit jamais être écrasée par les props.
+  const lastSavedRef = useRef(values);
 
-  // Synchronisation quand les prix externes changent (ex : données serveur chargées après montage)
+  // Synchronisation quand les prix externes changent (ex : données serveur chargées après
+  // montage, scan ciblé, recalcul). On n'adopte les nouvelles props QUE si le brouillon
+  // local correspond au dernier enregistrement, sinon on conserve la saisie en WIP.
   useEffect(() => {
+    const next = { x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 };
+    const last = lastSavedRef.current;
+    if (next.x1 === last.x1 && next.x10 === last.x10 && next.x100 === last.x100 && next.x1000 === last.x1000) return;
     setValues(prev => {
-      const next = { x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 };
-      // Évite de perdre un brouillon si les valeurs externes n'ont pas changé
-      if (prev.x1 === next.x1 && prev.x10 === next.x10 && prev.x100 === next.x100 && prev.x1000 === next.x1000) return prev;
-      return next;
+      const drafting = prev.x1 !== last.x1 || prev.x10 !== last.x10 || prev.x100 !== last.x100 || prev.x1000 !== last.x1000;
+      return drafting ? prev : next;
     });
   }, [x1, x10, x100, x1000]);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+  const changeTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const doSave = useCallback(() => {
     if (disabled) return;
+    const last = lastSavedRef.current;
+    if (values.x1 === last.x1 && values.x10 === last.x10 && values.x100 === last.x100 && values.x1000 === last.x1000) return;
+    lastSavedRef.current = values;
     onSetPrices(values.x1, values.x10, values.x100, values.x1000);
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 1200);
   }, [values, onSetPrices, disabled]);
+  // Référence toujours à jour de doSave pour le debounce de handleChange.
+  const doSaveRef = useRef(doSave);
+  useEffect(() => {
+    doSaveRef.current = doSave;
+  });
 
   const handleSave = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -47,6 +62,7 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
   }, [doSave]);
 
   const handleBlur = useCallback(() => {
+    if (changeTimer.current) clearTimeout(changeTimer.current);
     doSave();
   }, [doSave]);
 
@@ -66,6 +82,18 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
       const v = e.target.valueAsNumber;
       if (!isNaN(v) && v >= 0) setValues(prev => ({ ...prev, [lot]: v }));
     }
+    // Sauvegarde debounced (500 ms) : évite de perdre la saisie si l'utilisateur quitte
+    // le champ sans blur (navigation, clic ailleurs) et évite tout spam Supabase.
+    if (changeTimer.current) clearTimeout(changeTimer.current);
+    changeTimer.current = setTimeout(() => doSaveRef.current(), 500);
+  }, []);
+
+  // Ménage des timers au démontage
+  useEffect(() => {
+    return () => {
+      if (changeTimer.current) clearTimeout(changeTimer.current);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    };
   }, []);
 
   const lotTypes = ['x1', 'x10', 'x100', 'x1000'] as const;
