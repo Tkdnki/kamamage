@@ -13,10 +13,11 @@
 /**
  * Résout le ratio XP de craft effectif d'une recette.
  * Le craftXpRatio vient de l'item produit (ou du type d'item à défaut) :
- * une valeur à −1 ou absente signifie "non renseigné" → défaut 1.
+ * une valeur à −1 ou absente signifie "non renseigné" → défaut 100 (XP complète).
+ * Le ratio est un pourcentage : 100 = XP de base complète, 10 = 10% (ex: Agathe).
  */
 export function getCraftXpRatio(craftXpRatio?: number): number {
-  return craftXpRatio !== undefined && craftXpRatio > -1 ? craftXpRatio : 1;
+  return craftXpRatio !== undefined && craftXpRatio > -1 ? craftXpRatio : 100;
 }
 
 export function getCalculatedXp(

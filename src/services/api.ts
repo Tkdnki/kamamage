@@ -10,7 +10,8 @@ const TIMEOUT_MS = 5000;
 /**
  * Résout le ratio XP de craft d'une recette selon la règle DofusDB :
  * on prend d'abord le craftXpRatio de l'item produit ; s'il vaut −1 (non renseigné),
- * on retombe sur celui du type d'item ; sinon défaut 1.
+ * on retombe sur celui du type d'item ; sinon défaut 100 (XP de base complète).
+ * Le ratio est un pourcentage : 100 = XP complète, 10 = 10% (ex: Agathe).
  */
 export function getCraftXpRatio(resultItem?: DofusDbItem, resultType?: { craftXpRatio?: number }): number {
   if (resultItem && resultItem.craftXpRatio !== undefined && resultItem.craftXpRatio > -1) {
@@ -19,7 +20,7 @@ export function getCraftXpRatio(resultItem?: DofusDbItem, resultType?: { craftXp
   if (resultType && resultType.craftXpRatio !== undefined && resultType.craftXpRatio > -1) {
     return resultType.craftXpRatio;
   }
-  return 1;
+  return 100;
 }
 
 // ─── Map des Métiers DofusDB ──────────────────────────────────────────────────
