@@ -141,15 +141,18 @@ export default function LevelingAdvisor() {
   }, [pendingBreakingItemId, craftItems, clearPendingBreakingNavigation]);
 
   const minLevel = Math.max(1, jobLevel - 20);
+  // Plage par défaut : au minimum Niv. 1 à 20 pour que les bas niveaux
+  // (ex. Niv. 1 → 2) montrent toujours les crafts de départ.
+  const defaultMaxLevel = Math.max(jobLevel, 20);
 
   const filteredItems = useMemo(() => {
-    let list = craftItems.filter(item => item.level >= minLevel && item.level <= jobLevel);
+    let list = craftItems.filter(item => item.level >= minLevel && item.level <= defaultMaxLevel);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(item => item.name.toLowerCase().includes(q));
     }
     return list;
-  }, [craftItems, searchQuery, jobLevel, minLevel]);
+  }, [craftItems, searchQuery, defaultMaxLevel, minLevel]);
 
   const rows = useMemo<LevelRow[]>(() => {
     return filteredItems.map(item => {
@@ -177,10 +180,10 @@ export default function LevelingAdvisor() {
 
   // ── Scan Métier par tranche de niveau ─────────────────────────────────────
   // Collecte TOUTES les ressources de toutes les recettes de la tranche
-  // affichée (Niv. minLevel → jobLevel), dédoublonnées par id, puis ne garde
+  // affichée (Niv. minLevel → defaultMaxLevel), dédoublonnées par id, puis ne garde
   // que celles dont le prix est manquant ou obsolète (> 10 jours).
   const trancheFromLevel = minLevel;
-  const trancheToLevel = jobLevel;
+  const trancheToLevel = defaultMaxLevel;
 
   const rangeRecipes = useMemo(
     () => craftItems.filter(r => r.level >= trancheFromLevel && r.level <= trancheToLevel),
@@ -393,12 +396,13 @@ export default function LevelingAdvisor() {
                   type="button"
                   onClick={openJobScan}
                   disabled={isLoadingItems || rangeRecipes.length === 0}
-                  className="mt-1 w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all border relative overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={`mt-1 w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all border relative overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed ${
+                    allUpToDate
+                      ? 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                      : 'border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
+                  }`}
                   title={`Scanner les prix des ressources de la tranche Niv. ${trancheFromLevel} à ${trancheToLevel}`}
                 >
-                  {allUpToDate
-                    ? 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                    : 'border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.15)]'}
                   <span className="flex items-center gap-1.5 min-w-0">
                     <Camera className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">Scanner la tranche Niv. {trancheFromLevel} - {trancheToLevel}</span>
@@ -439,7 +443,7 @@ export default function LevelingAdvisor() {
       <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-xl bg-slate-900/40 backdrop-blur-md border border-slate-700/50 text-xs text-slate-300 relative z-10 shadow-xl">
         <Info className="h-4 w-4 text-amber-400 shrink-0" />
         <span>
-          Affichage des recettes optimisées (<strong className="text-amber-400">Niv. {minLevel} à {jobLevel}</strong>).
+          Affichage des recettes optimisées (<strong className="text-amber-400">Niv. {minLevel} à {defaultMaxLevel}</strong>).
           Pour un classement fiable, cliquez sur les items et complétez les prix manquants.
         </span>
       </div>
@@ -471,7 +475,7 @@ export default function LevelingAdvisor() {
         <div className="text-center py-16 text-slate-400 text-sm">
           {searchQuery.trim()
             ? 'Aucun item ne correspond à votre recherche.'
-            : `Aucun craft disponible entre les niveaux ${minLevel} et ${jobLevel} pour ce métier.`}
+            : `Aucun craft disponible entre les niveaux ${minLevel} et ${defaultMaxLevel} pour ce métier.`}
         </div>
       )}
 
