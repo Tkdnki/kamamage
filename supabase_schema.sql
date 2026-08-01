@@ -155,6 +155,35 @@ BEGIN
 END;
 $$;
 
+-- RPC : upsert EN LOT d'une liste de prix consolidés (1 seule requête réseau,
+-- contourne RLS via SECURITY DEFINER). p_prices est un tableau JSON, ex :
+-- [{server_name, category, item_key, lot, price}, ...]
+CREATE OR REPLACE FUNCTION upsert_consolidated_prices(p_prices JSONB)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  item JSONB;
+BEGIN
+  FOR item IN SELECT * FROM jsonb_array_elements(p_prices)
+  LOOP
+    INSERT INTO public.consolidated_prices (server_name, category, item_key, lot, price, author_id, updated_at)
+    VALUES (
+      item->>'server_name',
+      item->>'category',
+      item->>'item_key',
+      NULLIF(item->>'lot', '')::TEXT,
+      (item->>'price')::INTEGER,
+      auth.uid(),
+      now()
+    )
+    ON CONFLICT (server_name, category, item_key, lot)
+    DO UPDATE SET price = (item->>'price')::INTEGER, author_id = auth.uid(), updated_at = now();
+  END LOOP;
+END;
+$$;
+
 -- ============================================================
 -- VOTES PARTICIPATIFS
 -- ============================================================
@@ -360,5 +389,30 @@ BEGIN
   VALUES (p_server_name, p_item_key, p_volume, now())
   ON CONFLICT (server_name, item_key)
   DO UPDATE SET volume = p_volume, updated_at = now();
+END;
+$$;
+
+-- RPC : upsert EN LOT des volumes mensuels (1 seule requête réseau).
+-- p_volumes est un tableau JSON, ex : [{server_name, item_key, volume}, ...]
+CREATE OR REPLACE FUNCTION upsert_monthly_sales_volumes(p_volumes JSONB)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = ''
+AS $$
+DECLARE
+  item JSONB;
+BEGIN
+  FOR item IN SELECT * FROM jsonb_array_elements(p_volumes)
+  LOOP
+    INSERT INTO public.item_monthly_sales_volume (server_name, item_key, volume, updated_at)
+    VALUES (
+      item->>'server_name',
+      item->>'item_key',
+      (item->>'volume')::INTEGER,
+      now()
+    )
+    ON CONFLICT (server_name, item_key)
+    DO UPDATE SET volume = (item->>'volume')::INTEGER, updated_at = now();
+  END LOOP;
 END;
 $$;

@@ -110,6 +110,7 @@ function applyRemotePrice(merged: HdvPrices, key: string, val: PriceData): boole
 export function DofusProvider({ children }: { children: ReactNode }) {
   const { selectedServer } = useServer();
   const storageKey = `hdvPrices_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
+  const syncedStorageKey = `kamamage_synced_hdv_${selectedServer.toLowerCase().replace(/[\s']/g, '_')}`;
 
   const [trackedItemIds, setTrackedItemIds] = useLocalStorage<string[]>('kamamage_tracked_items', [
     'ing_ble', 'ing_frene', '312', 'ing_laine_bouftou'
@@ -118,6 +119,31 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   // hdvPrices est un état local, initialisé depuis le cache localStorage
   const [hdvPrices, setHdvPrices] = useState<HdvPrices>(() => loadCache(storageKey));
+
+  // Clés des items déjà synchronisés vers Supabase (persistées par serveur).
+  // Permet au re-sync (login) de ne pousser QUE les items réellement non sync
+  // au lieu de renvoyer tout le cache localStorage à chaque connexion.
+  const syncedKeysRef = useRef<Set<string>>((() => {
+    try {
+      const raw = window.localStorage.getItem(syncedStorageKey);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  })());
+
+  const persistSyncedKeys = useCallback(() => {
+    try {
+      window.localStorage.setItem(syncedStorageKey, JSON.stringify([...syncedKeysRef.current]));
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [syncedStorageKey]);
+
+  const markSynced = useCallback((keys: string[]) => {
+    for (const k of keys) syncedKeysRef.current.add(k);
+    persistSyncedKeys();
+  }, [persistSyncedKeys]);
 
   // Persiste dans localStorage à chaque changement
   const isFirstRender = useRef(true);
@@ -131,6 +157,14 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   const serverRef = useRef(selectedServer);
   useEffect(() => {
     serverRef.current = selectedServer;
+    // On recharge l'ensemble "synced" propre au nouveau serveur.
+    syncedKeysRef.current = new Set<string>();
+    try {
+      const raw = window.localStorage.getItem(syncedStorageKey);
+      if (raw) syncedKeysRef.current = new Set(JSON.parse(raw) as string[]);
+    } catch {
+      // ignore localStorage errors
+    }
     let cancelled = false;
 
     const mergeVolumes = (prev: HdvPrices, remoteVolumes: Record<string, number>) => {
@@ -171,7 +205,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
     loadFromServer();
     return () => { cancelled = true; };
-  }, [selectedServer]);
+  }, [selectedServer, syncedStorageKey]);
 
   // Rafraîchissement automatique des prix en arrière-plan : les prix distants
   // (Supabase) alimentent le state global de manière réactive sans attendre un
@@ -205,15 +239,22 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   const { user } = useAuth();
 
-  // Re-sync : quand un utilisateur se connecte, pousser les prix localStorage
-  // qui n'ont jamais été sync (ex: scan fait hors-ligne, ou onglet fermé avant le flush)
+  // Re-sync : quand un utilisateur se connecte, pousser UNIQUEMENT les prix
+  // localStorage qui n'ont jamais été sync (ex: scan fait hors-ligne, ou onglet
+  // fermé avant le flush). Les items déjà marqués "synced" ne sont PAS renvoyés.
   useEffect(() => {
     if (!user) return;
     const localCache = loadCache(storageKey);
-    const localKeys = Object.keys(localCache);
-    if (localKeys.length === 0) return;
-    pushHdvPricesToServer(selectedServer, localCache).catch(() => {});
-  }, [user, selectedServer, storageKey]);
+    const toPush: HdvPrices = {};
+    for (const [key, val] of Object.entries(localCache)) {
+      if (!syncedKeysRef.current.has(key)) toPush[key] = val;
+    }
+    const keys = Object.keys(toPush);
+    if (keys.length === 0) return;
+    pushHdvPricesToServer(selectedServer, toPush)
+      .then(() => markSynced(keys))
+      .catch(() => {});
+  }, [user, selectedServer, storageKey, markSynced]);
 
   // Sauvegarde : push immédiat à Supabase + update local
   const pendingPush = useRef<Record<string, PriceData>>({});
@@ -221,10 +262,13 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   const flushPending = useCallback(() => {
     const data = { ...pendingPush.current };
     pendingPush.current = {};
-    if (Object.keys(data).length > 0) {
-      pushHdvPricesToServer(selectedServer, data);
+    const keys = Object.keys(data);
+    if (keys.length > 0) {
+      pushHdvPricesToServer(selectedServer, data)
+        .then(() => markSynced(keys))
+        .catch(() => {});
     }
-  }, [selectedServer]);
+  }, [selectedServer, markSynced]);
 
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
     if (!user) return;
@@ -237,6 +281,10 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
     const entry: PriceData = { x1, x10, x100, x1000, unitAverage, updatedAt: new Date().toISOString() };
 
+    // Item modifié → à re-synchroniser (retiré de l'ensemble "synced")
+    syncedKeysRef.current.delete(itemId);
+    persistSyncedKeys();
+
     // Mise à jour locale immédiate
     setHdvPrices(prev => ({ ...prev, [itemId]: entry }));
 
@@ -244,7 +292,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     pendingPush.current[itemId] = entry;
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(flushPending, 1000);
-  }, [user, flushPending]);
+  }, [user, flushPending, persistSyncedKeys]);
 
   // Volume de ventes mensuel — même pattern debounced
   const pendingVolumePush = useRef<Record<string, number>>({});

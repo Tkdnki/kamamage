@@ -1,36 +1,37 @@
 import { supabase } from './supabaseClient';
 import type { PriceData } from '../context/DofusContext';
 
-// ─── RPC upsert (contourne RLS via SECURITY DEFINER) ────────────────────
+// ─── Batch upsert (contourne RLS via SECURITY DEFINER) ──────────────────
 
-async function upsertPrice(server: string, category: string, itemKey: string, lot: string | null, price: number) {
-  if (!price || price <= 0) {
-    console.warn(`[Sync] ⚠️ Upsert ignoré pour "${itemKey}" (lot ${lot ?? 'aucun'}): prix invalide (${price})`);
-    return;
-  }
-  const { data, error } = await supabase.rpc('upsert_consolidated_price', {
-    p_server_name: server,
-    p_category: category,
-    p_item_key: itemKey,
-    p_lot: lot,
-    p_price: price,
-  });
+interface ConsolidatedPricePayload {
+  server_name: string;
+  category: string;
+  item_key: string;
+  lot: string | null;
+  price: number;
+}
+
+async function batchUpsertPrices(payloads: ConsolidatedPricePayload[]): Promise<void> {
+  if (payloads.length === 0) return;
+  const { error } = await supabase.rpc('upsert_consolidated_prices', { p_prices: payloads });
   if (error) {
-    console.error(`[Sync] ❌ Error upsert_consolidated_price pour "${itemKey}" (${lot ?? 'x1'}):`, error.message);
+    console.error(`[Sync] ❌ Error upsert_consolidated_prices (${payloads.length} lignes):`, error.message);
   } else {
-    console.log(`[Sync] 📤 Supabase upsert réussi: server="${server}", category="${category}", itemKey="${itemKey}", lot="${lot ?? 'x1'}", price=${price}K`, data);
+    console.log(`[Sync] 📤 Batch Supabase réussi : ${payloads.length} prix synchronisés.`);
   }
 }
 
 // ─── Runes ──────────────────────────────────────────────────────────────
 
 export async function pushRunePricesToServer(server: string, data: Record<string, number>): Promise<void> {
-  console.log(`[Sync] 🚀 Envoi de ${Object.keys(data).length} prix de runes vers Supabase (${server})...`);
-  await Promise.all(
-    Object.entries(data).map(([itemKey, price]) =>
-      upsertPrice(server, 'rune', itemKey, null, price)
-    )
-  );
+  const payloads: ConsolidatedPricePayload[] = Object.entries(data)
+    .filter(([, price]) => price > 0)
+    .map(([itemKey, price]) => ({ server_name: server, category: 'rune', item_key: itemKey, lot: null, price }));
+  if (payloads.length === 0) {
+    console.log('[Sync] ℹ️ Aucun prix de rune > 0 à synchroniser.');
+    return;
+  }
+  await batchUpsertPrices(payloads);
 }
 
 export async function fetchRunePricesFromServer(server: string): Promise<Record<string, number> | null> {
@@ -77,27 +78,23 @@ export async function fetchRunePricesWithAuthor(server: string): Promise<Record<
 // ─── HDV ────────────────────────────────────────────────────────────────
 
 export async function pushHdvPricesToServer(server: string, data: Record<string, PriceData>): Promise<void> {
-  console.log(`[Sync] 🚀 Synchronisation HDV vers Supabase (Serveur: "${server}"). ${Object.keys(data).length} item(s) à traiter.`);
+  const payloads: ConsolidatedPricePayload[] = [];
 
-  await Promise.all(
-    Object.entries(data).flatMap(([itemId, pd]) => {
-      const lots: { lot: string; price: number }[] = [];
-      // Règle n°2 : Ne filtrer et n'envoyer QUE les lots ayant un prix strictement supérieur à 0.
-      // Pour un équipement (seul x1 > 0), les lots x10, x100, x1000 valant 0 NE SERONT PAS envoyés.
-      if (pd.x1 && pd.x1 > 0) lots.push({ lot: 'x1', price: pd.x1 });
-      if (pd.x10 && pd.x10 > 0) lots.push({ lot: 'x10', price: pd.x10 });
-      if (pd.x100 && pd.x100 > 0) lots.push({ lot: 'x100', price: pd.x100 });
-      if (pd.x1000 && pd.x1000 > 0) lots.push({ lot: 'x1000', price: pd.x1000 });
+  for (const [itemId, pd] of Object.entries(data)) {
+    // Règle n°2 : Ne filtrer et n'envoyer QUE les lots ayant un prix strictement supérieur à 0.
+    // Pour un équipement (seul x1 > 0), les lots x10, x100, x1000 valant 0 NE SERONT PAS envoyés.
+    if (pd.x1 && pd.x1 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1', price: pd.x1 });
+    if (pd.x10 && pd.x10 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x10', price: pd.x10 });
+    if (pd.x100 && pd.x100 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x100', price: pd.x100 });
+    if (pd.x1000 && pd.x1000 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1000', price: pd.x1000 });
+  }
 
-      if (lots.length === 0) {
-        console.log(`[Sync] ℹ️ Aucun lot > 0 pour itemKey="${itemId}" - aucun upsert envoyé à Supabase.`);
-        return [];
-      }
+  if (payloads.length === 0) {
+    console.log(`[Sync] ℹ️ Aucun lot > 0 à synchroniser (${Object.keys(data).length} item(s) traités).`);
+    return;
+  }
 
-      console.log(`[Sync] 📦 Envoi Supabase pour itemKey="${itemId}":`, lots.map(l => `${l.lot}=${l.price}K`).join(', '));
-      return lots.map(l => upsertPrice(server, 'hdv', itemId, l.lot, l.price));
-    })
-  );
+  await batchUpsertPrices(payloads);
 }
 
 export async function fetchHdvPricesFromServer(server: string): Promise<Record<string, PriceData> | null> {
@@ -216,16 +213,21 @@ export async function pushItemCoefficient(server: string, itemKey: string, coeff
 // ─── Volume de ventes mensuel ─────────────────────────────────────
 
 export async function pushMonthlySalesVolumeToServer(server: string, data: Record<string, number>): Promise<void> {
-  console.log(`[Sync] 🚀 Envoi du volume mensuel de ventes vers Supabase (${server})...`);
-  await Promise.all(
-    Object.entries(data).map(([itemKey, volume]) =>
-      supabase.rpc('upsert_monthly_sales_volume', {
-        p_server_name: server,
-        p_item_key: itemKey,
-        p_volume: volume,
-      })
-    )
-  );
+  const payloads = Object.entries(data)
+    .filter(([, volume]) => volume > 0)
+    .map(([itemKey, volume]) => ({ server_name: server, item_key: itemKey, volume }));
+
+  if (payloads.length === 0) {
+    console.log('[Sync] ℹ️ Aucun volume de ventes > 0 à synchroniser.');
+    return;
+  }
+
+  const { error } = await supabase.rpc('upsert_monthly_sales_volumes', { p_volumes: payloads });
+  if (error) {
+    console.error(`[Sync] ❌ Error upsert_monthly_sales_volumes (${payloads.length} lignes):`, error.message);
+  } else {
+    console.log(`[Sync] 📤 Batch Supabase réussi : ${payloads.length} volumes synchronisés.`);
+  }
 }
 
 export async function fetchMonthlySalesVolumeFromServer(server: string): Promise<Record<string, number> | null> {
