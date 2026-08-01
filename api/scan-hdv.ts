@@ -3,6 +3,21 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Nombre max de réessais après un échec de validation JSON du modèle (tentatives = retries + 1).
 const MAX_JSON_RETRIES = 2;
 
+// Index de rotation Round-Robin : alterne la clé de départ à chaque requête
+// pour répartir la charge sur toutes les clés Groq configurées.
+let currentKeyIndex = 0;
+
+/**
+ * Résout la liste des clés Groq utilisables :
+ * - La clé personnalisée du client (BYOK) prime toujours (une seule clé).
+ * - Sinon on lit GROQ_API_KEYS (séparées par des virgules) puis GROQ_API_KEY.
+ */
+function resolveApiKeys(customKey?: string): string[] {
+  if (customKey?.trim()) return [customKey.trim()];
+  const raw = process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '';
+  return raw.split(',').map(k => k.trim()).filter(Boolean);
+}
+
 // Prompt système STRICT : le modèle vision doit renvoyer UNIQUEMENT un objet JSON valide.
 const SYSTEM_PROMPT = `Tu es un extracteur de données STRICT pour l'Hôtel de Vente (HDV) du jeu Dofus.
 Règles impératives :
@@ -148,10 +163,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const customKey = req.headers['x-custom-groq-key'] as string | undefined;
-  const apiKey = customKey?.trim() || process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ 
-      error: 'La clé GROQ_API_KEY est manquante sur Vercel. Ajoutez-la dans Environment Variables.' 
+  const apiKeys = resolveApiKeys(customKey);
+  if (apiKeys.length === 0) {
+    return res.status(500).json({
+      error: 'Aucune clé API Groq configurée. Ajoutez GROQ_API_KEYS ou GROQ_API_KEY dans Environment Variables Vercel.'
     });
   }
 
@@ -206,89 +221,134 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       ? `${SYSTEM_PROMPT}\n\nSCAN CIBLÉ : l'item à analyser est « ${targetedItemName} ». Tu ne dois PAS lire, deviner ni écrire son nom. Concentre-toi UNIQUEMENT sur l'extraction des prix des lots 1, 10, 100 et 1000 visibles dans l'image.`
       : SYSTEM_PROMPT;
 
-    let lastError = '';
-    let jsonValidationFailed = false;
+    // Tente le scan complet avec UNE clé donnée. Retourne un résultat typé pour
+    // que la boucle multi-clés sache quoi faire (succès / quota / erreur JSON).
+    const attemptWithKey = async (apiKey: string): Promise<
+      | { kind: 'success'; payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } }
+      | { kind: 'quota'; status: number; retryAfter: number }
+      | { kind: 'jsonValidationFailed'; detail: string }
+      | { kind: 'modelFailure'; detail: string }
+    > => {
+      let lastError = '';
+      let jsonValidationFailed = false;
 
-    for (const model of visionModels) {
-      // Réessais automatiques en cas d'échec de validation JSON (l'IA peut réussir au 2e essai).
-      for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
-        try {
-          const result = await callGroqVision(apiKey, model, systemPrompt, promptText, imageUrl);
+      for (const model of visionModels) {
+        // Réessais automatiques en cas d'échec de validation JSON (l'IA peut réussir au 2e essai).
+        for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
+          try {
+            const result = await callGroqVision(apiKey, model, systemPrompt, promptText, imageUrl);
 
-          // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : remontées
-          // telles quelles au frontend avec le délai d'attente recommandé, au lieu
-          // de tester un autre modèle ou de renvoyer un 500. Inutile de réessayer
-          // immédiatement, le quota ne se libère pas tout de suite.
-          if (result.status === 429 || result.status === 503) {
-            console.warn(`[scan-hdv] Quota Groq (${result.status}) : ${(result.body?.error?.message || result.rawText).slice(0, 200)}`);
-            return res.status(result.status).json({
-              error: result.status === 429 ? 'Rate limit' : 'Service Unavailable',
-              retryAfter: extractRetryAfter(result) ?? 15,
-            });
-          }
+            // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : on
+            // laisse la boucle multi-clés décider (basculement sur une autre clé).
+            if (result.status === 429 || result.status === 503) {
+              console.warn(`[scan-hdv] Quota Groq (${result.status}) : ${(result.body?.error?.message || result.rawText).slice(0, 200)}`);
+              return { kind: 'quota', status: result.status, retryAfter: extractRetryAfter(result) ?? 15 };
+            }
 
-          if (result.ok) {
-            const content = result.body?.choices?.[0]?.message?.content;
-            if (content) {
-              try {
-                const parsedData = parseJsonContent(content) as AiResponse;
-                console.log('[scan-hdv] IA brute:', JSON.stringify(parsedData));
-                const sanitized = sanitizeResponse(parsedData);
+            if (result.ok) {
+              const content = result.body?.choices?.[0]?.message?.content;
+              if (content) {
+                try {
+                  const parsedData = parseJsonContent(content) as AiResponse;
+                  console.log('[scan-hdv] IA brute:', JSON.stringify(parsedData));
+                  const sanitized = sanitizeResponse(parsedData);
 
-                // Mode scan ciblé : on FORCE le nom exact de l'item ciblé sur le
-                // résultat final (on ignore les tentatives de l'IA d'identifier
-                // un nom), garantissant un upsert sur la bonne ligne Supabase.
-                if (isTargeted) {
-                  const forcedPrices = sanitized.items?.[0]?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
-                  sanitized.items = [{ name: targetedItemName as string, prices: forcedPrices }];
+                  // Mode scan ciblé : on FORCE le nom exact de l'item ciblé sur le
+                  // résultat final (on ignore les tentatives de l'IA d'identifier
+                  // un nom), garantissant un upsert sur la bonne ligne Supabase.
+                  if (isTargeted) {
+                    const forcedPrices = sanitized.items?.[0]?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
+                    sanitized.items = [{ name: targetedItemName as string, prices: forcedPrices }];
+                  }
+
+                  const payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } = {
+                    ...sanitized,
+                    tokens: {
+                      remaining: parseInt(result.headers.get('x-ratelimit-remaining-tokens') || '0', 10),
+                      limit: parseInt(result.headers.get('x-ratelimit-limit-tokens') || '0', 10),
+                      used: parseInt(result.headers.get('x-ratelimit-used-tokens') || '0', 10),
+                    },
+                  };
+                  console.log('[scan-hdv] Sanitized:', JSON.stringify(payload));
+                  return { kind: 'success', payload };
+                } catch (parseErr: unknown) {
+                  jsonValidationFailed = true;
+                  lastError = `[${model}] ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`;
+                  console.warn(`[scan-hdv] JSON illisible (${model}), tentative ${attempt + 1}/${MAX_JSON_RETRIES + 1}...`);
+                  continue;
                 }
-
-                const payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } = {
-                  ...sanitized,
-                  tokens: {
-                    remaining: parseInt(result.headers.get('x-ratelimit-remaining-tokens') || '0', 10),
-                    limit: parseInt(result.headers.get('x-ratelimit-limit-tokens') || '0', 10),
-                    used: parseInt(result.headers.get('x-ratelimit-used-tokens') || '0', 10),
-                  },
-                };
-                console.log('[scan-hdv] Sanitized:', JSON.stringify(payload));
-                return res.status(200).json(payload);
-              } catch (parseErr: unknown) {
-                jsonValidationFailed = true;
-                lastError = `[${model}] ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`;
-                console.warn(`[scan-hdv] JSON illisible (${model}), tentative ${attempt + 1}/${MAX_JSON_RETRIES + 1}...`);
-                continue;
               }
             }
-          }
 
-          if (result.isJsonValidationError) {
-            jsonValidationFailed = true;
-            lastError = `[${model}] ${result.body?.error?.message || result.rawText.slice(0, 300)}`;
-            console.warn(`[scan-hdv] Validation JSON échouée (${model}), tentative ${attempt + 1}/${MAX_JSON_RETRIES + 1}...`);
-            continue;
-          }
+            if (result.isJsonValidationError) {
+              jsonValidationFailed = true;
+              lastError = `[${model}] ${result.body?.error?.message || result.rawText.slice(0, 300)}`;
+              console.warn(`[scan-hdv] Validation JSON échouée (${model}), tentative ${attempt + 1}/${MAX_JSON_RETRIES + 1}...`);
+              continue;
+            }
 
-          lastError = `[${model}] ${result.status}: ${result.rawText.slice(0, 300)}`;
-          console.warn(`[scan-hdv] Modèle ${model} non valide (${result.status}), test du suivant...`);
-          break;
-        } catch (err: unknown) {
-          lastError = `[${model}] Exception: ${err instanceof Error ? err.message : String(err)}`;
-          break;
+            lastError = `[${model}] ${result.status}: ${result.rawText.slice(0, 300)}`;
+            console.warn(`[scan-hdv] Modèle ${model} non valide (${result.status}), test du suivant...`);
+            break;
+          } catch (err: unknown) {
+            lastError = `[${model}] Exception: ${err instanceof Error ? err.message : String(err)}`;
+            break;
+          }
         }
       }
-    }
 
-    // Erreur de validation JSON du modèle : réponse propre 422 (pas de crash 500).
-    if (jsonValidationFailed) {
-      return res.status(422).json({
-        error: 'Le modèle vision n\'a pas produit de JSON valide.',
-        detail: lastError,
+      if (jsonValidationFailed) {
+        return { kind: 'jsonValidationFailed', detail: lastError };
+      }
+      return { kind: 'modelFailure', detail: lastError };
+    };
+
+    // Round-Robin : on démarre à la clé suivante (rotation par requête).
+    const startKeyIndex = currentKeyIndex;
+    let lastQuota: { status: number; retryAfter: number } | null = null;
+
+    for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset++) {
+      const keyIndex = (startKeyIndex + keyOffset) % apiKeys.length;
+      const apiKey = apiKeys[keyIndex];
+
+      const outcome = await attemptWithKey(apiKey);
+
+      if (outcome.kind === 'success') {
+        // Succès : on fait avancer la rotation pour la prochaine requête.
+        currentKeyIndex = (keyIndex + 1) % apiKeys.length;
+        return res.status(200).json(outcome.payload);
+      }
+
+      if (outcome.kind === 'quota') {
+        lastQuota = { status: outcome.status, retryAfter: outcome.retryAfter };
+        if (keyOffset < apiKeys.length - 1) {
+          console.warn(`[Groq Multi-Key] Clé ${keyOffset + 1}/${apiKeys.length} bloquée (${outcome.status}), basculement...`);
+          continue;
+        }
+        // Toutes les clés ont été testées et échouent (quota) → réponse 429 au client.
+        return res.status(outcome.status).json({
+          error: outcome.status === 429 ? 'Rate limit' : 'Service Unavailable',
+          retryAfter: outcome.retryAfter,
+        });
+      }
+
+      if (outcome.kind === 'jsonValidationFailed') {
+        return res.status(422).json({
+          error: 'Le modèle vision n\'a pas produit de JSON valide.',
+          detail: outcome.detail,
+        });
+      }
+
+      // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle.
+      return res.status(500).json({
+        error: `Aucun modèle vision Groq fonctionnel. Dernière erreur : ${outcome.detail}`
       });
     }
 
-    return res.status(500).json({
-      error: `Aucun modèle vision Groq fonctionnel. Dernière erreur : ${lastError}`
+    // Cas limite : boucle terminée sans retour (ne devrait pas arriver).
+    return res.status(lastQuota?.status ?? 500).json({
+      error: lastQuota ? (lastQuota.status === 429 ? 'Rate limit' : 'Service Unavailable') : 'Erreur inconnue',
+      retryAfter: lastQuota?.retryAfter,
     });
 
   } catch (err: unknown) {
