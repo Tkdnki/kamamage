@@ -20,16 +20,25 @@ export interface CartEntry {
 
 type ShoppingCart = Record<string, CartEntry>;
 
+interface ScannerOpenOptions {
+  /** Titre personnalisé affiché dans l'en-tête de la modale. */
+  title?: string;
+  /** Méthode de scan pré-sélectionnée à l'ouverture. */
+  initialScanMode?: 'full' | 'stale';
+}
+
 interface NavigationContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
   isScannerOpen: boolean;
-  openScanner: (recipeItems?: ScannerQueueItem[]) => void;
+  openScanner: (recipeItems?: ScannerQueueItem[], options?: ScannerOpenOptions) => void;
   /** Ouvre le scanner en MODE CIBLÉ : les prix scannés sont forcés sur CET item précis. */
   openTargetedScanner: (item: ScannerQueueItem) => void;
   closeScanner: () => void;
   scannerInitialQueue: ScannerQueueItem[];
   scannerTargetedItem: ScannerQueueItem | null;
+  scannerTitle?: string;
+  scannerInitialScanMode?: 'full' | 'stale';
   pendingHdvItem: Partial<DofusItem> | null;
   navigateToHdvItem: (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => void;
   clearPendingHdvItem: () => void;
@@ -65,20 +74,28 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerInitialQueue, setScannerInitialQueue] = useState<ScannerQueueItem[]>([]);
   const [scannerTargetedItem, setScannerTargetedItem] = useState<ScannerQueueItem | null>(null);
-  const openScanner = (recipeItems?: ScannerQueueItem[]) => {
+  const [scannerTitle, setScannerTitle] = useState<string | undefined>(undefined);
+  const [scannerInitialScanMode, setScannerInitialScanMode] = useState<'full' | 'stale' | undefined>(undefined);
+  const openScanner = (recipeItems?: ScannerQueueItem[], options?: ScannerOpenOptions) => {
     setScannerTargetedItem(null);
+    setScannerTitle(options?.title);
+    setScannerInitialScanMode(options?.initialScanMode);
     if (recipeItems) setScannerInitialQueue(recipeItems);
     setIsScannerOpen(true);
   };
   const openTargetedScanner = (item: ScannerQueueItem) => {
     setScannerInitialQueue([]);
     setScannerTargetedItem(item);
+    setScannerTitle(undefined);
+    setScannerInitialScanMode(undefined);
     setIsScannerOpen(true);
   };
   const closeScanner = () => {
     setIsScannerOpen(false);
     setScannerInitialQueue([]);
     setScannerTargetedItem(null);
+    setScannerTitle(undefined);
+    setScannerInitialScanMode(undefined);
   };
   const [pendingHdvItem, setPendingHdvItem] = useState<Partial<DofusItem> | null>(null);
   const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -179,7 +196,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   return (
     <NavigationContext.Provider value={{
       activeView, setActiveView,
-      isScannerOpen, openScanner, openTargetedScanner, closeScanner, scannerInitialQueue, scannerTargetedItem,
+      isScannerOpen, openScanner, openTargetedScanner, closeScanner, scannerInitialQueue, scannerTargetedItem, scannerTitle, scannerInitialScanMode,
       pendingHdvItem, navigateToHdvItem, clearPendingHdvItem,
       previousView, clearPreviousView,
       previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,

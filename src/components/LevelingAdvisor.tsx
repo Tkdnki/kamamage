@@ -3,21 +3,22 @@ import type { ComponentType, FC } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
+import type { ScannerQueueItem } from '../context/NavigationContext';
 import { DOFUS_JOBS } from '../data/mockData';
 import { fetchCraftsByJob } from '../services/api';
-import type { CraftItem } from '../services/api';
+import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
 import { BREAKING_JOBS } from '../lib/breaking';
 import {
   Flame, Trees, Pickaxe, Scissors, Droplets, Fish, Bone,
   Wrench, Shield, Footprints, Gem, Wand2, Wheat, Heart,
   Loader2, TrendingUp, TrendingDown, AlertTriangle, Search,
-  GraduationCap, Info, Copy, Check, ChevronDown, Camera
+  GraduationCap, Info, Copy, Check, ChevronDown, Camera, CheckCircle2
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
 import { getCalculatedXp, calculateCraftsToTarget, JOB_XP_LEVELS } from '../lib/leveling/xp';
 import type { LevelGoalResult } from '../lib/leveling/xp';
-import { getOptimalCost } from '../lib/pricing';
+import { getOptimalCost, isPriceStaleOrMissing } from '../lib/pricing';
 
 const JOB_ICONS: { [key: string]: ComponentType<any> } = {
   'Alchimiste': Droplets, 'Bijoutier': Gem, 'Bricoleur': Wrench,
@@ -173,6 +174,50 @@ export default function LevelingAdvisor() {
     const p = hdvPrices[itemId];
     return !!p && (p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0);
   };
+
+  // ── Scan Métier par tranche de niveau ─────────────────────────────────────
+  // Collecte TOUTES les ressources de toutes les recettes de la tranche
+  // affichée (Niv. minLevel → jobLevel), dédoublonnées par id, puis ne garde
+  // que celles dont le prix est manquant ou obsolète (> 10 jours).
+  const trancheFromLevel = minLevel;
+  const trancheToLevel = jobLevel;
+
+  const rangeRecipes = useMemo(
+    () => craftItems.filter(r => r.level >= trancheFromLevel && r.level <= trancheToLevel),
+    [craftItems, trancheFromLevel, trancheToLevel],
+  );
+
+  const allTrancheIngredients = useMemo<NormalizedRecipeIngredient[]>(() => {
+    const map = new Map<string, NormalizedRecipeIngredient>();
+    for (const r of rangeRecipes) {
+      for (const ing of r.recipeIngredients ?? []) {
+        if (!map.has(ing.id)) map.set(ing.id, ing);
+      }
+    }
+    return Array.from(map.values());
+  }, [rangeRecipes]);
+
+  const staleOrMissingIngredients = useMemo(
+    () => allTrancheIngredients.filter(ing => isPriceStaleOrMissing(ing.id, hdvPrices)),
+    [allTrancheIngredients, hdvPrices],
+  );
+
+  const openJobScan = useCallback(() => {
+    // S'il reste des prix à actualiser : scan ciblé "stale" sur la liste filtrée.
+    // Sinon (tout est à jour) : on ouvre quand même en mode "full" pour permettre
+    // un rescan manuel de toute la tranche.
+    const items: ScannerQueueItem[] = (
+      staleOrMissingIngredients.length > 0 ? staleOrMissingIngredients : allTrancheIngredients
+    ).map(ing => ({
+      expectedName: ing.name,
+      expectedId: ing.id,
+      type: ing.type,
+    }));
+    openScanner(items, {
+      title: `Scan HDV Métier - ${activeJob} Niv. ${trancheFromLevel} à ${trancheToLevel}`,
+      initialScanMode: staleOrMissingIngredients.length > 0 ? 'stale' : 'full',
+    });
+  }, [staleOrMissingIngredients, allTrancheIngredients, openScanner, activeJob, trancheFromLevel, trancheToLevel]);
 
   const isCostUnknown = (row: LevelRow): boolean =>
     row.missingIngredients || row.craftCost <= 0 || !hasResalePrice(row.item._id);
@@ -338,6 +383,40 @@ export default function LevelingAdvisor() {
                 style={{ width: `${Math.round((targetLevel / 200) * 100)}%` }}
               />
             </div>
+
+            {/* Scan Métier par tranche de niveau */}
+            {(() => {
+              const staleCount = staleOrMissingIngredients.length;
+              const allUpToDate = staleCount === 0;
+              return (
+                <button
+                  type="button"
+                  onClick={openJobScan}
+                  disabled={isLoadingItems || rangeRecipes.length === 0}
+                  className="mt-1 w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all border relative overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={`Scanner les prix des ressources de la tranche Niv. ${trancheFromLevel} à ${trancheToLevel}`}
+                >
+                  {allUpToDate
+                    ? 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                    : 'border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.15)]'}
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <Camera className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Scanner la tranche Niv. {trancheFromLevel} - {trancheToLevel}</span>
+                  </span>
+                  {allUpToDate ? (
+                    <span className="shrink-0 flex items-center gap-1 text-[9px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      À jour (&lt;10j)
+                    </span>
+                  ) : (
+                    <span className="shrink-0 flex items-center gap-1 text-[9px] bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.5 rounded-full">
+                      <Camera className="h-2.5 w-2.5" />
+                      {staleCount} ressource{staleCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>
 

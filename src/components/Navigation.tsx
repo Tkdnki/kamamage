@@ -11,7 +11,7 @@ export type { ViewType } from '../context/NavigationContext';
 
 export default function Navigation() {
   const { selectedServer, setSelectedServer } = useServer();
-  const { activeView, setActiveView, isScannerOpen, openScanner, closeScanner, scannerInitialQueue, scannerTargetedItem } = useNavigation();
+  const { activeView, setActiveView, isScannerOpen, openScanner, closeScanner, scannerInitialQueue, scannerTargetedItem, scannerTitle, scannerInitialScanMode } = useNavigation();
 
   const tabs = [
     {
@@ -144,7 +144,7 @@ export default function Navigation() {
           </nav>
 
           {/* Scanner Modal */}
-          <HdvScannerModal isOpen={isScannerOpen} onClose={closeScanner} initialQueue={scannerInitialQueue} targetedItem={scannerTargetedItem} />
+          <HdvScannerModal isOpen={isScannerOpen} onClose={closeScanner} initialQueue={scannerInitialQueue} targetedItem={scannerTargetedItem} title={scannerTitle} initialScanMode={scannerInitialScanMode} />
         </div>
       </div>
     </header>

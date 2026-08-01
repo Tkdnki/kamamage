@@ -1,4 +1,22 @@
-import type { PriceData } from '../context/DofusContext';
+import type { PriceData, HdvPrices } from '../context/DofusContext';
+
+/** Seuil de fraîcheur d'un prix HDV : au-delà de 10 jours, il est obsolète. */
+export const STALE_PRICE_MS = 10 * 24 * 60 * 60 * 1000;
+
+/**
+ * Un prix est "à actualiser" (obsolète ou manquant) s'il est absent, sans lot
+ * renseigné, sans date de mise à jour, ou plus vieux que STALE_PRICE_MS.
+ */
+export function isPriceStaleOrMissing(itemId: string, hdvPrices: HdvPrices): boolean {
+  const p = hdvPrices[itemId];
+  if (!p) return true;
+  const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
+  if (!hasAnyPrice) return true;
+  if (!p.updatedAt) return true;
+  const ageMs = Date.now() - new Date(p.updatedAt).getTime();
+  if (Number.isNaN(ageMs)) return true;
+  return ageMs > STALE_PRICE_MS;
+}
 
 interface LotOption {
   size: number;

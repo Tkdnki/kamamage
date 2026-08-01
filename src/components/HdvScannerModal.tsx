@@ -6,6 +6,7 @@ import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
+import { isPriceStaleOrMissing as isStaleShared } from '../lib/pricing';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
 // Cooldown systématique entre chaque scan d'image : le modèle Vision Groq
@@ -15,10 +16,6 @@ const SCAN_COOLDOWN_SECONDS = 25;
 
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
-
-// Seuil de fraîcheur d'un prix HDV : au-delà de 10 jours, il est considéré
-// comme obsolète et doit être rescanné en mode "Prix à actualiser".
-const STALE_PRICE_MS = 10 * 24 * 60 * 60 * 1000;
 
 // Pause asynchrone bloquante : l'appelant DOIT faire `await sleep(ms)` pour
 // que la boucle d'envoi attende réellement la fin du délai avant de relancer.
@@ -57,6 +54,10 @@ interface HdvScannerModalProps {
   /** Mode "Scan forcé" : item ciblé par l'utilisateur. Les prix extraits lui
    *  sont attribués de force, sans dépendre de l'OCR du nom. */
   targetedItem?: ScannerQueueItem | null;
+  /** Titre personnalisé affiché dans l'en-tête de la modale. */
+  title?: string;
+  /** Méthode de scan pré-sélectionnée à l'ouverture (défaut : "full"). */
+  initialScanMode?: 'full' | 'stale';
 }
 
 const compressImage = (base64Str: string): Promise<string> => {
@@ -83,7 +84,7 @@ const compressImage = (base64Str: string): Promise<string> => {
   });
 };
 
-export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem }: HdvScannerModalProps) {
+export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem, title, initialScanMode }: HdvScannerModalProps) {
   const { setHdvPrice, hdvPrices } = useDofus();
   const { user } = useAuth();
 
@@ -187,6 +188,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
 
   useEffect(() => {
     if (!isOpen) return;
+    setScanMode(initialScanMode ?? 'full');
     targetedItemRef.current = targetedItem ?? null;
     if (targetedItem) {
       // Mode scan ciblé : l'unique item attendu EST l'item ciblé.
@@ -210,7 +212,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
       resolvedIdsRef.current = new Set();
       setCopiedId(null);
     }
-  }, [isOpen, initialQueue, targetedItem]);
+  }, [isOpen, initialQueue, targetedItem, initialScanMode]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -221,14 +223,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // Un prix est "à actualiser" s'il est absent, sans lot renseigné, sans date de
   // mise à jour, ou plus vieux que STALE_PRICE_MS (10 jours).
   const isPriceStaleOrMissing = useCallback((item: ScannerQueueItem): boolean => {
-    const p = hdvPrices[item.expectedId];
-    if (!p) return true;
-    const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
-    if (!hasAnyPrice) return true;
-    if (!p.updatedAt) return true;
-    const ageMs = Date.now() - new Date(p.updatedAt).getTime();
-    if (Number.isNaN(ageMs)) return true;
-    return ageMs > STALE_PRICE_MS;
+    return isStaleShared(item.expectedId, hdvPrices);
   }, [hdvPrices]);
 
   const getItemAgeLabel = useCallback((item: ScannerQueueItem): string => {
@@ -629,7 +624,7 @@ for (const file of Array.from(e.dataTransfer.files)) {
               <Camera className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Scan HDV</h2>
+              <h2 className="text-sm font-bold text-white">{title ?? 'Scan HDV'}</h2>
               <p className="text-[10px] text-slate-400">
                 {targetedItem ? 'Scan ciblé (forcé)' : totalExpected > 0 ? 'Scan de recette' : 'Import par capture d\'écran'}
               </p>
