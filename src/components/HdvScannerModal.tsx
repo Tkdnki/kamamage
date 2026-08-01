@@ -7,6 +7,7 @@ import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
 import { isPriceStaleOrMissing as isStaleShared } from '../lib/pricing';
+import { compressImage } from '../lib/imageUtils';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
 // Espacement obligatoire dans la file d'attente : pause systématique de 2s
@@ -71,30 +72,6 @@ interface HdvScannerModalProps {
   /** Méthode de scan pré-sélectionnée à l'ouverture (défaut : "full"). */
   initialScanMode?: 'full' | 'stale';
 }
-
-const compressImage = (base64Str: string): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64Str.startsWith('data:') ? base64Str : `data:image/png;base64,${base64Str}`;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 1024;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > MAX_WIDTH) {
-        height = Math.round((height * MAX_WIDTH) / width);
-        width = MAX_WIDTH;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.75));
-    };
-  });
-};
 
 export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem, title, initialScanMode }: HdvScannerModalProps) {
   const { setHdvPrice, hdvPrices } = useDofus();
