@@ -9,13 +9,18 @@ import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
 import { isPriceStaleOrMissing as isStaleShared } from '../lib/pricing';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
-// Cooldown systématique entre chaque scan d'image : le modèle Vision Groq
-// (qwen/qwen3.6-27b, tier on_demand) est limité à 8000 TPM. À ~3000 tokens par
-// image, on ne peut envoyer que ~2,5 requêtes/minute => ~25s entre deux envois.
-const SCAN_COOLDOWN_SECONDS = 25;
+// Espacement obligatoire dans la file d'attente : pause systématique de 2s
+// entre deux images distinctes pour lisser les appels vers l'API IA et ne pas
+// déclencher le rate-limit RPM du provider.
+const QUEUE_THROTTLE_MS = 2000;
 
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
+
+// Exponential Backoff : le délai entre deux tentatives de la même image double
+// à chaque échec (attempt 1 → 3000ms, attempt 2 → 6000ms, ...) au lieu de
+// relancer immédiatement à 0ms et épuiser le quota du provider.
+const RETRY_BASE_DELAY_MS = 3000;
 
 // Pause asynchrone bloquante : l'appelant DOIT faire `await sleep(ms)` pour
 // que la boucle d'envoi attende réellement la fin du délai avant de relancer.
@@ -356,8 +361,10 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             if (!Number.isNaN(parsed)) retryAfter = parsed;
           }
           retries += 1;
-          const waitSeconds = Math.max(retryAfter ?? 15, 5);
           setIsLoading(false);
+
+          // Alerte discrète pour expliquer la pause à l'utilisateur.
+          showToast('error', 'Quota IA atteint. Pause de quelques secondes...');
 
           // Coupe-circuit anti-boucle infinie : après MAX_RETRIES échecs
           // (429/503) consécutifs sur la MÊME image, on l'abandonne et on
@@ -370,9 +377,11 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             continue;
           }
 
-          // Pause asynchrone bloquante AVANT de relancer la même image :
-          // le thread attend réellement `waitSeconds` (retryAfter backend ou 15s),
-          // il ne relance JAMAIS immédiatement.
+          // EXPONENTIAL BACKOFF : le délai double à chaque tentative de la MÊME
+          // image (attempt 1 → 3000ms, attempt 2 → 6000ms). On ne réenvoie JAMAIS
+          // immédiatement : on attend réellement le délai avant de relancer.
+          const backoffDelay = RETRY_BASE_DELAY_MS * Math.pow(2, retries - 1);
+          const waitSeconds = Math.max(backoffDelay / 1000, retryAfter ?? 0);
           const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;
           // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
@@ -547,10 +556,11 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
         }
         }
 
-        // Cooldown systématique entre chaque image pour rester sous le quota
-        // Groq (~8000 TPM). Attendu uniquement s'il reste des images à traiter.
+        // Queue Throttling : pause systématique de 2s entre deux images distinctes
+        // pour lisser les appels vers l'API IA et éviter le rate-limit RPM.
+        // Attendu uniquement s'il reste des images à traiter.
         if (queueRef.current.length > 0) {
-          await waitWithCountdown(SCAN_COOLDOWN_SECONDS, 'Pause entre deux scans — prochain scan dans');
+          await sleep(QUEUE_THROTTLE_MS);
         }
       }
     }
