@@ -179,9 +179,8 @@ export default function LevelingAdvisor() {
   };
 
   // ── Scan Métier par tranche de niveau ─────────────────────────────────────
-  // Collecte TOUTES les ressources de toutes les recettes de la tranche
-  // affichée (Niv. minLevel → defaultMaxLevel), dédoublonnées par id, puis ne garde
-  // que celles dont le prix est manquant ou obsolète (> 10 jours).
+  // Items à scanner = les items façonnés de la tranche (prix de revente en HDV
+  // Équipements) + TOUTES les ressources de leurs recettes, dédoublonnées par id.
   const trancheFromLevel = minLevel;
   const trancheToLevel = defaultMaxLevel;
 
@@ -200,27 +199,63 @@ export default function LevelingAdvisor() {
     return Array.from(map.values());
   }, [rangeRecipes]);
 
-  const staleOrMissingIngredients = useMemo(
-    () => allTrancheIngredients.filter(ing => isPriceStaleOrMissing(ing.id, hdvPrices)),
-    [allTrancheIngredients, hdvPrices],
+  // Tous les items de la tranche (revente des équipements façonnés + ingrédients).
+  const allTrancheItems = useMemo<ScannerQueueItem[]>(() => {
+    const items: ScannerQueueItem[] = [];
+    for (const r of rangeRecipes) {
+      items.push({ expectedName: r.name, expectedId: r._id, type: r.type });
+    }
+    for (const ing of allTrancheIngredients) {
+      items.push({ expectedName: ing.name, expectedId: ing.id, type: ing.type });
+    }
+    return items;
+  }, [rangeRecipes, allTrancheIngredients]);
+
+  // Nombre d'items de la tranche dont les prix sont manquants (0/null) :
+  // ingrédients OU prix de revente de l'item façonné.
+  const missingPricesCount = useMemo(
+    () => allTrancheItems.filter(item => !hasResalePrice(item.expectedId)).length,
+    [allTrancheItems, hdvPrices],
+  );
+
+  // Dernière mise à jour effective de la tranche (updatedAt le plus récent).
+  const lastScannedAt = useMemo(() => {
+    let latest: number | null = null;
+    for (const item of allTrancheItems) {
+      const p = hdvPrices[item.expectedId];
+      if (p?.updatedAt) {
+        const t = new Date(p.updatedAt).getTime();
+        if (!Number.isNaN(t) && (latest === null || t > latest)) latest = t;
+      }
+    }
+    return latest;
+  }, [allTrancheItems, hdvPrices]);
+
+  // Une tranche est "À jour" uniquement si elle a été scannée il y a moins de
+  // 10 jours ET qu'il ne reste AUCUN prix manquant (ingrédients ou revente).
+  const isUpToDate = useMemo(() => {
+    if (missingPricesCount > 0) return false;
+    if (lastScannedAt === null) return false;
+    const daysDiff = (Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000);
+    return daysDiff < 10;
+  }, [missingPricesCount, lastScannedAt]);
+
+  // Items (ingrédients OU revente) à actualiser : prix manquant ou obsolète (> 10 jours).
+  const staleOrMissingItems = useMemo(
+    () => allTrancheItems.filter(item => isPriceStaleOrMissing(item.expectedId, hdvPrices)),
+    [allTrancheItems, hdvPrices],
   );
 
   const openJobScan = useCallback(() => {
-    // S'il reste des prix à actualiser : scan ciblé "stale" sur la liste filtrée.
-    // Sinon (tout est à jour) : on ouvre quand même en mode "full" pour permettre
-    // un rescan manuel de toute la tranche.
-    const items: ScannerQueueItem[] = (
-      staleOrMissingIngredients.length > 0 ? staleOrMissingIngredients : allTrancheIngredients
-    ).map(ing => ({
-      expectedName: ing.name,
-      expectedId: ing.id,
-      type: ing.type,
-    }));
+    // S'il reste des prix à actualiser (manquants ou obsolètes) : scan ciblé
+    // "stale" sur la liste filtrée. Sinon (tout est à jour) : rescan manuel en
+    // mode "full" de toute la tranche (revente + ingrédients).
+    const items = staleOrMissingItems.length > 0 ? staleOrMissingItems : allTrancheItems;
     openScanner(items, {
       title: `Scan HDV Métier - ${activeJob} Niv. ${trancheFromLevel} à ${trancheToLevel}`,
-      initialScanMode: staleOrMissingIngredients.length > 0 ? 'stale' : 'full',
+      initialScanMode: staleOrMissingItems.length > 0 ? 'stale' : 'full',
     });
-  }, [staleOrMissingIngredients, allTrancheIngredients, openScanner, activeJob, trancheFromLevel, trancheToLevel]);
+  }, [staleOrMissingItems, allTrancheItems, openScanner, activeJob, trancheFromLevel, trancheToLevel]);
 
   const isCostUnknown = (row: LevelRow): boolean =>
     row.missingIngredients || row.craftCost <= 0 || !hasResalePrice(row.item._id);
@@ -389,33 +424,39 @@ export default function LevelingAdvisor() {
 
             {/* Scan Métier par tranche de niveau */}
             {(() => {
-              const staleCount = staleOrMissingIngredients.length;
-              const allUpToDate = staleCount === 0;
+              const staleCount = staleOrMissingItems.length;
               return (
                 <button
                   type="button"
                   onClick={openJobScan}
                   disabled={isLoadingItems || rangeRecipes.length === 0}
                   className={`mt-1 w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all border relative overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed ${
-                    allUpToDate
+                    isUpToDate
                       ? 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                      : missingPricesCount > 0
+                      ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
                       : 'border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
                   }`}
-                  title={`Scanner les prix des ressources de la tranche Niv. ${trancheFromLevel} à ${trancheToLevel}`}
+                  title={`Scanner les prix (ingrédients + revente) de la tranche Niv. ${trancheFromLevel} à ${trancheToLevel}`}
                 >
                   <span className="flex items-center gap-1.5 min-w-0">
                     <Camera className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">Scanner la tranche Niv. {trancheFromLevel} - {trancheToLevel}</span>
                   </span>
-                  {allUpToDate ? (
+                  {isUpToDate ? (
                     <span className="shrink-0 flex items-center gap-1 text-[9px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
                       <CheckCircle2 className="h-2.5 w-2.5" />
                       À jour (&lt;10j)
                     </span>
+                  ) : missingPricesCount > 0 ? (
+                    <span className="shrink-0 flex items-center gap-1 text-[9px] bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      {missingPricesCount} prix incomplet{missingPricesCount > 1 ? 's' : ''}
+                    </span>
                   ) : (
                     <span className="shrink-0 flex items-center gap-1 text-[9px] bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.5 rounded-full">
                       <Camera className="h-2.5 w-2.5" />
-                      {staleCount} ressource{staleCount > 1 ? 's' : ''}
+                      {staleCount} obsolète{staleCount > 1 ? 's' : ''}
                     </span>
                   )}
                 </button>
