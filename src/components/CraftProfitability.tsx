@@ -52,7 +52,7 @@ const CopyButton = ({ text }: { text: string }) => {
 export default function CraftProfitability() {
   const { user } = useAuth();
   const { hdvPrices, setHdvPrice, setMonthlySalesVolume, trackItem } = useDofus();
-  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner } = useNavigation();
+  const { navigateToHdvItem, addIngredientsToCart, previousItemId, previousJob, clearPreviousNavigation, navigateToLevelingItem, pendingCraftsItemId, pendingCraftsJob, clearPendingCraftsNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner, openTargetedScanner } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Paysan');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -512,6 +512,14 @@ export default function CraftProfitability() {
                         {selectedItem.name}
                       </h3>
                       <CopyButton text={selectedItem.name} />
+                      <button
+                        type="button"
+                        onClick={() => openTargetedScanner({ expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type })}
+                        className="h-4 w-4 opacity-40 hover:opacity-100 hover:text-cyan-400 transition-opacity shrink-0"
+                        title={`Scan forcé des prix de ${selectedItem.name}`}
+                      >
+                        <Camera className="h-4 w-4" />
+                      </button>
                     </div>
                     <p className="text-xs text-slate-400 mt-1 capitalize font-medium">
                       {selectedItem.type} &bull; Métier {activeJob}
@@ -589,6 +597,14 @@ export default function CraftProfitability() {
                             <div className="flex items-center gap-1.5">
                               <p className="text-sm font-semibold text-white leading-tight hover:text-amber-400 transition-colors">{ing.name}</p>
                               <CopyButton text={ing.name} />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: ing.name, expectedId: ing.id, type: ing.type }); }}
+                                className="h-4 w-4 opacity-40 hover:opacity-100 hover:text-cyan-400 transition-opacity shrink-0"
+                                title={`Scan forcé des prix de ${ing.name}`}
+                              >
+                                <Camera className="h-4 w-4" />
+                              </button>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               Quantité : <span className="text-dofus-accent font-bold">x{ing.quantity}</span>

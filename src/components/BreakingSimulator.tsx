@@ -31,7 +31,7 @@ export default function BreakingSimulator() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { selectedServer } = useServer();
   const { user } = useAuth();
-  const { navigateToCraftsItem, navigateToLevelingItem, navigateToHdvItem, openScanner, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
+  const { navigateToCraftsItem, navigateToLevelingItem, navigateToHdvItem, openScanner, openTargetedScanner, pendingBreakingItemId, clearPendingBreakingNavigation } = useNavigation();
 
   const [activeJob, setActiveJob] = useState('Forgeron');
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
@@ -411,10 +411,20 @@ export default function BreakingSimulator() {
               const profit = profitById[item._id] ?? Number.NEGATIVE_INFINITY;
               const status = statusById[item._id] ?? 'no-stats';
               return (
-                <button
+                <div
                   key={item._id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => { setSelectedItemId(item._id); setFocusEffectIndex(null); setExoEntries([]); }}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all ${
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedItemId(item._id);
+                      setFocusEffectIndex(null);
+                      setExoEntries([]);
+                    }
+                  }}
+                  className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-amber-900/15 border-amber-500/40'
                       : 'bg-slate-800/20 border-slate-700/40 hover:bg-slate-800/40'
@@ -423,9 +433,18 @@ export default function BreakingSimulator() {
                   <div className="flex items-center gap-3">
                     <ItemImage item={item} className="h-9 w-9 bg-slate-800/30 rounded-lg p-1 border border-slate-700/30 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
-                        {item.name}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
+                          {item.name}
+                        </p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: item.name, expectedId: item._id, type: item.type }); }}
+                          className="shrink-0 p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                          title={`Scan forcé des prix de ${item.name}`}
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                       <p className="text-[10px] text-slate-500">
                         Niveau {item.level}
                         {hasPrice && <span className="ml-2 text-amber-400/70">{Math.round(priceData!.unitAverage).toLocaleString()} K</span>}
@@ -445,7 +464,7 @@ export default function BreakingSimulator() {
                       )}
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -509,6 +528,13 @@ export default function BreakingSimulator() {
                         title="Copier le nom"
                       >
                         <Copy className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => openTargetedScanner({ expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type })}
+                        className="p-1 rounded transition-all shrink-0 text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10"
+                        title={`Scan forcé des prix de ${selectedItem.name}`}
+                      >
+                        <Camera className="h-3 w-3" />
                       </button>
                       <ExternalLink className="h-3 w-3 text-slate-500 shrink-0" />
                     </div>
@@ -766,6 +792,13 @@ export default function BreakingSimulator() {
                                         >
                                           <Copy className="h-2.5 w-2.5" />
                                         </button>
+                                        <button
+                                          onClick={() => openTargetedScanner({ expectedName: l.rune.name, expectedId: getRunePriceKey(l.rune), type: 'Rune de forgemagie' })}
+                                          className="p-0.5 rounded transition-all text-slate-600 hover:text-cyan-400 hover:bg-cyan-500/10"
+                                          title={`Scan forcé des prix de ${l.rune.name}`}
+                                        >
+                                          <Camera className="h-2.5 w-2.5" />
+                                        </button>
                                       </div>
                                     </div>
                                   </td>
@@ -838,6 +871,13 @@ export default function BreakingSimulator() {
                                           title="Voir les prix de cette rune"
                                         >
                                           {exo.rune.code}
+                                        </button>
+                                        <button
+                                          onClick={() => openTargetedScanner({ expectedName: exo.rune.name, expectedId: getRunePriceKey(exo.rune), type: 'Rune de forgemagie' })}
+                                          className="p-0.5 rounded transition-all text-slate-600 hover:text-cyan-400 hover:bg-cyan-500/10"
+                                          title={`Scan forcé des prix de ${exo.rune.name}`}
+                                        >
+                                          <Camera className="h-2.5 w-2.5" />
                                         </button>
                                         <div className="text-[9px] text-cyan-400/60">Exo</div>
                                       </div>

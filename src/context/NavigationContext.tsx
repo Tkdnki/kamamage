@@ -25,8 +25,11 @@ interface NavigationContextType {
   setActiveView: (view: ViewType) => void;
   isScannerOpen: boolean;
   openScanner: (recipeItems?: ScannerQueueItem[]) => void;
+  /** Ouvre le scanner en MODE CIBLÉ : les prix scannés sont forcés sur CET item précis. */
+  openTargetedScanner: (item: ScannerQueueItem) => void;
   closeScanner: () => void;
   scannerInitialQueue: ScannerQueueItem[];
+  scannerTargetedItem: ScannerQueueItem | null;
   pendingHdvItem: Partial<DofusItem> | null;
   navigateToHdvItem: (item: Partial<DofusItem>, itemId?: string, job?: string, jobLevel?: number) => void;
   clearPendingHdvItem: () => void;
@@ -61,13 +64,21 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const [activeView, setActiveView] = useState<ViewType>('hdv');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerInitialQueue, setScannerInitialQueue] = useState<ScannerQueueItem[]>([]);
+  const [scannerTargetedItem, setScannerTargetedItem] = useState<ScannerQueueItem | null>(null);
   const openScanner = (recipeItems?: ScannerQueueItem[]) => {
+    setScannerTargetedItem(null);
     if (recipeItems) setScannerInitialQueue(recipeItems);
+    setIsScannerOpen(true);
+  };
+  const openTargetedScanner = (item: ScannerQueueItem) => {
+    setScannerInitialQueue([]);
+    setScannerTargetedItem(item);
     setIsScannerOpen(true);
   };
   const closeScanner = () => {
     setIsScannerOpen(false);
     setScannerInitialQueue([]);
+    setScannerTargetedItem(null);
   };
   const [pendingHdvItem, setPendingHdvItem] = useState<Partial<DofusItem> | null>(null);
   const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -168,7 +179,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   return (
     <NavigationContext.Provider value={{
       activeView, setActiveView,
-      isScannerOpen, openScanner, closeScanner, scannerInitialQueue,
+      isScannerOpen, openScanner, openTargetedScanner, closeScanner, scannerInitialQueue, scannerTargetedItem,
       pendingHdvItem, navigateToHdvItem, clearPendingHdvItem,
       previousView, clearPreviousView,
       previousItemId, previousJob, previousJobLevel, clearPreviousNavigation,

@@ -6,7 +6,7 @@ import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
-import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key } from 'lucide-react';
+import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target } from 'lucide-react';
 
 // Cooldown systématique entre chaque scan d'image : le modèle Vision Groq
 // (qwen/qwen3.6-27b, tier on_demand) est limité à 8000 TPM. À ~3000 tokens par
@@ -50,6 +50,9 @@ interface HdvScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialQueue?: ScannerQueueItem[];
+  /** Mode "Scan forcé" : item ciblé par l'utilisateur. Les prix extraits lui
+   *  sont attribués de force, sans dépendre de l'OCR du nom. */
+  targetedItem?: ScannerQueueItem | null;
 }
 
 const compressImage = (base64Str: string): Promise<string> => {
@@ -76,7 +79,7 @@ const compressImage = (base64Str: string): Promise<string> => {
   });
 };
 
-export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvScannerModalProps) {
+export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem }: HdvScannerModalProps) {
   const { setHdvPrice } = useDofus();
   const { user } = useAuth();
 
@@ -105,6 +108,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
   const expectedItemsRef = useRef<ScannerQueueItem[]>([]);
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const recipeDoneRef = useRef(false);
+  const targetedItemRef = useRef<ScannerQueueItem | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -167,24 +171,35 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
     resolvedIdsRef.current = new Set();
     setCopiedId(null);
     setTokenInfo(null);
+    targetedItemRef.current = null;
   }, []);
 
   useEffect(() => {
-    if (isOpen && initialQueue && initialQueue.length > 0) {
+    if (!isOpen) return;
+    targetedItemRef.current = targetedItem ?? null;
+    if (targetedItem) {
+      // Mode scan ciblé : l'unique item attendu EST l'item ciblé.
+      setExpectedItems([targetedItem]);
+      expectedItemsRef.current = [targetedItem];
+      setResolvedIds(new Set());
+      resolvedIdsRef.current = new Set();
+      setCopiedId(null);
+      recipeDoneRef.current = false;
+    } else if (initialQueue && initialQueue.length > 0) {
       setExpectedItems(initialQueue);
       expectedItemsRef.current = initialQueue;
       setResolvedIds(new Set());
       resolvedIdsRef.current = new Set();
       setCopiedId(null);
       recipeDoneRef.current = false;
-    } else if (isOpen) {
+    } else {
       setExpectedItems([]);
       expectedItemsRef.current = [];
       setResolvedIds(new Set());
       resolvedIdsRef.current = new Set();
       setCopiedId(null);
     }
-  }, [isOpen, initialQueue]);
+  }, [isOpen, initialQueue, targetedItem]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -264,11 +279,20 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
       try {
         const body: Record<string, any> = { image: entry.base64 };
-        const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
-        if (unresolvedExpected.length > 0) {
-          body.expectedName = unresolvedExpected[0].expectedName;
+        if (targetedItemRef.current) {
+          // Mode scan ciblé : on indique au backend l'item précis à scanner.
+          // Le nom/ID final sera forcé à cet item, l'IA ne doit PAS deviner le nom.
+          body.targetedItemId = targetedItemRef.current.expectedId;
+          body.targetedItemName = targetedItemRef.current.expectedName;
+          body.expectedName = targetedItemRef.current.expectedName;
+          console.log('[scan] 🎯 Envoi scan CIBLÉ à /api/scan-hdv :', body.targetedItemName, '(', body.targetedItemId, ')');
+        } else {
+          const unresolvedExpected = expectedItemsRef.current.filter(e => !resolvedIdsRef.current.has(e.expectedId));
+          if (unresolvedExpected.length > 0) {
+            body.expectedName = unresolvedExpected[0].expectedName;
+          }
+          console.log('[scan] 📤 Envoi image à /api/scan-hdv. Suggéré:', body.expectedName || '(aucun)');
         }
-        console.log('[scan] 📤 Envoi image à /api/scan-hdv. Suggéré:', body.expectedName || '(aucun)');
 
         const response = await fetch('/api/scan-hdv', {
           method: 'POST',
@@ -373,6 +397,26 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         setResult(scanResult);
         setIsLoading(false);
 
+        // ── MODE SCAN CIBLÉ : attribution FORCÉE à l'item ciblé ─────────────
+        // Le nom/ID viennent de la file (`targetedItem`), on ignore totalement
+        // ce que l'IA a pu lire dans l'image (échecs d'OCR contournés).
+        if (targetedItemRef.current) {
+          const t = targetedItemRef.current;
+          const first = scanResult.items[0];
+          const prices = first?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
+          console.log(`[scan] 🎯 Scan forcé : prix attribués à "${t.expectedName}" (ID ${t.expectedId})`, prices);
+          setHdvPrice(t.expectedId, prices.x1, prices.x10, prices.x100, prices.x1000);
+
+          const newResolved = new Set(resolvedIdsRef.current);
+          newResolved.add(t.expectedId);
+          resolvedIdsRef.current = newResolved;
+          setResolvedIds(newResolved);
+          setMatchedItems([{
+            item: { name: t.expectedName, prices },
+            dofusItem: { _id: t.expectedId, name: t.expectedName, type: t.type } as DofusItem,
+          }]);
+          setUnmatchedNames([]);
+        } else {
         const matched: { item: ScanItem; dofusItem: DofusItem }[] = [];
         const unmatched: string[] = [];
         const newResolved = new Set(resolvedIdsRef.current);
@@ -461,6 +505,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
         if (unmatched.length > 0) {
           showToast('error', `${unmatched.length} item${unmatched.length > 1 ? 's' : ''} non trouvé${unmatched.length > 1 ? 's' : ''} — passage au suivant`);
         }
+        }
 
         // Cooldown systématique entre chaque image pour rester sous le quota
         // Groq (~8000 TPM). Attendu uniquement s'il reste des images à traiter.
@@ -477,7 +522,9 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue }: HdvSc
 
       if (expectedItemsRef.current.length > 0 && !recipeDoneRef.current && expectedItemsRef.current.every(e => resolvedIdsRef.current.has(e.expectedId))) {
         recipeDoneRef.current = true;
-        showToast('success', 'Prix de la recette mis à jour sur Supabase !');
+        showToast('success', targetedItemRef.current
+          ? `Prix de "${targetedItemRef.current.expectedName}" mis à jour !`
+          : 'Prix de la recette mis à jour sur Supabase !');
         setTimeout(() => onClose(), 1200);
       }
     }
@@ -537,7 +584,9 @@ for (const file of Array.from(e.dataTransfer.files)) {
             </div>
             <div>
               <h2 className="text-sm font-bold text-white">Scan HDV</h2>
-              <p className="text-[10px] text-slate-400">{totalExpected > 0 ? 'Scan de recette' : 'Import par capture d\'écran'}</p>
+              <p className="text-[10px] text-slate-400">
+                {targetedItem ? 'Scan ciblé (forcé)' : totalExpected > 0 ? 'Scan de recette' : 'Import par capture d\'écran'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white transition-colors border border-white/10">
@@ -547,6 +596,16 @@ for (const file of Array.from(e.dataTransfer.files)) {
 
         {/* Content */}
         <div className="p-5 space-y-4">
+          {/* Targeted mode banner */}
+          {targetedItem && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+              <Target className="h-4 w-4 text-emerald-400 shrink-0" />
+              <p className="text-xs font-semibold text-emerald-300 truncate">
+                Scan forcé pour : {targetedItem.expectedName}
+              </p>
+            </div>
+          )}
+
           {/* Token quota gauge */}
           {tokenInfo && tokenInfo.limit > 0 && (() => {
             const pct = (tokenInfo.remaining / tokenInfo.limit) * 100;

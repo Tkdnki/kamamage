@@ -100,7 +100,7 @@ function extractRetryAfter(result: GroqVisionResult): number | undefined {
   return undefined;
 }
 
-async function callGroqVision(apiKey: string, model: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
+async function callGroqVision(apiKey: string, model: string, systemPrompt: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -110,7 +110,7 @@ async function callGroqVision(apiKey: string, model: string, promptText: string,
     body: JSON.stringify({
       model: model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: [
@@ -156,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { image, expectedName } = req.body || {};
+    const { image, expectedName, targetedItemId, targetedItemName } = req.body || {};
     if (!image) {
       return res.status(400).json({ error: 'Aucune image fournie.' });
     }
@@ -166,7 +166,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       imageUrl = `data:image/png;base64,${image}`;
     }
 
-    const nameHint = expectedName
+    // Mode scan ciblé : l'utilisateur a déjà identifié l'item, on force l'IA à
+    // n'extraire QUE les prix (l'OCR du nom est trop faillible).
+    const isTargeted = Boolean(targetedItemId && targetedItemName);
+
+    const nameHint = isTargeted
+      ? `\nIMPORTANT — SCAN CIBLÉ : tu scannes UNIQUEMENT l'item « ${targetedItemName} ». Ne lis PAS le nom dans l'image, ne le devine PAS : extrais UNIQUEMENT les prix (x1, x10, x100, x1000) du lot affiché.`
+      : expectedName
       ? `\nContexte : l'item attendu est "${expectedName}". Vérifie-le visuellement dans l'image mais concentre-toi sur l'extraction des prix.`
       : '';
 
@@ -194,6 +200,12 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       'qwen/qwen3.6-27b'
     ];
 
+    // Prompt système adapté : en mode ciblé, l'IA ne doit JAMAIS lire/écrire le nom
+    // de l'item, uniquement extraire les prix du lot affiché.
+    const systemPrompt = isTargeted
+      ? `${SYSTEM_PROMPT}\n\nSCAN CIBLÉ : l'item à analyser est « ${targetedItemName} ». Tu ne dois PAS lire, deviner ni écrire son nom. Concentre-toi UNIQUEMENT sur l'extraction des prix des lots 1, 10, 100 et 1000 visibles dans l'image.`
+      : SYSTEM_PROMPT;
+
     let lastError = '';
     let jsonValidationFailed = false;
 
@@ -201,7 +213,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       // Réessais automatiques en cas d'échec de validation JSON (l'IA peut réussir au 2e essai).
       for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
         try {
-          const result = await callGroqVision(apiKey, model, promptText, imageUrl);
+          const result = await callGroqVision(apiKey, model, systemPrompt, promptText, imageUrl);
 
           // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : remontées
           // telles quelles au frontend avec le délai d'attente recommandé, au lieu
@@ -222,6 +234,15 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
                 const parsedData = parseJsonContent(content) as AiResponse;
                 console.log('[scan-hdv] IA brute:', JSON.stringify(parsedData));
                 const sanitized = sanitizeResponse(parsedData);
+
+                // Mode scan ciblé : on FORCE le nom exact de l'item ciblé sur le
+                // résultat final (on ignore les tentatives de l'IA d'identifier
+                // un nom), garantissant un upsert sur la bonne ligne Supabase.
+                if (isTargeted) {
+                  const forcedPrices = sanitized.items?.[0]?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
+                  sanitized.items = [{ name: targetedItemName as string, prices: forcedPrices }];
+                }
+
                 const payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } = {
                   ...sanitized,
                   tokens: {

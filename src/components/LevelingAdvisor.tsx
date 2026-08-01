@@ -60,7 +60,7 @@ interface LevelRow {
 export default function LevelingAdvisor() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { user } = useAuth();
-  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner } = useNavigation();
+  const { navigateToHdvItem, previousItemId, previousJob, previousJobLevel, clearPreviousNavigation, navigateToCraftsItem, pendingLevelingItemId, pendingLevelingJob, pendingLevelingJobLevel, pendingLevelingItemLevel, clearPendingLevelingNavigation, navigateToBreakingItem, pendingBreakingItemId, clearPendingBreakingNavigation, openScanner, openTargetedScanner } = useNavigation();
 
   const [activeJob, setActiveJob] = useState<string>('Forgeron');
   const [jobLevel, setJobLevel] = useState<number>(1);
@@ -414,10 +414,18 @@ export default function LevelingAdvisor() {
                   const isSelected = selectedItemId === row.item._id;
                   const isTop3 = index < 3;
                   return (
-                    <button
+                    <div
                       key={row.item._id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => selectItem(row.item._id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 relative overflow-hidden ${
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          selectItem(row.item._id);
+                        }
+                      }}
+                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 relative overflow-hidden cursor-pointer ${
                         isSelected || isTop3
                           ? 'border border-emerald-500/60 bg-emerald-900/10 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
                           : 'border border-slate-700/40 bg-slate-800/20 hover:bg-slate-800/40'
@@ -442,6 +450,14 @@ export default function LevelingAdvisor() {
                             <span className={`text-sm font-semibold truncate ${isSelected || isTop3 ? 'text-white' : 'text-slate-200'}`}>
                               {row.item.name}
                             </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: row.item.name, expectedId: row.item._id, type: row.item.type }); }}
+                              className="shrink-0 p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                              title={`Scan forcé des prix de ${row.item.name}`}
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                            </button>
                             {isTop3 && (
                               <span className="shrink-0 text-[9px] font-bold text-emerald-400 bg-emerald-900/40 border border-emerald-500/40 px-1.5 py-0.5 rounded-full">
                                 Recommandé
@@ -469,7 +485,7 @@ export default function LevelingAdvisor() {
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -486,10 +502,18 @@ export default function LevelingAdvisor() {
                   const isSelected = selectedItemId === row.item._id;
                   const missingResale = !row.missingIngredients && row.craftCost > 0 && !hasResalePrice(row.item._id);
                   return (
-                    <button
+                    <div
                       key={row.item._id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => selectItem(row.item._id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          selectItem(row.item._id);
+                        }
+                      }}
+                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
                         isSelected
                           ? 'bg-amber-900/20 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.1)]'
                           : 'border border-slate-700/40 bg-slate-800/20 hover:bg-slate-800/40'
@@ -504,6 +528,14 @@ export default function LevelingAdvisor() {
                             <span className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
                               {row.item.name}
                             </span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: row.item.name, expectedId: row.item._id, type: row.item.type }); }}
+                              className="shrink-0 p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                              title={`Scan forcé des prix de ${row.item.name}`}
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                            </button>
                             {missingResale ? (
                               <span className="shrink-0 text-[9px] font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                 Revente manquante
@@ -519,7 +551,7 @@ export default function LevelingAdvisor() {
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -599,6 +631,14 @@ export default function LevelingAdvisor() {
                       <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">
                         <button type="button" onClick={e => { e.stopPropagation(); navigateToHdvItem({ _id: selectedItem._id, name: selectedItem.name, type: selectedItem.type, level: selectedItem.level, imgUrl: selectedItem.imgUrl }, selectedItem._id, activeJob, jobLevel); }} className="hover:text-amber-400 transition-colors text-left truncate">{selectedItem.name}</button>
                         <CopyButton text={selectedItem.name} />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: selectedItem.name, expectedId: selectedItem._id, type: selectedItem.type }); }}
+                          className="shrink-0 p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                          title={`Scan forcé des prix de ${selectedItem.name}`}
+                        >
+                          <Camera className="h-3 w-3" />
+                        </button>
                       </div>
                       <div className="text-[10px] text-slate-500">Revente</div>
                     </div>
@@ -729,6 +769,14 @@ export default function LevelingAdvisor() {
                             <div className="text-sm font-semibold text-slate-200 truncate flex items-center gap-1.5">
                               <button type="button" onClick={() => navigateToHdvItem({ _id: ing.id, name: ing.name, type: ing.type, level: ing.level, imgUrl: ing.imgUrl }, selectedItemId ?? undefined, activeJob, jobLevel)} className="hover:text-amber-400 transition-colors text-left truncate">{ing.name}</button>
                               <CopyButton text={ing.name} />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openTargetedScanner({ expectedName: ing.name, expectedId: ing.id, type: ing.type }); }}
+                                className="shrink-0 p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                                title={`Scan forcé des prix de ${ing.name}`}
+                              >
+                                <Camera className="h-3 w-3" />
+                              </button>
                             </div>
                             <div className="text-[10px] text-slate-500">x{ing.quantity}</div>
                           </div>
