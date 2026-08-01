@@ -17,10 +17,17 @@ const QUEUE_THROTTLE_MS = 2000;
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
 
-// Exponential Backoff : le délai entre deux tentatives de la même image double
-// à chaque échec (attempt 1 → 3000ms, attempt 2 → 6000ms, ...) au lieu de
-// relancer immédiatement à 0ms et épuiser le quota du provider.
+// Backoff de base pour un 503 (Over Capacity) : délai fixe de 3s.
 const RETRY_BASE_DELAY_MS = 3000;
+
+// Backoff pour un 429 (Rate Limit) : Math.pow(2, retries) * 5000
+// (retry 1 → 10s, retry 2 → 20s) car la fenêtre de réinitialisation du
+// provider IA est généralement ~60s.
+const RATE_LIMIT_BASE_DELAY_MS = 5000;
+
+// Durée de pause automatique de la file après épuisement des retries (429) :
+// reprise automatique après 30s, ou immédiatement au clic.
+const QUOTA_PAUSE_MS = 30000;
 
 // Pause asynchrone bloquante : l'appelant DOIT faire `await sleep(ms)` pour
 // que la boucle d'envoi attende réellement la fin du délai avant de relancer.
@@ -131,6 +138,16 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   const processingRef = useRef(false);
   const cancelCurrentRef = useRef(false);
 
+  // File en PAUSE (quota IA 429 épuisé) : reprise auto après QUOTA_PAUSE_MS
+  // ou immédiatement au clic sur le bouton de reprise.
+  const [quotaPaused, setQuotaPaused] = useState(false);
+  const resumeRef = useRef<(() => void) | null>(null);
+
+  const resumeScan = useCallback(() => {
+    resumeRef.current?.();
+    resumeRef.current = null;
+  }, []);
+
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
@@ -189,6 +206,8 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     setScanMode('full');
     activeExpectedRef.current = [];
     targetedItemRef.current = null;
+    setQuotaPaused(false);
+    resumeRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -350,6 +369,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
         });
 
         if (response.status === 429 || response.status === 503) {
+          const isRateLimit = response.status === 429;
           let retryAfter: number | undefined;
           try {
             const errData = await response.json();
@@ -367,20 +387,46 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           showToast('error', 'Quota IA atteint. Pause de quelques secondes...');
 
           // Coupe-circuit anti-boucle infinie : après MAX_RETRIES échecs
-          // (429/503) consécutifs sur la MÊME image, on l'abandonne et on
-          // force le passage à la suivante (auto-skip) au lieu de re-spammer.
+          // (429/503) consécutifs sur la MÊME image, on NE SAUTE PAS les images
+          // suivantes en chaîne. On met la file en PAUSE (reprise auto dans
+          // QUOTA_PAUSE_MS ou au clic) puis on re-tente la MÊME image.
           if (retries >= MAX_RETRIES) {
             retries = 0;
-            console.error('Nombre maximum de tentatives atteint. Passage à l\'image suivante.');
-            setError('API indisponible, passage à l\'image suivante.');
-            await sleep(3000); // laisse le temps de lire le message
+            console.error('Nombre maximum de tentatives atteint. Mise en pause de la file.');
+            setIsLoading(false);
+            setQuotaPaused(true);
+            setPauseMessage('Scan en pause - Quota IA temporairement atteint. Reprise automatique dans 30s ou au clic.');
+
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(() => {
+                resumeRef.current = null;
+                resolve();
+              }, QUOTA_PAUSE_MS);
+              // Permet au clic de court-circuiter le timer.
+              resumeRef.current = () => {
+                clearTimeout(timer);
+                resolve();
+              };
+            });
+
+            setQuotaPaused(false);
+            setPauseMessage(null);
+            if (cancelCurrentRef.current) break;
+            // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
+            queueRef.current = [entry, ...queueRef.current];
+            setQueue([...queueRef.current]);
             continue;
           }
 
-          // EXPONENTIAL BACKOFF : le délai double à chaque tentative de la MÊME
-          // image (attempt 1 → 3000ms, attempt 2 → 6000ms). On ne réenvoie JAMAIS
-          // immédiatement : on attend réellement le délai avant de relancer.
-          const backoffDelay = RETRY_BASE_DELAY_MS * Math.pow(2, retries - 1);
+          // EXPONENTIAL BACKOFF adapté au type d'erreur :
+          // - 429 (Rate Limit) : la fenêtre de réinitialisation du provider est
+          //   ~60s → Math.pow(2, retries) * 5000 (retry 1 → 10s, retry 2 → 20s).
+          // - 503 (Over Capacity) : délai fixe de 3s.
+          // Si la route renvoie un champ `retryAfter` (JSON ou header), on
+          // l'utilise exactement via le setTimeout bloquant ci-dessous.
+          const backoffDelay = isRateLimit
+            ? Math.pow(2, retries) * RATE_LIMIT_BASE_DELAY_MS
+            : RETRY_BASE_DELAY_MS;
           const waitSeconds = Math.max(backoffDelay / 1000, retryAfter ?? 0);
           const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;
@@ -888,7 +934,16 @@ for (const file of Array.from(e.dataTransfer.files)) {
           {pauseMessage && (
             <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <Clock className="h-5 w-5 text-amber-400 shrink-0 animate-pulse" />
-              <p className="text-xs font-semibold text-amber-300">{pauseMessage}</p>
+              <p className="text-xs font-semibold text-amber-300 flex-1">{pauseMessage}</p>
+              {quotaPaused && (
+                <button
+                  type="button"
+                  onClick={resumeScan}
+                  className="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+                >
+                  Reprendre
+                </button>
+              )}
             </div>
           )}
 
