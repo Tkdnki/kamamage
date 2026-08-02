@@ -15,7 +15,9 @@ import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as 
 // déclencher le rate-limit RPM du provider.
 const QUEUE_THROTTLE_MS = 2000;
 
-// Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
+// Nombre max de réessais (503) pour la MÊME image avant de l'abandonner.
+// NB : le 429 (Rate Limit RPM/TPM) ne compte PAS dans ce quota : c'est une pause
+// globale de l'API (fenêtre glissante 60s de Groq), pas une erreur propre à l'image.
 const MAX_RETRIES = 3;
 
 // Nombre max de réessais après un timeout client (60s) sur la MÊME image
@@ -23,17 +25,18 @@ const MAX_RETRIES = 3;
 // de 60s sous charge : on re-tente au lieu de perdre l'image.
 const MAX_TIMEOUT_RETRIES = 3;
 
-// Backoff de base exponentiel pour l'erreur 429 (Rate Limit) :
-// Math.pow(2, retries - 1) * 3000 → retry 1 → 3s, retry 2 → 6s, retry 3 → 12s.
-const RETRY_BASE_DELAY_MS = 3000;
-
 // Backoff de base exponentiel pour l'erreur 503 (Over Capacity / Surcharge Groq) :
 // délai plus long pour laisser les serveurs Groq récupérer avant la nouvelle
 // tentative : Math.pow(2, retries - 1) * 5000 → retry 1 → 5s, retry 2 → 10s,
 // retry 3 → 20s.
 const GROQ_OVERLOAD_BASE_DELAY_MS = 5000;
 
-// Durée de pause automatique de la file après épuisement des retries (429) :
+// Durée de pause automatique de la file après un 429 (Rate Limit) : on attend
+// que la fenêtre glissante 60s (RPM/TPM) de Groq se réinitialise complètement
+// avant de re-tenter la MÊME image. Reprise automatique après 45s, ou au clic.
+const RPM_QUOTA_PAUSE_MS = 45000;
+
+// Durée de pause automatique de la file après épuisement des retries (503) :
 // reprise automatique après 30s, ou immédiatement au clic.
 const QUOTA_PAUSE_MS = 30000;
 
@@ -161,6 +164,26 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     }
     setPauseMessage(null);
     return true;
+  }, []);
+
+  // Met la file en PAUSE tant que le quota IA (429) n'est pas rétabli : reprise
+  // automatique après `ms`, ou immédiatement au clic sur le bouton "Reprendre".
+  // Retourne false si la file a été annulée (fermeture du modal) pendant la pause.
+  const waitForQuotaResume = useCallback(async (ms: number): Promise<boolean> => {
+    setQuotaPaused(true);
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(() => {
+        resumeRef.current = null;
+        resolve();
+      }, ms);
+      // Permet au clic de court-circuiter le timer.
+      resumeRef.current = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+    setQuotaPaused(false);
+    return !cancelCurrentRef.current;
   }, []);
 
   const updateDisplay = useCallback((entry: QueueEntry | null) => {
@@ -379,53 +402,56 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             const parsed = header ? parseFloat(header) : NaN;
             if (!Number.isNaN(parsed)) retryAfter = parsed;
           }
-          retries += 1;
           setIsLoading(false);
 
-          // Alerte discrète pour expliquer la pause à l'utilisateur.
-          showToast('error', 'Quota IA atteint. Pause de quelques secondes...');
-
-          // Coupe-circuit anti-boucle infinie : après MAX_RETRIES échecs
-          // (429/503) consécutifs sur la MÊME image, on NE SAUTE PAS les images
-          // suivantes en chaîne. On met la file en PAUSE (reprise auto dans
-          // QUOTA_PAUSE_MS ou au clic) puis on re-tente la MÊME image.
-          if (retries >= MAX_RETRIES) {
-            retries = 0;
-            console.error('Nombre maximum de tentatives atteint. Mise en pause de la file.');
-            setIsLoading(false);
-            setQuotaPaused(true);
-            setPauseMessage('Scan en pause - Quota IA temporairement atteint. Reprise automatique dans 30s ou au clic.');
-
-            await new Promise<void>(resolve => {
-              const timer = setTimeout(() => {
-                resumeRef.current = null;
-                resolve();
-              }, QUOTA_PAUSE_MS);
-              // Permet au clic de court-circuiter le timer.
-              resumeRef.current = () => {
-                clearTimeout(timer);
-                resolve();
-              };
-            });
-
-            setQuotaPaused(false);
+          // ── 429 (Rate Limit RPM/TPM) : PAUSE GLOBALE, hors retries de l'image ──
+          // Le 429 ne compte PAS dans le quota d'essais de l'image : il reflète une
+          // pause globale de l'API (fenêtre glissante 60s RPM/TPM de Groq), pas une
+          // erreur propre à l'image. On met donc la file en pause immédiatement
+          // (reprise auto après ~45s, ou au clic) pour laisser la fenêtre se
+          // réinitialiser complètement avant de re-tenter la MÊME image.
+          if (isRateLimit) {
+            console.warn('[scan] ⏳ 429 Rate Limit (RPM/TPM) — pause globale de la file (retries de l\'image préservés).');
+            showToast('error', 'Quota IA (RPM) atteint. Pause de 45s...');
+            const pauseMs = Math.max((retryAfter ?? 0) * 1000, RPM_QUOTA_PAUSE_MS);
+            setPauseMessage(`Scan en pause - Quota IA (RPM) atteint. Reprise automatique dans ${Math.round(pauseMs / 1000)}s ou au clic.`);
+            const resumed = await waitForQuotaResume(pauseMs);
             setPauseMessage(null);
-            if (cancelCurrentRef.current) break;
+            if (!resumed) break;
             // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
             queueRef.current = [entry, ...queueRef.current];
             setQueue([...queueRef.current]);
             continue;
           }
 
-          // EXPONENTIAL BACKOFF spécifique au type d'erreur :
-          // - 429 (Rate Limit) : Math.pow(2, retries - 1) * 3000 → 3s, 6s, 12s.
-          // - 503 (Over Capacity / Surcharge Groq) : Math.pow(2, retries - 1) * 5000
-          //   → 5s, 10s, 20s : pause plus longue pour laisser Groq récupérer.
+          // ── 503 (Over Capacity / Surcharge Groq) : réessai propre à l'image ──
+          retries += 1;
+
+          // Alerte discrète pour expliquer la pause à l'utilisateur.
+          showToast('error', 'Surcharge IA (503). Pause de quelques secondes...');
+
+          // Coupe-circuit anti-boucle infinie : après MAX_RETRIES échecs (503)
+          // consécutifs sur la MÊME image, on NE SAUTE PAS les images suivantes
+          // en chaîne. On met la file en PAUSE (reprise auto dans QUOTA_PAUSE_MS
+          // ou au clic) puis on re-tente la MÊME image.
+          if (retries >= MAX_RETRIES) {
+            retries = 0;
+            console.error('Nombre maximum de tentatives atteint. Mise en pause de la file.');
+            setPauseMessage('Scan en pause - Surcharge IA (503). Reprise automatique dans 30s ou au clic.');
+            const resumed = await waitForQuotaResume(QUOTA_PAUSE_MS);
+            setPauseMessage(null);
+            if (!resumed) break;
+            // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
+            queueRef.current = [entry, ...queueRef.current];
+            setQueue([...queueRef.current]);
+            continue;
+          }
+
+          // EXPONENTIAL BACKOFF pour 503 : Math.pow(2, retries - 1) * 5000 → 5s,
+          // 10s, 20s : pause plus longue pour laisser les serveurs Groq récupérer.
           // Si la route renvoie un champ `retryAfter` (JSON ou header), on l'utilise
           // exactement via le setTimeout bloquant ci-dessous.
-          const backoffDelay = isRateLimit
-            ? Math.pow(2, retries - 1) * RETRY_BASE_DELAY_MS
-            : Math.pow(2, retries - 1) * GROQ_OVERLOAD_BASE_DELAY_MS;
+          const backoffDelay = Math.pow(2, retries - 1) * GROQ_OVERLOAD_BASE_DELAY_MS;
           const waitSeconds = Math.max(backoffDelay / 1000, retryAfter ?? 0);
           const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;
