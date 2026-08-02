@@ -220,6 +220,13 @@ export interface BreakingResult {
   netProfitFocus: number;
   roiStd: number;
   roiFocus: number;
+  /**
+   * Coefficient de brisage minimum (en %) pour rentabiliser l'opération
+   * (netProfit ≥ 0) avec le coût d'achat utilisé (`craftCost`). `null` si
+   * incalculable (aucune valeur de rune ou prix manquant).
+   */
+  breakEvenCoefStd: number | null;
+  breakEvenCoefFocus: number | null;
 }
 
 export interface ExoEntry {
@@ -384,6 +391,9 @@ export function calculateBreaking(
   const totalPdbStd = lineData.reduce((s, d) => s + d.pdbStd, 0);
 
   const lines: BreakingLineResult[] = [];
+  // Valeur des runes générées à coef 100 % (utilisée pour le coef de rentabilité minimum).
+  let runeValueAt100Std = 0;
+  let runeValueAt100Focus = 0;
   for (const d of lineData) {
     const isFocused = focusEffectIndex !== null && d.effectIndex === focusEffectIndex;
 
@@ -401,6 +411,9 @@ export function calculateBreaking(
 
     const quantityStd = calculateBreakingQuantity(d.pdbStd, d.rune.weight, coefficient);
     const quantityFocus = calculateBreakingQuantity(pdbFocus, d.rune.weight, coefficient);
+
+    runeValueAt100Std += (d.pdbStd / Math.max(d.rune.weight, 1)) * d.price;
+    runeValueAt100Focus += (pdbFocus / Math.max(d.rune.weight, 1)) * d.price;
 
     lines.push({
       effectIndex: d.effectIndex,
@@ -441,6 +454,17 @@ export function calculateBreaking(
   const roiStd = craftCost > 0 ? (netProfitStd / craftCost) * 100 : 0;
   const roiFocus = craftCost > 0 ? (netProfitFocus / craftCost) * 100 : 0;
 
+  // Coef minimum pour rentabiliser (netProfit ≥ 0) :
+  //   runeValueAt100 × (coef/100) + exoValue ≥ craftCost
+  //   → coef = (craftCost − exoValue) × 100 / runeValueAt100
+  const exoValue = exoLines.reduce((s, l) => s + l.valueStd, 0);
+  const breakEvenCoefStd = runeValueAt100Std > 0 && craftCost > 0
+    ? Math.max(1, Math.round(((craftCost - exoValue) * 100) / runeValueAt100Std))
+    : null;
+  const breakEvenCoefFocus = runeValueAt100Focus > 0 && craftCost > 0
+    ? Math.max(1, Math.round(((craftCost - exoValue) * 100) / runeValueAt100Focus))
+    : null;
+
   const missingItemPrice = !(craftCost > 0);
   const hasMissingPrices = missingItemPrice || missingRuneCodes.length > 0;
 
@@ -454,5 +478,6 @@ export function calculateBreaking(
     missingRuneCodes: [...new Set(missingRuneCodes)],
     netProfitStd, netProfitFocus,
     roiStd, roiFocus,
+    breakEvenCoefStd, breakEvenCoefFocus,
   };
 }
