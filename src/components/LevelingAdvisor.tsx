@@ -772,7 +772,7 @@ export default function LevelingAdvisor() {
                       x10={hdvPrices[selectedItem._id]?.x10 ?? 0}
                       x100={hdvPrices[selectedItem._id]?.x100 ?? 0}
                       x1000={hdvPrices[selectedItem._id]?.x1000 ?? 0}
-                      onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d)}
+                      onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d, { explicit: true })}
                       disabled={!user}
                     />
                   </div>
@@ -909,7 +909,7 @@ export default function LevelingAdvisor() {
                             x10={currentX10}
                             x100={currentX100}
                             x1000={currentX1000}
-                            onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d)}
+                            onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d, { explicit: true })}
                             disabled={!user}
                           />
                         </div>

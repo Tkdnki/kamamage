@@ -7,6 +7,8 @@ import { useServer } from './ServerContext';
 import { useAuth } from './AuthContext';
 import { pushHdvPricesToServer, fetchHdvPricesFromServer, pushMonthlySalesVolumeToServer, fetchMonthlySalesVolumeFromServer } from '../lib/sync';
 
+export type PriceLot = 'x1' | 'x10' | 'x100' | 'x1000';
+
 export interface PriceData {
   x1: number;
   x10: number;
@@ -17,6 +19,28 @@ export interface PriceData {
   authorId?: string | null;
   monthlySalesVolume?: number;
   updatedAt?: string | null;
+  /**
+   * Lots explicitement mis à 0 par l'utilisateur (enregistrement manuel).
+   * La fusion distante (poll/scan) ne doit JAMAIS ré-écraser ces lots par
+   * l'ancienne valeur du serveur (qui ne stocke que les lots > 0). Un lot
+   * présent ici vaut "décision explicite de 0", pas "donnée manquante".
+   */
+  manualZeroLots?: Partial<Record<PriceLot, boolean>>;
+  /** Horodatage (ISO) de la dernière écriture connue PAR LOT. Permet à la
+   *  fusion de comparer la fraîcheur lot par lot et d'accepter un 0 explicite
+   *  distant sans que les anciennes valeurs du serveur ne ressuscitent un prix
+   *  que l'utilisateur a volontairement effacé. */
+  lotUpdatedAt?: Partial<Record<PriceLot, string>>;
+}
+
+export interface SetHdvPriceOptions {
+  /**
+   * true = enregistrement EXPLICITE de l'utilisateur : les lots à 0 sont une
+   * décision volontaire (effacement manuel) et seront protégés de la fusion
+   * distante. false/absent = écriture par défaut (scan) : un 0 reste une
+   * "donnée inconnue" que la fusion peut combler.
+   */
+  explicit?: boolean;
 }
 
 export interface HdvPrices {
@@ -30,7 +54,7 @@ interface DofusContextType {
   /** Vrai pendant qu'un scan HDV est en cours (file non vide ou traitement actif). */
   isScanning: boolean;
   setIsScanning: (scanning: boolean) => void;
-  setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number) => void;
+  setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number, options?: SetHdvPriceOptions) => void;
   setMonthlySalesVolume: (itemId: string, volume: number) => void;
   trackItem: (item: DofusItem) => void;
   untrackItem: (itemId: string) => void;
@@ -59,10 +83,13 @@ const PRICE_POLL_INTERVAL_MS = 30000;
 /**
  * Fusionne une valeur distante dans un objet de prix (muté en place).
  * - L'utilisateur n'a pas l'item en local → on prend la valeur distante.
- * - La valeur distante est strictement plus récente (updatedAt) → elle prime sur les lots
- *   qu'elle connaît, MAIS un lot distant à 0/absent (pas de ligne en base) ne peut JAMAIS
- *   écraser une valeur locale connue : la base ne stocke que les lots > 0, donc un 0
- *   distant signifie "lot inconnu", pas "prix volontairement à 0".
+ * - La fraîcheur est comparée LOT PAR LOT (lotUpdatedAt) quand disponible : cela
+ *   distingue un prix explicitement mis à 0 (ligne en base à 0, marquée
+ *   manualZeroLots) d'un lot simplement absent (0 non marqué).
+ * - Une ligne distante plus récente pour un lot (prix > 0 OU 0 explicite) prime.
+ * - Un zéro EXPLICITE local reste protégé tant que le distant n'apporte pas de
+ *   ligne plus fraîche pour CE lot (les anciennes valeurs du serveur ne
+ *   ressuscitent pas un prix volontairement effacé).
  * - Sinon on conserve les lots locaux et on comble les trous avec le distant.
  * @returns true si l'objet a été modifié.
  */
@@ -76,19 +103,67 @@ function applyRemotePrice(merged: HdvPrices, key: string, val: PriceData): boole
   const remoteIsNewer =
     !!val.updatedAt && (local.updatedAt ? new Date(val.updatedAt) > new Date(local.updatedAt) : true);
 
-  // Fusion lot par lot (non destructif) : la donnée la plus pertinente gagne, mais un lot
-  // distant absent (0) ne supprime jamais un prix local déjà renseigné.
-  const pickLot = (loc: number, rem: number): number => {
-    if (remoteIsNewer) return rem > 0 ? rem : loc;
-    return loc > 0 ? loc : rem;
+  // Horodatage (ms) d'un lot : privilégie le timestamp par lot, sinon celui de l'entrée.
+  const lotTs = (p: PriceData, lot: PriceLot): number => {
+    const t = p.lotUpdatedAt?.[lot];
+    if (t) { const n = new Date(t).getTime(); if (!Number.isNaN(n)) return n; }
+    if (p.updatedAt) { const n = new Date(p.updatedAt).getTime(); if (!Number.isNaN(n)) return n; }
+    return 0;
   };
+  const iso = (ts: number): string | undefined => (ts > 0 ? new Date(ts).toISOString() : undefined);
+
+  // Fusion lot par lot : renvoie la valeur gagnante, si c'est un zéro explicite
+  // (décision utilisateur) et l'horodatage de la source gagnante.
+  const decideLot = (loc: number, rem: number, lot: PriceLot): { value: number; explicitZero: boolean; ts: number } => {
+    const locT = lotTs(local, lot);
+    const remT = lotTs(val, lot);
+    const remoteLotIsNewer = remT > locT;
+    const localExplicitZero = !!local.manualZeroLots?.[lot];
+    const remoteExplicitZero = !!val.manualZeroLots?.[lot];
+
+    let value: number;
+    let ts: number;
+    let source: 'local' | 'remote';
+
+    if (remoteLotIsNewer && (remoteExplicitZero || rem > 0)) {
+      // 1) Le distant possède une ligne plus fraîche pour CE lot (prix connu OU
+      //    0 explicite distant) → sa décision prime, 0 inclus.
+      value = rem; ts = remT > 0 ? remT : locT; source = 'remote';
+    } else if (localExplicitZero) {
+      // 2) Zéro explicite local : protégé contre les anciennes valeurs distantes.
+      value = 0; ts = locT; source = 'local';
+    } else if (remoteIsNewer) {
+      // 3) Fusion par défaut : un lot distant absent (0 non marqué) ne supprime
+      //    jamais un prix local connu.
+      if (rem > 0) { value = rem; ts = remT > 0 ? remT : locT; source = 'remote'; }
+      else { value = loc; ts = locT; source = 'local'; }
+    } else if (loc > 0) {
+      value = loc; ts = locT; source = 'local';
+    } else {
+      value = rem; ts = remT > 0 ? remT : locT; source = 'remote';
+    }
+
+    const explicitZero = value === 0 && (localExplicitZero || (remoteExplicitZero && source === 'remote'));
+    return { value, explicitZero, ts };
+  };
+
+  const d1 = decideLot(local.x1, val.x1, 'x1');
+  const d10 = decideLot(local.x10, val.x10, 'x10');
+  const d100 = decideLot(local.x100, val.x100, 'x100');
+  const d1000 = decideLot(local.x1000, val.x1000, 'x1000');
+
+  const manualZeroLots: Partial<Record<PriceLot, boolean>> = {};
+  if (d1.explicitZero) manualZeroLots.x1 = true;
+  if (d10.explicitZero) manualZeroLots.x10 = true;
+  if (d100.explicitZero) manualZeroLots.x100 = true;
+  if (d1000.explicitZero) manualZeroLots.x1000 = true;
 
   const before = JSON.stringify(merged[key]);
   const mergedEntry: PriceData = {
-    x1: pickLot(local.x1, val.x1),
-    x10: pickLot(local.x10, val.x10),
-    x100: pickLot(local.x100, val.x100),
-    x1000: pickLot(local.x1000, val.x1000),
+    x1: d1.value,
+    x10: d10.value,
+    x100: d100.value,
+    x1000: d1000.value,
     unitAverage: 0,
     author: remoteIsNewer ? (val.author ?? local.author ?? null) : (local.author ?? val.author ?? null),
     authorId: remoteIsNewer ? (val.authorId ?? local.authorId ?? null) : (local.authorId ?? val.authorId ?? null),
@@ -96,6 +171,15 @@ function applyRemotePrice(merged: HdvPrices, key: string, val: PriceData): boole
       ? (val.updatedAt ?? local.updatedAt ?? null)
       : (local.updatedAt ?? val.updatedAt ?? null),
     monthlySalesVolume: local.monthlySalesVolume ?? val.monthlySalesVolume,
+    // Préserve les décisions utilisateur (lots explicitement mis à 0) et la
+    // fraîcheur par lot à travers les fusions.
+    manualZeroLots: Object.keys(manualZeroLots).length > 0 ? manualZeroLots : undefined,
+    lotUpdatedAt: {
+      x1: iso(d1.ts) ?? local.lotUpdatedAt?.x1 ?? val.lotUpdatedAt?.x1,
+      x10: iso(d10.ts) ?? local.lotUpdatedAt?.x10 ?? val.lotUpdatedAt?.x10,
+      x100: iso(d100.ts) ?? local.lotUpdatedAt?.x100 ?? val.lotUpdatedAt?.x100,
+      x1000: iso(d1000.ts) ?? local.lotUpdatedAt?.x1000 ?? val.lotUpdatedAt?.x1000,
+    },
   };
   // Recalcule le prix moyen unitaire à partir des lots fusionnés pour rester cohérent.
   let sum = 0;
@@ -286,7 +370,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedServer, markSynced]);
 
-  const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number) => {
+  const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number, options?: SetHdvPriceOptions) => {
     if (!user) return;
     let sum = 0;
     let count = 0;
@@ -295,7 +379,29 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     if (x100 > 0) { sum += x100 / 100; count++; }
     if (x1000 > 0) { sum += x1000 / 1000; count++; }
     const unitAverage = count > 0 ? Math.round((sum / count) * 100) / 100 : 0;
-    const entry: PriceData = { x1, x10, x100, x1000, unitAverage, updatedAt: new Date().toISOString() };
+    const nowIso = new Date().toISOString();
+    const entry: PriceData = {
+      x1, x10, x100, x1000,
+      unitAverage,
+      updatedAt: nowIso,
+      // L'enregistrement est une photographie complète des 4 lots : on marque la
+      // fraîcheur par lot pour que la fusion distante ne ré-écrase pas cette
+      // décision par d'anciennes lignes du serveur.
+      lotUpdatedAt: { x1: nowIso, x10: nowIso, x100: nowIso, x1000: nowIso },
+    };
+
+    // Enregistrement EXPLICITE de l'utilisateur : les lots à 0 sont une décision
+    // volontaire. On les marque pour que la fusion distante (applyRemotePrice)
+    // ne les ré-écrase pas par l'ancienne valeur du serveur. Un lot re-saisi à
+    // une valeur > 0 est simplement absent de ce marquage (donc non protégé).
+    if (options?.explicit) {
+      const manualZeroLots: Partial<Record<PriceLot, boolean>> = {};
+      if (x1 <= 0) manualZeroLots.x1 = true;
+      if (x10 <= 0) manualZeroLots.x10 = true;
+      if (x100 <= 0) manualZeroLots.x100 = true;
+      if (x1000 <= 0) manualZeroLots.x1000 = true;
+      if (Object.keys(manualZeroLots).length > 0) entry.manualZeroLots = manualZeroLots;
+    }
 
     // Item modifié → à re-synchroniser (retiré de l'ensemble "synced")
     syncedKeysRef.current.delete(itemId);

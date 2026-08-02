@@ -416,7 +416,7 @@ export default function CraftProfitability() {
                         x10={hdvPrices[item._id]?.x10}
                         x100={hdvPrices[item._id]?.x100}
                         x1000={hdvPrices[item._id]?.x1000}
-                        onSetPrices={(a, b, c, d) => setHdvPrice(item._id, a, b, c, d)}
+                        onSetPrices={(a, b, c, d) => setHdvPrice(item._id, a, b, c, d, { explicit: true })}
                         disabled={!user}
                       />
                     </div>
@@ -618,7 +618,7 @@ export default function CraftProfitability() {
                           x10={hdvPrices[ing.id]?.x10}
                           x100={hdvPrices[ing.id]?.x100}
                           x1000={hdvPrices[ing.id]?.x1000}
-                          onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d)}
+                          onSetPrices={(a, b, c, d) => setHdvPrice(ing.id, a, b, c, d, { explicit: true })}
                           disabled={!user}
                         />
                         {(hdvPrices[ing.id]?.author || hdvPrices[ing.id]?.updatedAt) && (
@@ -658,7 +658,7 @@ export default function CraftProfitability() {
                         x10={hdvPrices[selectedItem._id]?.x10}
                         x100={hdvPrices[selectedItem._id]?.x100}
                         x1000={hdvPrices[selectedItem._id]?.x1000}
-                        onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d)}
+                        onSetPrices={(a, b, c, d) => setHdvPrice(selectedItem._id, a, b, c, d, { explicit: true })}
                         disabled={!user}
                       />
                     </div>

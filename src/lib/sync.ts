@@ -81,16 +81,20 @@ export async function pushHdvPricesToServer(server: string, data: Record<string,
   const payloads: ConsolidatedPricePayload[] = [];
 
   for (const [itemId, pd] of Object.entries(data)) {
-    // Règle n°2 : Ne filtrer et n'envoyer QUE les lots ayant un prix strictement supérieur à 0.
-    // Pour un équipement (seul x1 > 0), les lots x10, x100, x1000 valant 0 NE SERONT PAS envoyés.
-    if (pd.x1 && pd.x1 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1', price: pd.x1 });
-    if (pd.x10 && pd.x10 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x10', price: pd.x10 });
-    if (pd.x100 && pd.x100 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x100', price: pd.x100 });
-    if (pd.x1000 && pd.x1000 > 0) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1000', price: pd.x1000 });
+    // On n'envoie qu'un lot s'il a un prix strictement supérieur à 0 OU s'il a
+    // été explicitement mis à 0 par l'utilisateur (manualZeroLots) : un 0 explicite
+    // est une décision volontaire (effacement manuel) à persister en base, alors
+    // qu'un 0 non marqué (scan incomplet) signifie "lot inconnu" et ne doit pas
+    // écraser la donnée existante.
+    const explicitZeros = pd.manualZeroLots ?? {};
+    if ((pd.x1 > 0) || explicitZeros.x1) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1', price: pd.x1 });
+    if ((pd.x10 > 0) || explicitZeros.x10) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x10', price: pd.x10 });
+    if ((pd.x100 > 0) || explicitZeros.x100) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x100', price: pd.x100 });
+    if ((pd.x1000 > 0) || explicitZeros.x1000) payloads.push({ server_name: server, category: 'hdv', item_key: itemId, lot: 'x1000', price: pd.x1000 });
   }
 
   if (payloads.length === 0) {
-    console.log(`[Sync] ℹ️ Aucun lot > 0 à synchroniser (${Object.keys(data).length} item(s) traités).`);
+    console.log(`[Sync] ℹ️ Aucun lot à synchroniser (${Object.keys(data).length} item(s) traités).`);
     return;
   }
 
@@ -114,13 +118,26 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {
     const id = row.item_key;
-    if (!prices[id]) prices[id] = { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0, author: null, authorId: null, updatedAt: null };
-    if (row.lot === 'x1') prices[id].x1 = row.price;
-    else if (row.lot === 'x10') prices[id].x10 = row.price;
-    else if (row.lot === 'x100') prices[id].x100 = row.price;
-    else if (row.lot === 'x1000') prices[id].x1000 = row.price;
+    if (!prices[id]) prices[id] = {
+      x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0,
+      author: null, authorId: null, updatedAt: null,
+      manualZeroLots: {}, lotUpdatedAt: {},
+    };
+    const lot = row.lot;
+    // Un lot dont la ligne existe en base avec price = 0 est une décision
+    // EXPLICITE de l'utilisateur (effacement manuel) : on le marque pour que la
+    // fusion distante l'accepte au lieu de le traiter comme "lot inconnu".
+    if (lot === 'x1') { prices[id].x1 = row.price; if (row.price === 0) prices[id].manualZeroLots!.x1 = true; }
+    else if (lot === 'x10') { prices[id].x10 = row.price; if (row.price === 0) prices[id].manualZeroLots!.x10 = true; }
+    else if (lot === 'x100') { prices[id].x100 = row.price; if (row.price === 0) prices[id].manualZeroLots!.x100 = true; }
+    else if (lot === 'x1000') { prices[id].x1000 = row.price; if (row.price === 0) prices[id].manualZeroLots!.x1000 = true; }
     if ((row as any).profiles?.pseudo) prices[id].author = (row as any).profiles.pseudo;
     if (row.author_id) prices[id].authorId = row.author_id;
+    // Horodatage par lot (1 ligne par lot par item en base) : sert de comparatif
+    // de fraîcheur dans la fusion (applyRemotePrice).
+    if (lot === 'x1' || lot === 'x10' || lot === 'x100' || lot === 'x1000') {
+      if (row.updated_at) prices[id].lotUpdatedAt![lot as 'x1' | 'x10' | 'x100' | 'x1000'] = row.updated_at;
+    }
     // updatedAt = timestamp le PLUS RÉCENT parmi les lignes du lot (une ligne obsolète ne
     // doit jamais rétrograder la fraîcheur de l'entrée).
     if (row.updated_at) {

@@ -636,7 +636,7 @@ export default function BreakingSimulator() {
                         x10={hdvPrices[selectedItem._id]?.x10 ?? 0}
                         x100={hdvPrices[selectedItem._id]?.x100 ?? 0}
                         x1000={hdvPrices[selectedItem._id]?.x1000 ?? 0}
-                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(selectedItem._id, x1, x10, x100, x1000)}
+                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(selectedItem._id, x1, x10, x100, x1000, { explicit: true })}
                         disabled={!user}
                       />
                     </div>
@@ -720,7 +720,7 @@ export default function BreakingSimulator() {
                         value={breaking.craftCost}
                         onChange={e => {
                           const v = parseInt(e.target.value);
-                          if (!isNaN(v) && v >= 0) setHdvPrice(selectedItem._id, v, 0, 0, 0);
+                          if (!isNaN(v) && v >= 0) setHdvPrice(selectedItem._id, v, 0, 0, 0, { explicit: true });
                         }}
                         className={`w-full bg-transparent text-center text-lg font-extrabold focus:outline-none focus:text-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                           breaking.missingItemPrice ? 'text-rose-400 border border-red-500/50 rounded py-0.5' : 'text-slate-300'
@@ -906,7 +906,7 @@ export default function BreakingSimulator() {
                                         x10={hdvPrices[getRunePriceKey(l.rune)]?.x10 ?? 0}
                                         x100={hdvPrices[getRunePriceKey(l.rune)]?.x100 ?? 0}
                                         x1000={hdvPrices[getRunePriceKey(l.rune)]?.x1000 ?? 0}
-                                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(getRunePriceKey(l.rune), x1, x10, x100, x1000)}
+                                        onSetPrices={(x1, x10, x100, x1000) => setHdvPrice(getRunePriceKey(l.rune), x1, x10, x100, x1000, { explicit: true })}
                                         disabled={!user}
                                         warnEmpty
                                       />

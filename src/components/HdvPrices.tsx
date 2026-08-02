@@ -243,6 +243,7 @@ export default function HdvPrices() {
       parse(priceDraft.x10),
       parse(priceDraft.x100),
       parse(priceDraft.x1000),
+      { explicit: true },
     );
   };
 
@@ -684,7 +685,7 @@ export default function HdvPrices() {
                               onChange={(e) => {
                                 const val = parseInt(e.target.value, 10);
                                 if (!isNaN(val) && val >= 0) {
-                                  setHdvPrice(item._id, val, 0, 0, 0);
+                                  setHdvPrice(item._id, val, 0, 0, 0, { explicit: true });
                                 }
                               }}
                               className="w-20 bg-[#070a12] border border-white/10 rounded py-1 px-2 text-xs text-white text-right focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
