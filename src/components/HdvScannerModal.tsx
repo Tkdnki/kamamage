@@ -142,6 +142,12 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // ou immédiatement au clic sur le bouton de reprise.
   const [quotaPaused, setQuotaPaused] = useState(false);
   const resumeRef = useRef<(() => void) | null>(null);
+  // Verrou SYNCHRONE de pause quota : contrairement à l'état React `quotaPaused`
+  // (associé à un rendu différé), un ref est lisible immédiatement par la boucle
+  // d'envoi et par `addToQueue`, même à l'intérieur d'une closure de boucle.
+  // C'est ce verrou qui garantit qu'aucune image n'est envoyée pendant la fenêtre
+  // de réinitialisation RPM/TPM.
+  const quotaPausedRef = useRef(false);
 
   const resumeScan = useCallback(() => {
     resumeRef.current?.();
@@ -170,7 +176,14 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // automatique après `ms`, ou immédiatement au clic sur le bouton "Reprendre".
   // Retourne false si la file a été annulée (fermeture du modal) pendant la pause.
   const waitForQuotaResume = useCallback(async (ms: number): Promise<boolean> => {
+    // Le verrou est posé SYNCHRONEMENT, avant toute promesse : même si le rendu
+    // React est différé, la boucle d'envoi et `addToQueue` voient immédiatement
+    // la pause active via `quotaPausedRef`.
     setQuotaPaused(true);
+    quotaPausedRef.current = true;
+    // Purge d'un éventuel résolveur résiduel d'une pause précédente pour éviter
+    // qu'un clic "Reprendre" ne débloque par erreur un timer déjà expiré.
+    resumeRef.current = null;
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => {
         resumeRef.current = null;
@@ -183,6 +196,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
       };
     });
     setQuotaPaused(false);
+    quotaPausedRef.current = false;
     return !cancelCurrentRef.current;
   }, []);
 
@@ -227,6 +241,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     activeExpectedRef.current = [];
     targetedItemRef.current = null;
     setQuotaPaused(false);
+    quotaPausedRef.current = false;
     resumeRef.current = null;
   }, []);
 
@@ -333,7 +348,12 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
 
       setError(null);
 
-      if (!processingRef.current) {
+      // Verrou : jamais de nouvelle boucle de traitement tant qu'une pause quota
+      // (429) est active OU qu'une boucle est déjà en cours. Les images ajoutées
+      // pendant la pause restent en file et seront traitées par la boucle existante
+      // à sa reprise. Aucun trigger de rendu/état ne peut donc relancer un envoi
+      // tant que `quotaPausedRef` est levé.
+      if (!processingRef.current && !quotaPausedRef.current) {
         processingRef.current = true;
         cancelCurrentRef.current = false;
         setIsProcessing(true);
@@ -350,6 +370,14 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     // Compteur de timeouts (AbortError 60s) de l'image COURANTE : même logique.
     let timeoutRetries = 0;
     while (queueRef.current.length > 0 && !cancelCurrentRef.current) {
+      // Filet de sécurité STRICT : si une pause quota (429) est active (verrou
+      // synchrone), on interrompt immédiatement l'itération courante. Aucune
+      // image ne peut donc être envoyée tant que la fenêtre RPM/TPM n'est pas
+      // réinitialisée, même si un trigger externe relançait la boucle.
+      if (quotaPausedRef.current) {
+        console.warn('[scan] 🚦 Pause quota (429) active — itération interrompue, aucune image envoyée.');
+        break;
+      }
       const entry = queueRef.current[0];
       queueRef.current = queueRef.current.slice(1);
       setQueue([...queueRef.current]);
