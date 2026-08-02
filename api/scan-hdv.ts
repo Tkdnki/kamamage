@@ -25,11 +25,19 @@ Règles impératives :
 2. N'ajoute AUCUN texte avant ou après l'objet JSON : pas d'explication, pas de salutation, pas de commentaire.
 3. N'utilise PAS de balises markdown (pas de \`\`\`json ni de \`\`\`).
 4. N'invente JAMAIS de nom ni de prix : toute valeur non visible dans l'image doit être 0.
-5. Recopie les noms d'items exactement comme ils apparaissent (orthographe et accents).`;
+5. Recopie les noms d'items exactement comme ils apparaissent (orthographe et accents).
+6. INTERDICTION de dupliquer une même valeur entre "price_x1" et "price_x10" : chaque lot a SON prix propre. Si tu n'es pas certain d'un lot, mets 0 plutôt que de recopier un autre lot.
+7. Si la case du lot "1" (price_x1) est vide ou non visible, force "price_x1" à 0 : NE DÉCALE JAMAIS le prix du lot "10" (price_x10) vers "price_x1".
+8. Format JSON STRICT obligatoire : chaque item DOIT contenir exactement les clés "price_x1", "price_x10", "price_x100", "price_x1000" avec des nombres entiers (jamais de texte, jamais de virgules ni d'espaces dans les chiffres).`;
 
 interface AiItem {
   name?: string;
   prices?: { x1?: number | string; x10?: number | string; x100?: number | string; x1000?: number | string } | null;
+  // Format STRICT imposé au modèle (prompt v2) : chaque lot à son niveau propre.
+  price_x1?: number | string;
+  price_x10?: number | string;
+  price_x100?: number | string;
+  price_x1000?: number | string;
 }
 interface AiResponse {
   items?: AiItem[] | null;
@@ -41,23 +49,64 @@ const normalizeItemName = (name: string): string => {
     .trim();
 };
 
+// Convertit toute valeur en entier positif (0 si indéfinie, non numérique ou
+// négative). Nettoie les espaces/points/virgules de séparation des milliers.
 function cleanPrice(val: unknown): number {
-  if (typeof val === 'string') return parseInt(val.replace(/\s+/g, ''), 10) || 0;
-  return typeof val === 'number' ? val : 0;
+  if (typeof val === 'number') return Number.isFinite(val) ? Math.max(0, Math.floor(val)) : 0;
+  if (typeof val === 'string') {
+    const digits = val.replace(/\D+/g, '');
+    return digits ? parseInt(digits, 10) : 0;
+  }
+  return 0;
+}
+
+// POST-TRAITEMENT de sécurité : corrige les erreurs OCR classiques sur les prix
+// Dofus (décalage de colonne / doublon x1-x10) AVANT d'envoyer la donnée au client.
+// Règles :
+// 1. Si x1 === x10 (> 0) → x1 = 0 : la valeur de x1 est en réalité celle du lot x10.
+// 2. Si x1 > x10 (et x10 > 0) → décalage d'une colonne : x100 = x10, x10 = x1, x1 = 0.
+// 3. Toute valeur indéfinie ou non numérique → 0.
+function applyPriceFixRules(raw: {
+  x1?: unknown; x10?: unknown; x100?: unknown; x1000?: unknown;
+}): { x1: number; x10: number; x100: number; x1000: number } {
+  let x1 = cleanPrice(raw.x1);
+  let x10 = cleanPrice(raw.x10);
+  let x100 = cleanPrice(raw.x100);
+  let x1000 = cleanPrice(raw.x1000);
+
+  // Doublon x1 === x10 : x1 porte la valeur du lot x10 → on le neutralise.
+  if (x1 > 0 && x1 === x10) {
+    x1 = 0;
+  }
+  // Décalage x1 > x10 : la grille OCR est décalée d'une colonne (x1 contient en
+  // réalité le prix du lot x10, x10 celui du lot x100). On décale tout vers le bas.
+  else if (x10 > 0 && x1 > x10) {
+    x1000 = x100;
+    x100 = x10;
+    x10 = x1;
+    x1 = 0;
+  }
+
+  return { x1, x10, x100, x1000 };
 }
 
 function sanitizeResponse(data: AiResponse): AiResponse {
   if (!data?.items || !Array.isArray(data.items)) return data;
   return {
-    items: data.items.map(item => ({
-      name: normalizeItemName(typeof item.name === 'string' ? item.name : ''),
-      prices: {
-        x1: cleanPrice(item.prices?.x1),
-        x10: cleanPrice(item.prices?.x10),
-        x100: cleanPrice(item.prices?.x100),
-        x1000: cleanPrice(item.prices?.x1000),
-      }
-    }))
+    items: data.items.map(item => {
+      // L'IA renvoie désormais les clés strictes "price_xN" (prompt v2) ;
+      // on accepte en repli l'ancien format "prices.xN".
+      const prices = applyPriceFixRules({
+        x1: item.price_x1 ?? item.prices?.x1,
+        x10: item.price_x10 ?? item.prices?.x10,
+        x100: item.price_x100 ?? item.prices?.x100,
+        x1000: item.price_x1000 ?? item.prices?.x1000,
+      });
+      return {
+        name: normalizeItemName(typeof item.name === 'string' ? item.name : ''),
+        prices,
+      };
+    })
   };
 }
 
@@ -208,15 +257,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 Pour chaque item :
 1. Le nom exact de l'item tel qu'il est écrit textuellement. NE MODIFIE PAS l'orthographe, recopie exactement les caractères visibles.
 2. Les prix selon le type d'affichage de l'item :
-   - Si l'item montre plusieurs lignes successives de lot "1" (cas typique des équipements et armes), prends **uniquement le prix le plus bas** (le tout premier en haut de la liste pour un lot de 1) et assigne-le à "x1". Mets "0" pour "x10", "x100" et "x1000".
+   - Si l'item montre plusieurs lignes successives de lot "1" (cas typique des équipements et armes), prends **uniquement le prix le plus bas** (le tout premier en haut de la liste pour un lot de 1) et assigne-le à "price_x1". Mets "0" pour "price_x10", "price_x100" et "price_x1000".
    - Si c'est une ressource classique avec des lots de tailles différentes (1, 10, 100, 1000), extrait chaque prix dans son lot correspondant. Nettoie les espaces dans les grands chiffres (ex: "1 200 000" devient 1200000). Si un lot est absent ou non visible, mets 0.
+   - NE DUPLIQUE JAMAIS la même valeur entre "price_x1" et "price_x10" : chaque lot a son prix propre.
+   - Si la case du lot "1" est vide ou non visible, mets "price_x1" à 0 : ne décale JAMAIS "price_x10" vers "price_x1".
 
 Réponds UNIQUEMENT avec un objet JSON valide au format exact suivant (SANS balises markdown) :
 {
   "items": [
     {
       "name": "Nom exact de l'item",
-      "prices": { "x1": 0, "x10": 0, "x100": 0, "x1000": 0 }
+      "price_x1": 0,
+      "price_x10": 0,
+      "price_x100": 0,
+      "price_x1000": 0
     }
   ]
 }

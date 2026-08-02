@@ -13,16 +13,29 @@ interface QuickPriceInputProps {
   warnEmpty?: boolean;
 }
 
+// Convertit une valeur saisie en entier positif : 0 si vide, non numérique ou négatif.
+const toNumber = (s: string): number => {
+  if (s.trim() === '') return 0;
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+};
+
 const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSetPrices, disabled, warnEmpty }) => {
-  const [values, setValues] = useState({
-    x1: x1 ?? 0,
-    x10: x10 ?? 0,
-    x100: x100 ?? 0,
-    x1000: x1000 ?? 0,
+  // Brouillon local en CHAÎNES : autorise la valeur vide "" pendant la saisie.
+  // L'utilisateur peut donc effacer complètement un champ sans qu'il soit
+  // immédiatement remplacé par 0 ou par l'ancienne valeur. La conversion en
+  // nombre (0 si vide/non numérique) n'a lieu qu'à la sauvegarde (blur / Enter /
+  // clic sur ✓ / debounce), ce qui ne bloque jamais la touche Retour arrière ni
+  // la sélection du texte.
+  const [draft, setDraft] = useState<{ x1: string; x10: string; x100: string; x1000: string }>({
+    x1: String(x1 ?? 0),
+    x10: String(x10 ?? 0),
+    x100: String(x100 ?? 0),
+    x1000: String(x1000 ?? 0),
   });
-  // Dernière valeur connue comme "persistée" (soit envoyée via doSave, soit adoptée
-  // depuis les props). Tant que le brouillon local en diffère, une sauvegarde est due.
-  const lastSavedRef = useRef(values);
+  // Dernière valeur connue comme "persistée" (en nombres). Tant que le brouillon
+  // local converti en diffère, une sauvegarde est due.
+  const lastSavedRef = useRef({ x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 });
   const rootRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -30,15 +43,21 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
 
   const doSave = useCallback(() => {
     if (disabled) return;
-    console.log('[QuickPriceInput] Saving...', { localDraft: values, lastSaved: lastSavedRef.current });
+    console.log('[QuickPriceInput] Saving...', { localDraft: draft, lastSaved: lastSavedRef.current });
+    const current = {
+      x1: toNumber(draft.x1),
+      x10: toNumber(draft.x10),
+      x100: toNumber(draft.x100),
+      x1000: toNumber(draft.x1000),
+    };
     const last = lastSavedRef.current;
-    if (values.x1 === last.x1 && values.x10 === last.x10 && values.x100 === last.x100 && values.x1000 === last.x1000) return;
-    lastSavedRef.current = values;
-    onSetPrices(values.x1, values.x10, values.x100, values.x1000);
+    if (current.x1 === last.x1 && current.x10 === last.x10 && current.x100 === last.x100 && current.x1000 === last.x1000) return;
+    lastSavedRef.current = current;
+    onSetPrices(current.x1, current.x10, current.x100, current.x1000);
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 1200);
-  }, [values, onSetPrices, disabled]);
+  }, [draft, onSetPrices, disabled]);
   // Référence toujours à jour de doSave pour le debounce de handleChange : la fonction
   // appelée depuis le setTimeout lit la dernière closure, jamais annulée par un re-rendu.
   const doSaveRef = useRef(doSave);
@@ -53,12 +72,12 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
     const root = rootRef.current;
     const active = document.activeElement;
     if (root && active instanceof HTMLInputElement && root.contains(active)) return;
-    const next = { x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 };
-    setValues(prev => {
+    const next = { x1: String(x1 ?? 0), x10: String(x10 ?? 0), x100: String(x100 ?? 0), x1000: String(x1000 ?? 0) };
+    setDraft(prev => {
       const same = prev.x1 === next.x1 && prev.x10 === next.x10 && prev.x100 === next.x100 && prev.x1000 === next.x1000;
       return same ? prev : next;
     });
-    lastSavedRef.current = next;
+    lastSavedRef.current = { x1: x1 ?? 0, x10: x10 ?? 0, x100: x100 ?? 0, x1000: x1000 ?? 0 };
   }, [x1, x10, x100, x1000]);
 
   const flushSave = useCallback(() => {
@@ -84,13 +103,10 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
   }, [flushSave]);
 
   const handleChange = useCallback((lot: 'x1' | 'x10' | 'x100' | 'x1000') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (raw === '') {
-      setValues(prev => ({ ...prev, [lot]: 0 }));
-    } else {
-      const v = e.target.valueAsNumber;
-      if (!isNaN(v) && v >= 0) setValues(prev => ({ ...prev, [lot]: v }));
-    }
+    // On enregistre la valeur brute, y compris "" : rien ne bloque la suppression
+    // manuelle (Retour arrière / sélection du texte). Le champ reste vide tant que
+    // l'utilisateur édite ; la conversion en 0 n'a lieu qu'à la sauvegarde.
+    setDraft(prev => ({ ...prev, [lot]: e.target.value }));
     // Sauvegarde debounced (500 ms) : évite de perdre la saisie si l'utilisateur quitte
     // le champ sans blur (navigation, clic ailleurs) et évite tout spam Supabase.
     if (changeTimer.current) clearTimeout(changeTimer.current);
@@ -115,14 +131,14 @@ const QuickPriceInput: FC<QuickPriceInputProps> = ({ x1, x10, x100, x1000, onSet
           <input
             type="number"
             min="0"
-            value={values[lot]}
+            value={draft[lot]}
             onChange={handleChange(lot)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             disabled={disabled}
             title={disabled ? 'Connectez-vous pour modifier les prix' : ''}
             className={`w-14 bg-[#070a12] border rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-900/50 ${
-              warnEmpty && values[lot] <= 0 ? 'border-red-500/60 text-rose-300' : 'border-white/10 text-white'
+              warnEmpty && toNumber(draft[lot]) <= 0 ? 'border-red-500/60 text-rose-300' : 'border-white/10 text-white'
             }`}
           />
         </div>

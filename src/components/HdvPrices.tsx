@@ -193,6 +193,23 @@ export default function HdvPrices() {
     ? hdvPrices[activeHdvItem._id] || { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 }
     : { x1: 0, x10: 0, x100: 0, x1000: 0, unitAverage: 0 };
   const [activeAuthor, setActiveAuthor] = useState<string | null>(null);
+  // Brouillon local des prix de l'item actif (en chaînes) : autorise la valeur
+  // vide "" pendant la saisie (l'utilisateur peut effacer un champ librement).
+  // La conversion en nombre (0 si vide/non numérique) n'a lieu qu'au blur.
+  const [priceDraft, setPriceDraft] = useState<Record<'x1' | 'x10' | 'x100' | 'x1000', string> | null>(null);
+
+  // Initialise le brouillon à chaque changement d'item actif (jamais pendant
+  // la saisie : les champs gardent le focus et ne sont donc pas écrasés).
+  useEffect(() => {
+    if (!activeHdvItem) { setPriceDraft(null); return; }
+    setPriceDraft({
+      x1: String(activePrices.x1),
+      x10: String(activePrices.x10),
+      x100: String(activePrices.x100),
+      x1000: String(activePrices.x1000),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHdvItem?._id]);
 
   useEffect(() => {
     if (!activeHdvItem) { setActiveAuthor(null); return; }
@@ -204,13 +221,29 @@ export default function HdvPrices() {
 
   const displayAuthor = activePrices.author ?? activeAuthor;
 
+  // Mise à jour du brouillon SEUL : accepte la valeur brute, y compris ""
+  // (suppression manuelle). Le champ n'est ni remplacé par 0 ni par l'ancienne
+  // valeur pendant la saisie ; la conversion a lieu au blur (commitActivePrice).
   const handleActivePriceChange = (lot: 'x1' | 'x10' | 'x100' | 'x1000', valString: string) => {
-    if (!activeHdvItem) return;
-    const val = valString === '' ? 0 : Math.max(0, parseInt(valString, 10));
-    if (lot === 'x1') setHdvPrice(activeHdvItem._id, val, activePrices.x10, activePrices.x100, activePrices.x1000);
-    if (lot === 'x10') setHdvPrice(activeHdvItem._id, activePrices.x1, val, activePrices.x100, activePrices.x1000);
-    if (lot === 'x100') setHdvPrice(activeHdvItem._id, activePrices.x1, activePrices.x10, val, activePrices.x1000);
-    if (lot === 'x1000') setHdvPrice(activeHdvItem._id, activePrices.x1, activePrices.x10, activePrices.x100, val);
+    setPriceDraft(prev => (prev ? { ...prev, [lot]: valString } : prev));
+  };
+
+  // Sauvegarde à la perte de focus : "" ou 0 → enregistre 0, sans bloquer le Retour arrière.
+  const commitActivePrice = () => {
+    if (!activeHdvItem || !priceDraft) return;
+    const parse = (s: string): number => {
+      const t = s.trim();
+      if (t === '') return 0;
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+    };
+    setHdvPrice(
+      activeHdvItem._id,
+      parse(priceDraft.x1),
+      parse(priceDraft.x10),
+      parse(priceDraft.x100),
+      parse(priceDraft.x1000),
+    );
   };
 
   const isActiveTracked = activeHdvItem ? trackedItemIds.includes(activeHdvItem._id) : false;
@@ -464,11 +497,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x1</label>
                       <input
                         type="number"
-                        value={activePrices.x1 || ''}
+                        value={priceDraft?.x1 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x1', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -476,11 +510,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x10</label>
                       <input
                         type="number"
-                        value={activePrices.x10 || ''}
+                        value={priceDraft?.x10 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x10', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -488,11 +523,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x100</label>
                       <input
                         type="number"
-                        value={activePrices.x100 || ''}
+                        value={priceDraft?.x100 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x100', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -500,11 +536,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x1000</label>
                       <input
                         type="number"
-                        value={activePrices.x1000 || ''}
+                        value={priceDraft?.x1000 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -780,11 +817,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x1</label>
                       <input
                         type="number"
-                        value={activePrices.x1 || ''}
+                        value={priceDraft?.x1 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x1', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -792,11 +830,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x10</label>
                       <input
                         type="number"
-                        value={activePrices.x10 || ''}
+                        value={priceDraft?.x10 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x10', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -804,11 +843,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x100</label>
                       <input
                         type="number"
-                        value={activePrices.x100 || ''}
+                        value={priceDraft?.x100 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x100', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
@@ -816,11 +856,12 @@ export default function HdvPrices() {
                       <label className="block text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">Lot x1000</label>
                       <input
                         type="number"
-                        value={activePrices.x1000 || ''}
+                        value={priceDraft?.x1000 ?? ''}
                         placeholder="Prix"
                         disabled={!user}
                         title={!user ? 'Veuillez vous connecter pour renseigner ou modifier les prix' : (displayAuthor ? `Modifié par ${displayAuthor}` : '')}
                         onChange={(e) => handleActivePriceChange('x1000', e.target.value)}
+                        onBlur={commitActivePrice}
                         className="w-full bg-[#070a12] border border-white/10 rounded-lg py-1.5 px-2 text-xs font-semibold text-white focus:outline-none focus:border-dofus-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
                       />
                     </div>
