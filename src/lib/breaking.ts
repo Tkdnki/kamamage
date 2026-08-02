@@ -22,6 +22,32 @@ const STAT_NAME_TO_RUNE_NAME: Record<string, string> = {
   'Esquive PM': 'Résistance PM',
 };
 
+/**
+ * Dictionnaire Stat → code de rune (nom officiel raccourci HDV).
+ * Garantit que chaque caractéristique d'équipement est convertie en la rune
+ * simple OFFICIELLE (ex: Puissance → "Rune Pui") pour que le prix HDV soit
+ * retrouvé dans hdvPrices / consolidated_prices. Sans ce mapping, le module
+ * générait un nom complet (ex: "Puissance") → "Prix manquant".
+ */
+const STAT_TO_RUNE_CODE: Record<string, string> = {
+  'Puissance': 'Pui',
+  'Agilité': 'Age',
+  'Intelligence': 'Ine',
+  'Force': 'Fo',
+  'Chance': 'Cha',
+  'Sagesse': 'Sa',
+  'Vitalité': 'Vi',
+  'Soin': 'So',
+  'Soins': 'So',
+  'Invocation': 'Invo',
+  'Invocations': 'Invo',
+  'Initiative': 'Ini',
+  'Prospection': 'Prospe',
+  'Portée': 'Po',
+  'Tacle': 'Tac',
+  'Fuite': 'Fui',
+};
+
 /** Normalise les écarts (singulier/pluriel, suffixe fixe) entre config et runes */
 function normalizeStatName(name: string): string {
   let n = name.replace(/\s*\(fixe\)\s*$/, '').trim();
@@ -228,9 +254,25 @@ export function calculateBreakingQuantity(
 export function findMatchingRune(statName: string, _statValue: number, unit: string): Rune | null {
   let name = statName.replace(/\s*%\s*$/, '').trim();
   name = STAT_NAME_TO_RUNE_NAME[name] ?? name;
-  name = normalizeStatName(name);
+  const normalized = normalizeStatName(name);
 
-  const runes = STAT_RUNE_MAP.get(name);
+  // 1. Résolution directe via le mapping Stat → rune officielle (le plus fiable) :
+  //    garantit le nom raccourci HDV exact (ex: "Puissance" → Rune Pui) même si le
+  //    matching par `statEffect` échoue.
+  const directCode = STAT_TO_RUNE_CODE[normalized] ?? STAT_TO_RUNE_CODE[name];
+  if (directCode) {
+    const byCode = DOFUS_RUNES.filter(r => r.code === directCode);
+    if (byCode.length > 0) {
+      if (unit === '%') {
+        const pctRune = byCode.find(r => r.statEffect.includes('%'));
+        if (pctRune) return pctRune;
+      }
+      return byCode[0];
+    }
+  }
+
+  // 2. Repli : matching par `statEffect` (résistances %, dommages, etc.).
+  const runes = STAT_RUNE_MAP.get(normalized);
   if (!runes || runes.length === 0) return null;
 
   if (unit === '%') {

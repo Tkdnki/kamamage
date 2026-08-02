@@ -108,7 +108,7 @@ const EXOTIC_EFFECTS = [
 ];
 
 
-const RUNE_NAMES = ['Vi', 'Fo', 'Ine', 'Age', 'Cha', 'Sa', 'So', 'Do', 'Cri', 'Do Cri', 'Do Pou', 'Tac', 'Fui', 'Prospe', 'Pod', 'Ini', 'Portée', 'Invoc', 'Pa Ga', 'Pme Ga', 'Ra Vi', 'Pa Vi', 'Ra Fo', 'Pa Fo', 'Ra Ine', 'Pa Ine', 'Ra Age', 'Pa Age', 'Ra Cha', 'Pa Cha', 'Ra Sa', 'Pa Sa'];
+const RUNE_NAMES = ['Vi', 'Fo', 'Ine', 'Age', 'Cha', 'Sa', 'So', 'Do', 'Cri', 'Do Cri', 'Do Pou', 'Tac', 'Fui', 'Prospe', 'Pod', 'Ini', 'Po', 'Invo', 'Pui', 'Pa Ga', 'Pme Ga', 'Ra Vi', 'Pa Vi', 'Ra Fo', 'Pa Fo', 'Ra Ine', 'Pa Ine', 'Ra Age', 'Pa Age', 'Ra Cha', 'Pa Cha', 'Ra Sa', 'Pa Sa'];
 
 const EMPTY_RUNE_PRICES: Record<string, number> = Object.fromEntries(RUNE_NAMES.map(k => [k, 0]));
 
@@ -121,8 +121,8 @@ const WEIGHT_TO_RUNE: Record<number, string> = {
   5: 'Do',
   6: 'Prospe',
   10: 'Cri',
-  30: 'Invoc',
-  51: 'Portée',
+  30: 'Invo',
+  51: 'Po',
   90: 'Pme Ga',
   100: 'Pa Ga',
 };

@@ -52,7 +52,7 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 'ga_pa', name: 'Rune Ga Pa', code: 'Ga Pa', weight: 100, statEffect: '+1 PA', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78055.png', itemId: '1557' },
   { id: 'ga_pme', name: 'Rune Ga Pme', code: 'Ga Pme', weight: 90, statEffect: '+1 PM', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78056.png', itemId: '1558' },
   { id: 'po', name: 'Rune Po', code: 'Po', weight: 51, statEffect: '+1 Portée', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78018.png', itemId: '7438' },
-  { id: 'invoc', name: 'Rune Invoc', code: 'Invoc', weight: 30, statEffect: '+1 Invocation', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78019.png', itemId: '7442' },
+  { id: 'invoc', name: 'Rune Invo', code: 'Invo', weight: 30, statEffect: '+1 Invocation', category: 'Exotiques', imgUrl: 'https://api.dofusdb.fr/img/items/78019.png', itemId: '7442' },
 
   // Sagesse / Prospection / Soin
   { id: 'ra_sa', name: 'Rune Ra Sa', code: 'Ra Sa', weight: 30, statEffect: '+10 Sagesse', category: 'VigSagesse', imgUrl: 'https://api.dofusdb.fr/img/items/78051.png', itemId: '1552' },
@@ -79,6 +79,7 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 'ra_cha', name: 'Rune Ra Cha', code: 'Ra Cha', weight: 10, statEffect: '+10 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78042.png', itemId: '1556' },
   { id: 'pa_cha', name: 'Rune Pa Cha', code: 'Pa Cha', weight: 3, statEffect: '+3 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78041.png', itemId: '1550' },
   { id: 'cha', name: 'Rune Cha', code: 'Cha', weight: 1, statEffect: '+1 Chance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78040.png', itemId: '1525' },
+  { id: 'pui', name: 'Rune Pui', code: 'Pui', weight: 5, statEffect: '+1 Puissance', category: 'Carac', imgUrl: 'https://api.dofusdb.fr/img/items/78016.png', itemId: '7436' },
 
   // Dommages
   { id: 'pa_do', name: 'Rune Pa Do', code: 'Pa Do', weight: 60, statEffect: '+3 Dommages', category: 'Dommages' },
