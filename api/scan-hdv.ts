@@ -115,6 +115,19 @@ function extractRetryAfter(result: GroqVisionResult): number | undefined {
   return undefined;
 }
 
+// Marqueurs de QUOTA QUOTIDIEN chez Groq (Tokens Per Day / Requests Per Day) :
+// ex. "Rate limit reached for organisation: ... for tokens per day. ..." ou
+// "Daily limit reached for organisation: ...". Contrairement au rate-limit par
+// minute (RPM/TPM), ce quota ne se réinitialise qu'à minuit UTC : une pause de
+// quelques secondes est donc inutile.
+const DAILY_LIMIT_RE = /(?:tokens?|requests?)\s+per\s+day|daily\s+(?:tokens?|requests?)\s+limit|daily\s+limit\s+reached|\bTPD\b|\bRPD\b/i;
+
+// Détecte si une erreur 429 de Groq concerne le quota quotidien (TPD/RPD).
+function isDailyLimitError(result: GroqVisionResult): boolean {
+  const message = result.body?.error?.message || result.rawText || '';
+  return DAILY_LIMIT_RE.test(message);
+}
+
 async function callGroqVision(apiKey: string, model: string, systemPrompt: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -225,7 +238,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
     // que la boucle multi-clés sache quoi faire (succès / quota / erreur JSON).
     const attemptWithKey = async (apiKey: string): Promise<
       | { kind: 'success'; payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } }
-      | { kind: 'quota'; status: number; retryAfter: number }
+      | { kind: 'quota'; status: number; retryAfter: number; isDailyLimit: boolean }
       | { kind: 'jsonValidationFailed'; detail: string }
       | { kind: 'modelFailure'; detail: string }
     > => {
@@ -240,9 +253,17 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
 
             // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : on
             // laisse la boucle multi-clés décider (basculement sur une autre clé).
+            // NB : on distingue le rate-limit PAR MINUTE (RPM/TPM, pause de
+            // quelques secondes) du QUOTA QUOTIDIEN (TPD/RPD, bloqué jusqu'à
+            // minuit UTC) via le flag `isDailyLimit` transmis au client.
             if (result.status === 429 || result.status === 503) {
               console.warn(`[scan-hdv] Quota Groq (${result.status}) : ${(result.body?.error?.message || result.rawText).slice(0, 200)}`);
-              return { kind: 'quota', status: result.status, retryAfter: extractRetryAfter(result) ?? 15 };
+              return {
+                kind: 'quota',
+                status: result.status,
+                retryAfter: extractRetryAfter(result) ?? 15,
+                isDailyLimit: result.status === 429 && isDailyLimitError(result),
+              };
             }
 
             if (result.ok) {
@@ -309,7 +330,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
 
     // Round-Robin : on démarre à la clé suivante (rotation par requête).
     const startKeyIndex = currentKeyIndex;
-    let lastQuota: { status: number; retryAfter: number } | null = null;
+    let lastQuota: { status: number; retryAfter: number; isDailyLimit: boolean } | null = null;
 
     for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset++) {
       const keyIndex = (startKeyIndex + keyOffset) % apiKeys.length;
@@ -324,14 +345,18 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       }
 
       if (outcome.kind === 'quota') {
-        lastQuota = { status: outcome.status, retryAfter: outcome.retryAfter };
+        lastQuota = { status: outcome.status, retryAfter: outcome.retryAfter, isDailyLimit: outcome.isDailyLimit };
         if (keyOffset < apiKeys.length - 1) {
           console.warn(`[Groq Multi-Key] Clé ${keyOffset + 1}/${apiKeys.length} bloquée (${outcome.status}), basculement...`);
           continue;
         }
         // Toutes les clés ont été testées et échouent (quota) → réponse 429 au client.
+        // Si le quota QUOTIDIEN est atteint (TPD/RPD), on le signale via
+        // `isDailyLimit: true` pour que le client stoppe la file au lieu de
+        // re-tenter en boucle avec une pause inutile.
         return res.status(outcome.status).json({
-          error: outcome.status === 429 ? 'Rate limit' : 'Service Unavailable',
+          error: outcome.isDailyLimit ? 'Quota journalier atteint' : (outcome.status === 429 ? 'Rate limit' : 'Service Unavailable'),
+          isDailyLimit: outcome.isDailyLimit,
           retryAfter: outcome.retryAfter,
         });
       }
@@ -351,7 +376,10 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
 
     // Cas limite : boucle terminée sans retour (ne devrait pas arriver).
     return res.status(lastQuota?.status ?? 500).json({
-      error: lastQuota ? (lastQuota.status === 429 ? 'Rate limit' : 'Service Unavailable') : 'Erreur inconnue',
+      error: lastQuota
+        ? (lastQuota.isDailyLimit ? 'Quota journalier atteint' : (lastQuota.status === 429 ? 'Rate limit' : 'Service Unavailable'))
+        : 'Erreur inconnue',
+      isDailyLimit: lastQuota?.isDailyLimit,
       retryAfter: lastQuota?.retryAfter,
     });
 

@@ -31,10 +31,13 @@ const MAX_TIMEOUT_RETRIES = 3;
 // retry 3 → 20s.
 const GROQ_OVERLOAD_BASE_DELAY_MS = 5000;
 
-// Durée de pause automatique de la file après un 429 (Rate Limit) : on attend
-// que la fenêtre glissante 60s (RPM/TPM) de Groq se réinitialise complètement
-// avant de re-tenter la MÊME image. Reprise automatique après 45s, ou au clic.
-const RPM_QUOTA_PAUSE_MS = 45000;
+// Durée de pause automatique de la file après un 429 de type RPM/TPM (Rate
+// Limit par minute) : on attend que la fenêtre glissante 60s de Groq se
+// réinitialise complètement avant de re-tenter la MÊME image. Reprise
+// automatique après 65s, ou au clic.
+// NB : ce délai ne s'applique PAS au quota QUOTIDIEN (TPD/RPD) — voir le flag
+// `isDailyLimit` transmis par le backend, qui stoppe la file définitivement.
+const RPM_QUOTA_PAUSE_MS = 65000;
 
 // Durée de pause automatique de la file après épuisement des retries (503) :
 // reprise automatique après 30s, ou immédiatement au clic.
@@ -141,7 +144,12 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // File en PAUSE (quota IA 429 épuisé) : reprise auto après QUOTA_PAUSE_MS
   // ou immédiatement au clic sur le bouton de reprise.
   const [quotaPaused, setQuotaPaused] = useState(false);
+  // Décompte dynamique affiché dans le bandeau de pause (ex: 45 → 0).
+  const [quotaPauseCountdown, setQuotaPauseCountdown] = useState(0);
   const resumeRef = useRef<(() => void) | null>(null);
+  // Intervalle de décompte de la pause quota : nettoyé à la reprise automatique
+  // (compteur à 0), au clic sur "Reprendre" et au reset du modal.
+  const quotaCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Verrou SYNCHRONE de pause quota : contrairement à l'état React `quotaPaused`
   // (associé à un rendu différé), un ref est lisible immédiatement par la boucle
   // d'envoi et par `addToQueue`, même à l'intérieur d'une closure de boucle.
@@ -173,29 +181,62 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   }, []);
 
   // Met la file en PAUSE tant que le quota IA (429) n'est pas rétabli : reprise
-  // automatique après `ms`, ou immédiatement au clic sur le bouton "Reprendre".
+  // automatique après `ms` (décompte dynamique via `quotaPauseCountdown`), ou
+  // immédiatement au clic sur le bouton "Reprendre".
   // Retourne false si la file a été annulée (fermeture du modal) pendant la pause.
-  const waitForQuotaResume = useCallback(async (ms: number): Promise<boolean> => {
+  const waitForQuotaResume = useCallback(async (ms: number, baseMessage: string): Promise<boolean> => {
+    const totalSeconds = Math.max(1, Math.round(ms / 1000));
     // Le verrou est posé SYNCHRONEMENT, avant toute promesse : même si le rendu
     // React est différé, la boucle d'envoi et `addToQueue` voient immédiatement
     // la pause active via `quotaPausedRef`.
     setQuotaPaused(true);
+    setQuotaPauseCountdown(totalSeconds);
+    setPauseMessage(baseMessage);
     quotaPausedRef.current = true;
     // Purge d'un éventuel résolveur résiduel d'une pause précédente pour éviter
     // qu'un clic "Reprendre" ne débloque par erreur un timer déjà expiré.
     resumeRef.current = null;
+
     await new Promise<void>(resolve => {
+      // Décompte affiché chaque seconde : quand il atteint 0, la pause se lève
+      // automatiquement (nettoyage de l'intervalle + résolution de la promesse),
+      // ce qui relance la file d'attente.
+      let secondsLeft = totalSeconds;
+      if (quotaCountdownIntervalRef.current) clearInterval(quotaCountdownIntervalRef.current);
+      quotaCountdownIntervalRef.current = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft > 0) {
+          setQuotaPauseCountdown(secondsLeft);
+        } else {
+          setQuotaPauseCountdown(0);
+          if (quotaCountdownIntervalRef.current) clearInterval(quotaCountdownIntervalRef.current);
+          quotaCountdownIntervalRef.current = null;
+          resumeRef.current = null;
+          resolve();
+        }
+      }, 1000);
+
+      // Filet de sécurité : même si l'intervalle était perturbé, la promesse se
+      // résout automatiquement au bout de `ms` (reprise auto garantie).
       const timer = setTimeout(() => {
+        if (quotaCountdownIntervalRef.current) clearInterval(quotaCountdownIntervalRef.current);
+        quotaCountdownIntervalRef.current = null;
         resumeRef.current = null;
         resolve();
       }, ms);
-      // Permet au clic de court-circuiter le timer.
+
+      // Le clic "Reprendre" court-circuite l'intervalle ET le timer.
       resumeRef.current = () => {
+        if (quotaCountdownIntervalRef.current) clearInterval(quotaCountdownIntervalRef.current);
+        quotaCountdownIntervalRef.current = null;
         clearTimeout(timer);
         resolve();
       };
     });
+
     setQuotaPaused(false);
+    setQuotaPauseCountdown(0);
+    setPauseMessage(null);
     quotaPausedRef.current = false;
     return !cancelCurrentRef.current;
   }, []);
@@ -240,7 +281,10 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     setScanMode('full');
     activeExpectedRef.current = [];
     targetedItemRef.current = null;
+    if (quotaCountdownIntervalRef.current) clearInterval(quotaCountdownIntervalRef.current);
+    quotaCountdownIntervalRef.current = null;
     setQuotaPaused(false);
+    setQuotaPauseCountdown(0);
     quotaPausedRef.current = false;
     resumeRef.current = null;
   }, []);
@@ -421,9 +465,13 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
         if (response.status === 429 || response.status === 503) {
           const isRateLimit = response.status === 429;
           let retryAfter: number | undefined;
+          // `isDailyLimit` (flag backend) : le quota QUOTIDIEN Groq (TPD/RPD)
+          // est atteint — la clé est bloquée jusqu'à minuit UTC.
+          let isDailyLimit = false;
           try {
             const errData = await response.json();
             if (typeof errData?.retryAfter === 'number') retryAfter = errData.retryAfter;
+            if (errData?.isDailyLimit === true) isDailyLimit = true;
           } catch { /* corps non JSON */ }
           if (retryAfter === undefined) {
             const header = response.headers.get('Retry-After');
@@ -432,19 +480,28 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           }
           setIsLoading(false);
 
+          // ── 429 QUOTA QUOTIDIEN (TPD/RPD) : arrêt définitif de la file ──────
+          // Aucune pause temporaire ne peut aider : la clé est bloquée jusqu'à
+          // minuit UTC. On stoppe la file et on affiche un message explicite
+          // invitant l'utilisateur à fournir sa propre clé API Groq.
+          if (isRateLimit && isDailyLimit) {
+            console.error('[scan] ❌ Quota IA QUOTIDIEN épuisé (TPD/RPD) — file arrêtée.');
+            showToast('error', 'Quota IA quotidien épuisé. Utilisez votre propre clé API Groq pour continuer.');
+            setError('Quota IA quotidien épuisé. Veuillez renseigner votre propre clé API Groq ci-dessus pour continuer.');
+            break;
+          }
+
           // ── 429 (Rate Limit RPM/TPM) : PAUSE GLOBALE, hors retries de l'image ──
           // Le 429 ne compte PAS dans le quota d'essais de l'image : il reflète une
           // pause globale de l'API (fenêtre glissante 60s RPM/TPM de Groq), pas une
           // erreur propre à l'image. On met donc la file en pause immédiatement
-          // (reprise auto après ~45s, ou au clic) pour laisser la fenêtre se
+          // (reprise auto après ~65s, ou au clic) pour laisser la fenêtre se
           // réinitialiser complètement avant de re-tenter la MÊME image.
           if (isRateLimit) {
             console.warn('[scan] ⏳ 429 Rate Limit (RPM/TPM) — pause globale de la file (retries de l\'image préservés).');
-            showToast('error', 'Quota IA (RPM) atteint. Pause de 45s...');
+            showToast('error', 'Quota IA (RPM) atteint. Pause de 65s...');
             const pauseMs = Math.max((retryAfter ?? 0) * 1000, RPM_QUOTA_PAUSE_MS);
-            setPauseMessage(`Scan en pause - Quota IA (RPM) atteint. Reprise automatique dans ${Math.round(pauseMs / 1000)}s ou au clic.`);
-            const resumed = await waitForQuotaResume(pauseMs);
-            setPauseMessage(null);
+            const resumed = await waitForQuotaResume(pauseMs, 'Scan en pause - Quota IA (RPM) atteint.');
             if (!resumed) break;
             // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
             queueRef.current = [entry, ...queueRef.current];
@@ -465,9 +522,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           if (retries >= MAX_RETRIES) {
             retries = 0;
             console.error('Nombre maximum de tentatives atteint. Mise en pause de la file.');
-            setPauseMessage('Scan en pause - Surcharge IA (503). Reprise automatique dans 30s ou au clic.');
-            const resumed = await waitForQuotaResume(QUOTA_PAUSE_MS);
-            setPauseMessage(null);
+            const resumed = await waitForQuotaResume(QUOTA_PAUSE_MS, 'Scan en pause - Surcharge IA (503).');
             if (!resumed) break;
             // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
             queueRef.current = [entry, ...queueRef.current];
@@ -937,19 +992,13 @@ for (const file of Array.from(e.dataTransfer.files)) {
             </div>
           )}
 
-          {/* Queue status */}
-          {(queueCount > 0 || isProcessing) && (
-            <div className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold ${
-              pauseMessage
-                ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
-                : 'bg-cyan-500/5 border-cyan-500/20 text-cyan-300'
-            }`}>
-              {pauseMessage ? (
-                <Clock className="h-4 w-4 shrink-0 animate-pulse" />
-              ) : (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              )}
-              <span>{pauseMessage || `${queueCount} image${queueCount > 1 ? 's' : ''} restante${queueCount > 1 ? 's' : ''} dans la file d'attente`}</span>
+          {/* Queue status : UNIQUEMENT le compteur d'images en file. Le message de
+              pause est rendu par le bandeau "Pause / Rate limit" ci-dessous, seul
+              bandeau global, pour éviter l'affichage en double. */}
+          {!pauseMessage && (queueCount > 0 || isProcessing) && (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/5 border-cyan-500/20 text-cyan-300">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+              <span>{`${queueCount} image${queueCount > 1 ? 's' : ''} restante${queueCount > 1 ? 's' : ''} dans la file d'attente`}</span>
             </div>
           )}
 
@@ -1009,11 +1058,16 @@ for (const file of Array.from(e.dataTransfer.files)) {
             </div>
           )}
 
-          {/* Pause / Rate limit */}
+          {/* Pause / Rate limit : UNIQUE bandeau de pause global (429/503) avec
+              décompte dynamique et bouton "Reprendre". */}
           {pauseMessage && (
             <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <Clock className="h-5 w-5 text-amber-400 shrink-0 animate-pulse" />
-              <p className="text-xs font-semibold text-amber-300 flex-1">{pauseMessage}</p>
+              <p className="text-xs font-semibold text-amber-300 flex-1">
+                {quotaPaused
+                  ? `${pauseMessage} Reprise automatique dans ${quotaPauseCountdown}s ou au clic.`
+                  : pauseMessage}
+              </p>
               {quotaPaused && (
                 <button
                   type="button"
