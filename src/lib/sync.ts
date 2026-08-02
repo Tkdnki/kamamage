@@ -109,7 +109,7 @@ export async function fetchHdvPricesFromServer(server: string): Promise<Record<s
     return null;
   }
 
-  console.log('[Supabase Fetch] Prix reçus de la DB:', data);
+  console.log(`[Supabase Fetch] ${data?.length ?? 0} ligne(s) reçues de la DB.`);
 
   const prices: Record<string, PriceData> = {};
   for (const row of data ?? []) {

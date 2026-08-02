@@ -229,7 +229,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       });
     };
 
-    poll();
+    // Pas de poll() immédiat ici : l'effet de montage ci-dessus effectue déjà la
+    // récupération initiale (évite un double fetch simultané à l'ouverture).
     const intervalId = setInterval(poll, PRICE_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;

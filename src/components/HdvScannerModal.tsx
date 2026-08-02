@@ -18,6 +18,11 @@ const QUEUE_THROTTLE_MS = 2000;
 // Nombre max de réessais (429/503) pour la MÊME image avant de l'abandonner.
 const MAX_RETRIES = 3;
 
+// Nombre max de réessais après un timeout client (60s) sur la MÊME image
+// avant de l'abandonner (auto-skip). L'IA vision peut dépasser la fenêtre
+// de 60s sous charge : on re-tente au lieu de perdre l'image.
+const MAX_TIMEOUT_RETRIES = 3;
+
 // Backoff de base pour un 503 (Over Capacity) : délai fixe de 3s.
 const RETRY_BASE_DELAY_MS = 3000;
 
@@ -304,6 +309,8 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     // Compteur de réessais (429/503) de l'image COURANTE : persiste à travers
     // les re-queues de la même image, remis à zéro après un succès.
     let retries = 0;
+    // Compteur de timeouts (AbortError 60s) de l'image COURANTE : même logique.
+    let timeoutRetries = 0;
     while (queueRef.current.length > 0 && !cancelCurrentRef.current) {
       const entry = queueRef.current[0];
       queueRef.current = queueRef.current.slice(1);
@@ -429,8 +436,33 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           }
         }
       } catch (err) {
-        scanError = err instanceof Error ? err.message : 'Erreur inconnue';
-        console.error('[scan] ❌ Erreur fetch scan-hdv:', scanError);
+        // Timeout client (60s) : l'AbortController a coupé la requête car l'IA
+        // n'a pas répondu à temps (charge élevée). Ce n'est PAS une erreur fatale :
+        // on re-pousse la MÊME image en tête de file et on réessaie, sans afficher
+        // le message technique "signal is aborted" à l'utilisateur.
+        const isAbort =
+          (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && /abort/i.test(err.message));
+
+        if (isAbort) {
+          timeoutRetries += 1;
+          setIsLoading(false);
+          if (timeoutRetries < MAX_TIMEOUT_RETRIES) {
+            console.warn(`[scan] ⏱️ Timeout (60s) — réessai ${timeoutRetries}/${MAX_TIMEOUT_RETRIES} de la même image`);
+            showToast('error', 'Réponse IA trop lente, nouvel essai...');
+            const waited = await waitWithCountdown(5, 'Nouvel essai dans');
+            if (!waited || cancelCurrentRef.current) break;
+            // On re-pousse la MÊME image en tête de file : pas d'auto-skip.
+            queueRef.current = [entry, ...queueRef.current];
+            setQueue([...queueRef.current]);
+            continue;
+          }
+          scanError = `Scan trop long (60s max) après ${MAX_TIMEOUT_RETRIES} essais. Image ignorée.`;
+          console.error(`[scan] ⏱️ Timeout (60s) définitif pour cette image après ${MAX_TIMEOUT_RETRIES} réessais.`);
+        } else {
+          scanError = err instanceof Error ? err.message : 'Erreur inconnue';
+          console.error('[scan] ❌ Erreur fetch scan-hdv:', scanError);
+        }
       } finally {
         clearTimeout(timeoutId);
       }
@@ -443,6 +475,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
       // Ici l'image courante est consommée (succès ou erreur non-quota) :
       // la prochaine itération concerne une nouvelle image.
       retries = 0;
+      timeoutRetries = 0;
 
       if (scanError) {
         setResult(null);
