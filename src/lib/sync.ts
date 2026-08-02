@@ -180,7 +180,11 @@ export async function fetchItemCoefficient(server: string, itemKey: string): Pro
     return null;
   }
 
-  return data?.coefficient ?? null;
+  // Migration 100 % → non renseigné (ancienne valeur par défaut du simulateur).
+  if (data?.coefficient !== null && data?.coefficient !== undefined && data.coefficient !== 100 && data.coefficient > 0) {
+    return data.coefficient;
+  }
+  return null;
 }
 
 /**
@@ -200,13 +204,17 @@ export async function fetchAllItemCoefficients(server: string): Promise<Record<s
 
   const coefficients: Record<string, number> = {};
   for (const row of data ?? []) {
-    if (row.coefficient > 0) coefficients[row.item_key] = row.coefficient;
+    // Migration 100 % → non renseigné : 100 % était l'ancienne valeur par défaut
+    // affichée par le simulateur (et jamais un vrai coefficient saisi), on l'ignore.
+    if (row.coefficient > 0 && row.coefficient !== 100) coefficients[row.item_key] = row.coefficient;
   }
   return coefficients;
 }
 
 export async function pushItemCoefficient(server: string, itemKey: string, coefficient: number): Promise<void> {
-  if (!coefficient || coefficient <= 0) {
+  // 100 % est l'ancienne valeur par défaut du simulateur (jamais un vrai coefficient
+  // saisi) → on ne l'enregistre pas, pour préserver la migration vers « non renseigné ».
+  if (!coefficient || coefficient <= 0 || coefficient === 100) {
     console.warn(`[Sync] ⚠️ Upsert ignoré pour "${itemKey}": coefficient invalide (${coefficient})`);
     return;
   }
@@ -224,6 +232,24 @@ export async function pushItemCoefficient(server: string, itemKey: string, coeff
     console.error(`[Sync] ❌ Error upsert item_coefficients pour "${itemKey}" (${server}):`, error.message);
   } else {
     console.log(`[Sync] 📤 Coefficient sauvegardé: server="${server}", itemKey="${itemKey}", coefficient=${coefficient}`);
+  }
+}
+
+/**
+ * Supprime un coefficient enregistré (saisie vidée par l'utilisateur).
+ * Permet de repasser l'item à « non renseigné » sur tous les appareils.
+ */
+export async function deleteItemCoefficient(server: string, itemKey: string): Promise<void> {
+  const { error } = await supabase
+    .from('item_coefficients')
+    .delete()
+    .eq('server_name', server)
+    .eq('item_key', itemKey);
+
+  if (error) {
+    console.error(`[Sync] ❌ Error delete item_coefficients pour "${itemKey}" (${server}):`, error.message);
+  } else {
+    console.log(`[Sync] 🗑️ Coefficient supprimé: server="${server}", itemKey="${itemKey}"`);
   }
 }
 

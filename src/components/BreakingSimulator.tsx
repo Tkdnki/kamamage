@@ -21,8 +21,8 @@ import {
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
-import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients } from '../lib/sync';
-import { needsPriceScan } from '../lib/pricing';
+import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients, deleteItemCoefficient } from '../lib/sync';
+import { getOptimalCost, needsPriceScan } from '../lib/pricing';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -40,7 +40,7 @@ export default function BreakingSimulator() {
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [coefficient, setCoefficient] = useState(100);
+  const [coefficient, setCoefficient] = useState<number | null>(null);
   const [rollMode, setRollMode] = useState<'avg' | 'min' | 'max'>('avg');
 
   const [itemStats, setItemStats] = useState<DofusDbItemFull | null>(null);
@@ -113,7 +113,7 @@ export default function BreakingSimulator() {
 
   const COEFFICIENT_DEBOUNCE_MS = 700;
   const coeffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingCoeffRef = useRef<{ itemKey: string; server: string; value: number } | null>(null);
+  const pendingCoeffRef = useRef<{ itemKey: string; server: string; value: number | null } | null>(null);
   const coeffFetchItemRef = useRef<string | null>(null);
   const coeffEditedRef = useRef(false);
 
@@ -125,7 +125,11 @@ export default function BreakingSimulator() {
     }
     const pending = pendingCoeffRef.current;
     pendingCoeffRef.current = null;
-    if (pending && pending.value >= 1) {
+    if (pending && pending.value === null) {
+      deleteItemCoefficient(pending.server, pending.itemKey).catch(err =>
+        console.warn('[Brisage] ❌ Suppression du coefficient en erreur:', err),
+      );
+    } else if (pending && pending.value !== null && pending.value >= 1) {
       pushItemCoefficient(pending.server, pending.itemKey, pending.value).catch(err =>
         console.warn('[Brisage] ❌ Sauvegarde du coefficient en erreur:', err),
       );
@@ -136,12 +140,13 @@ export default function BreakingSimulator() {
     return () => flushPendingCoefficient();
   }, [flushPendingCoefficient]);
 
-  // Au chargement d'un item : reset à 100 puis lecture de la valeur sauvegardée pour le serveur actuel.
+  // Au chargement d'un item : reset à non renseigné puis lecture de la valeur sauvegardée pour le serveur actuel.
+  // (Migration : l'ancienne valeur par défaut 100 % est ignorée, elle ne représentait aucun coefficient saisi.)
   useEffect(() => {
     if (!selectedItem?._id) return;
     const itemKey = selectedItem._id;
     flushPendingCoefficient();
-    setCoefficient(100);
+    setCoefficient(null);
     coeffFetchItemRef.current = itemKey;
     coeffEditedRef.current = false;
     fetchItemCoefficient(selectedServer, itemKey)
@@ -154,20 +159,30 @@ export default function BreakingSimulator() {
   }, [selectedItem?._id, selectedServer, flushPendingCoefficient]);
 
   // Écriture immédiate dans le state local + upsert différé (debounce) vers Supabase.
-  const handleCoefficientChange = useCallback((value: number) => {
-    setCoefficient(value);
+  // 100 % est traité comme « non renseigné » (ancienne valeur par défaut du simulateur,
+  // jamais un vrai coefficient saisi) → on supprime la valeur enregistrée le cas échéant.
+  const handleCoefficientChange = useCallback((value: number | null) => {
+    const normalized = value !== null && value >= 1 && value !== 100 ? value : null;
+    setCoefficient(normalized);
     coeffEditedRef.current = true;
     if (!selectedItem) return;
-    pendingCoeffRef.current = { itemKey: selectedItem._id, server: selectedServer, value };
+    pendingCoeffRef.current = { itemKey: selectedItem._id, server: selectedServer, value: normalized };
     if (coeffTimerRef.current) clearTimeout(coeffTimerRef.current);
     coeffTimerRef.current = setTimeout(() => {
       coeffTimerRef.current = null;
       const pending = pendingCoeffRef.current;
       pendingCoeffRef.current = null;
       if (pending) {
-        pushItemCoefficient(pending.server, pending.itemKey, pending.value).catch(err =>
-          console.warn('[Brisage] ❌ Sauvegarde du coefficient en erreur:', err),
-        );
+        if (pending.value === null) {
+          // Saisie vidée → suppression du coefficient enregistré.
+          deleteItemCoefficient(pending.server, pending.itemKey).catch(err =>
+            console.warn('[Brisage] ❌ Suppression du coefficient en erreur:', err),
+          );
+        } else if (pending.value >= 1) {
+          pushItemCoefficient(pending.server, pending.itemKey, pending.value).catch(err =>
+            console.warn('[Brisage] ❌ Sauvegarde du coefficient en erreur:', err),
+          );
+        }
       }
     }, COEFFICIENT_DEBOUNCE_MS);
   }, [selectedItem, selectedServer]);
@@ -275,14 +290,35 @@ export default function BreakingSimulator() {
   // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
   // ou les coefficients changent → le tri se met à jour automatiquement.
   const itemsWithProfit = useMemo(() => {
-    const list: { item: CraftItem; profit: number; status: 'ok' | 'no-stats' | 'missing-price' }[] = [];
+    const list: {
+      item: CraftItem;
+      profit: number;
+      profitCraft: number | null;
+      status: 'ok' | 'no-stats' | 'missing-price' | 'no-coefficient' | 'missing-ingredients';
+    }[] = [];
     for (const item of craftItems) {
       if (!item.possibleEffects || item.possibleEffects.length === 0) {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'no-stats' });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'no-stats' });
         continue;
       }
-      const coeff = selectedItemId === item._id ? coefficient : (coeffMap[item._id] ?? 100);
+      const coeff = selectedItemId === item._id ? coefficient : (coeffMap[item._id] ?? null);
+      if (coeff === null || coeff < 1) {
+        // Coefficient non renseigné → aucune estimation possible.
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'no-coefficient' });
+        continue;
+      }
       const craftCost = hdvPrices[item._id]?.unitAverage ?? 0;
+      // Coût de craft : somme des coûts optimaux des ingrédients de la recette.
+      let recipeCost = 0;
+      let hasMissingIngredients = false;
+      for (const ing of item.recipeIngredients ?? []) {
+        const c = getOptimalCost(hdvPrices[ing.id], ing.quantity);
+        if (c === null) {
+          hasMissingIngredients = true;
+          continue;
+        }
+        recipeCost += c;
+      }
       try {
         const b = calculateBreaking(
           item.possibleEffects,
@@ -296,12 +332,15 @@ export default function BreakingSimulator() {
         );
         if (b.hasMissingPrices) {
           // Un prix indispensable (item ou rune) est manquant → le profit serait faux.
-          list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'missing-price' });
+          list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'missing-price' });
+        } else if (hasMissingIngredients) {
+          // Achat possible mais recette incomplète → profit craft indisponible.
+          list.push({ item, profit: b.netProfitStd, profitCraft: null, status: 'missing-ingredients' });
         } else {
-          list.push({ item, profit: b.netProfitStd, status: 'ok' });
+          list.push({ item, profit: b.netProfitStd, profitCraft: b.totalValueStd - recipeCost, status: 'ok' });
         }
       } catch {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, status: 'no-stats' });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'no-stats' });
       }
     }
     return list;
@@ -313,8 +352,14 @@ export default function BreakingSimulator() {
     return m;
   }, [itemsWithProfit]);
 
+  const profitCraftById = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of itemsWithProfit) if (p.profitCraft !== null) m[p.item._id] = p.profitCraft;
+    return m;
+  }, [itemsWithProfit]);
+
   const statusById = useMemo(() => {
-    const m: Record<string, 'ok' | 'no-stats' | 'missing-price'> = {};
+    const m: Record<string, 'ok' | 'no-stats' | 'missing-price' | 'no-coefficient' | 'missing-ingredients'> = {};
     for (const p of itemsWithProfit) m[p.item._id] = p.status;
     return m;
   }, [itemsWithProfit]);
@@ -334,6 +379,8 @@ export default function BreakingSimulator() {
 
   const breaking = useMemo<BreakingResult | null>(() => {
     if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0) return null;
+    // Coefficient non renseigné → aucune estimation possible.
+    if (coefficient === null || coefficient < 1) return null;
 
     const craftCost = hdvPrices[selectedItem._id]?.unitAverage ?? 0;
 
@@ -350,6 +397,40 @@ export default function BreakingSimulator() {
       exoEntries,
     );
   }, [selectedItem, itemStats, coefficient, rollMode, pricesByCode, hdvPrices, focusEffectIndex, exoEntries]);
+
+  // Coût de craft de l'item sélectionné (somme des coûts optimaux des ingrédients).
+  const selectedCraftCost = useMemo(() => {
+    let total = 0;
+    let hasMissing = false;
+    for (const ing of selectedItem?.recipeIngredients ?? []) {
+      const c = getOptimalCost(hdvPrices[ing.id], ing.quantity);
+      if (c === null) {
+        hasMissing = true;
+        continue;
+      }
+      total += c;
+    }
+    return { total, hasMissing };
+  }, [selectedItem, hdvPrices]);
+
+  // Rentabilité via craft (récupère les mêmes lignes de runes, seul le coût diffère).
+  const breakingCraft = useMemo<BreakingResult | null>(() => {
+    if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0) return null;
+    if (coefficient === null || coefficient < 1) return null;
+
+    return calculateBreaking(
+      itemStats.possibleEffects,
+      selectedItem.level,
+      coefficient,
+      rollMode,
+      pricesByCode,
+      selectedCraftCost.total,
+      selectedItem.name,
+      selectedItem.imgUrl,
+      focusEffectIndex,
+      exoEntries,
+    );
+  }, [selectedItem, itemStats, coefficient, rollMode, pricesByCode, selectedCraftCost.total, focusEffectIndex, exoEntries]);
 
   const formatKamas = (n: number) => {
     const sign = n >= 0 ? '+' : '';
@@ -537,12 +618,32 @@ export default function BreakingSimulator() {
                     </div>
                     <div className="shrink-0 text-right">
                       {status === 'ok' ? (
-                        <span className={`text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {profit >= 0 ? '+' : ''}{Math.round(profit).toLocaleString()} K
-                        </span>
+                        <div className="text-right">
+                          <span className={`block text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {profit >= 0 ? '+' : ''}{Math.round(profit).toLocaleString()} K
+                          </span>
+                          {profitCraftById[item._id] !== undefined && (
+                            <span className={`block text-[9px] font-semibold ${profitCraftById[item._id] >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
+                              Craft {profitCraftById[item._id] >= 0 ? '+' : ''}{Math.round(profitCraftById[item._id]).toLocaleString()} K
+                            </span>
+                          )}
+                        </div>
                       ) : status === 'missing-price' ? (
                         <span className="text-[9px] font-semibold text-amber-500/90 flex items-center gap-0.5 justify-end">
                           <AlertTriangle className="h-3 w-3" /> Prix manquant
+                        </span>
+                      ) : status === 'missing-ingredients' ? (
+                        <div className="text-right">
+                          <span className={`block text-[10px] font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {profit >= 0 ? '+' : ''}{Math.round(profit).toLocaleString()} K
+                          </span>
+                          <span className="block text-[9px] font-semibold text-amber-500/80 flex items-center gap-0.5 justify-end">
+                            <AlertTriangle className="h-3 w-3" /> Prix incomplet
+                          </span>
+                        </div>
+                      ) : status === 'no-coefficient' ? (
+                        <span className="text-[9px] font-semibold text-slate-500 flex items-center gap-0.5 justify-end">
+                          <Info className="h-3 w-3" /> Coef. manquant
                         </span>
                       ) : (
                         <span className="text-[9px] text-slate-600">—</span>
@@ -667,13 +768,20 @@ export default function BreakingSimulator() {
                     <input
                       type="number"
                       min={1}
-                      value={coefficient}
+                      value={coefficient ?? ''}
+                      placeholder="- %"
                       onChange={e => {
-                        const v = parseInt(e.target.value);
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          handleCoefficientChange(null);
+                          return;
+                        }
+                        const v = parseInt(raw, 10);
                         if (!isNaN(v) && v >= 1) handleCoefficientChange(v);
-                        if (e.target.value === '') handleCoefficientChange(1);
                       }}
-                      className="w-16 bg-[#070a12] border border-white/10 rounded px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className={`w-16 bg-[#070a12] border border-white/10 rounded px-2 py-1 text-xs text-center focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                        coefficient === null ? 'text-slate-500 italic' : 'text-white'
+                      }`}
                     />
                     <span className="text-[10px] text-slate-500">%</span>
                   </div>
@@ -711,9 +819,13 @@ export default function BreakingSimulator() {
               {breaking && (
                 <>
                   {/* Summary cards */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-400">Achat HDV</span>
+                    <div className="h-px flex-1 bg-white/5" />
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-slate-900/40 rounded-xl p-3 text-center">
-                      <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Prix de l'item</p>
+                      <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Prix d'achat</p>
                       <input
                         type="number"
                         min={0}
@@ -788,6 +900,64 @@ export default function BreakingSimulator() {
                           </p>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Rentabilité via craft */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">Via craft</span>
+                    <div className="h-px flex-1 bg-white/5" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-emerald-900/10 rounded-xl p-3 text-center border border-emerald-500/20">
+                      <p className="text-[9px] text-emerald-400/80 uppercase tracking-wider mb-1">Coût des ingrédients</p>
+                      {selectedCraftCost.hasMissing ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix incomplet
+                        </p>
+                      ) : (
+                        <p className={`text-lg font-extrabold ${breakingCraft?.missingItemPrice ? 'text-rose-400' : 'text-emerald-300'}`}>
+                          {Math.round(selectedCraftCost.total).toLocaleString()} K
+                        </p>
+                      )}
+                    </div>
+                    <div className="bg-emerald-900/10 rounded-xl p-3 text-center border border-emerald-500/20">
+                      <p className="text-[9px] text-emerald-400/80 uppercase tracking-wider mb-1">Bénéfice net</p>
+                      {selectedCraftCost.hasMissing ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix incomplet
+                        </p>
+                      ) : breakingCraft?.hasMissingPrices ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix manquant
+                        </p>
+                      ) : (
+                        <p className={`text-lg font-extrabold ${breakingCraft && breakingCraft.netProfitStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {breakingCraft ? formatKamas(breakingCraft.netProfitStd) : '—'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="bg-emerald-900/10 rounded-xl p-3 text-center border border-emerald-500/20">
+                      <p className="text-[9px] text-emerald-400/80 uppercase tracking-wider mb-1">ROI</p>
+                      {selectedCraftCost.hasMissing ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix incomplet
+                        </p>
+                      ) : breakingCraft?.hasMissingPrices ? (
+                        <p className="text-sm font-bold text-amber-400 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-4 w-4 shrink-0" /> Prix manquant
+                        </p>
+                      ) : (
+                        <p className={`text-lg font-extrabold ${breakingCraft && breakingCraft.roiStd >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {breakingCraft && breakingCraft.roiStd >= 0 ? '+' : ''}{breakingCraft ? breakingCraft.roiStd.toFixed(1) : '—'}%
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedCraftCost.hasMissing && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-300 -mt-1">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      Le prix de certains ingrédients est manquant : la rentabilité via craft ne peut pas être calculée.
                     </div>
                   )}
 
@@ -1075,9 +1245,13 @@ export default function BreakingSimulator() {
 
               {!breaking && itemStats && (
                 <div className="glass-panel rounded-xl p-8 text-center text-sm text-slate-500 min-h-[200px] flex items-center justify-center">
-                  {itemStats.possibleEffects.length > 0
-                    ? 'Aucune rune produite — vérifiez les réglages ou les prix des runes.'
-                    : 'Cet équipement n\'a pas de statistiques exploitables pour le brisage.'}
+                  {coefficient === null || coefficient < 1 ? (
+                    'Renseignez un coefficient de brisage pour estimer les runes produites.'
+                  ) : itemStats.possibleEffects.length > 0 ? (
+                    'Aucune rune produite — vérifiez les réglages ou les prix des runes.'
+                  ) : (
+                    'Cet équipement n\'a pas de statistiques exploitables pour le brisage.'
+                  )}
                 </div>
               )}
             </>
