@@ -444,10 +444,18 @@ export default function BreakingSimulator() {
   }, [selectedItem, itemStats, effectiveCoefficient, rollMode, pricesByCode, selectedCraftCost.total, focusEffectIndex, exoEntries]);
 
   // Suggestion du meilleur Focus : la rune dont le focus donne la plus grande valeur totale.
-  const bestFocusSuggestion = useMemo<{ effectIndex: number; runeCode: string; totalValueFocus: number } | null>(() => {
-    if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0) return null;
-    if (!breaking) return null;
-    let best: { effectIndex: number; runeCode: string; totalValueFocus: number } | null = null;
+  // Un Focus n'est recommandé QUE si la ligne ciblée génère au moins 1,0 rune entière en mode
+  // Focus (runesFocus ≥ 1.0) : en jeu, une quantité < 1 se traduit très souvent par 0 rune.
+  const bestFocusSuggestion = useMemo<{
+    suggestion: { effectIndex: number; runeCode: string; totalValueFocus: number; quantityFocus: number } | null;
+    noneQualify: boolean;
+  }>(() => {
+    if (!selectedItem || !itemStats?.possibleEffects || itemStats.possibleEffects.length === 0 || !breaking) {
+      return { suggestion: null, noneQualify: false };
+    }
+    let best: { effectIndex: number; runeCode: string; totalValueFocus: number; quantityFocus: number } | null = null;
+    let hasCandidateWithPrice = false;
+    let anyQualifying = false;
     for (const l of breaking.lines) {
       const focused = calculateBreaking(
         itemStats.possibleEffects,
@@ -462,11 +470,21 @@ export default function BreakingSimulator() {
         exoEntries,
       );
       if (!focused || focused.hasMissingPrices) continue;
+      const focusedLine = focused.lines.find(fl => fl.isFocused);
+      if (!focusedLine) continue;
+      hasCandidateWithPrice = true;
+      if (focusedLine.quantityFocus < 1.0) continue;
+      anyQualifying = true;
       if (!best || focused.totalValueFocus > best.totalValueFocus) {
-        best = { effectIndex: l.effectIndex, runeCode: l.rune.code, totalValueFocus: focused.totalValueFocus };
+        best = {
+          effectIndex: l.effectIndex,
+          runeCode: l.rune.code,
+          totalValueFocus: focused.totalValueFocus,
+          quantityFocus: focusedLine.quantityFocus,
+        };
       }
     }
-    return best;
+    return { suggestion: best, noneQualify: hasCandidateWithPrice && !anyQualifying };
   }, [selectedItem, itemStats, breaking, effectiveCoefficient, rollMode, pricesByCode, exoEntries]);
 
   const formatKamas = (n: number) => {
@@ -1023,20 +1041,26 @@ export default function BreakingSimulator() {
                     </div>
                   )}
 
-                  {bestFocusSuggestion && !hasFocus && (
+                  {bestFocusSuggestion && bestFocusSuggestion.suggestion && !hasFocus && (
                     <button
-                      onClick={() => setFocusEffectIndex(bestFocusSuggestion.effectIndex)}
+                      onClick={() => setFocusEffectIndex(bestFocusSuggestion.suggestion!.effectIndex)}
                       className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-[10px] text-purple-300 hover:bg-purple-500/20 transition-all -mt-1"
-                      title="Cliquer pour appliquer ce focus"
+                      title={`Cliquer pour appliquer ce focus (${bestFocusSuggestion.suggestion!.quantityFocus.toFixed(2)} rune(s) en focus)`}
                     >
                       <span className="flex items-center gap-1.5">
                         <Crosshair className="h-3.5 w-3.5 shrink-0" />
-                        Focus suggéré : <b>{bestFocusSuggestion.runeCode}</b> — rune la plus rentable à cibler
+                        Focus suggéré : <b>{bestFocusSuggestion.suggestion!.runeCode}</b> — rune la plus rentable à cibler
                       </span>
                       <span className="shrink-0 text-[9px] text-purple-400/80">
-                        {Math.round(bestFocusSuggestion.totalValueFocus).toLocaleString()} K (focus)
+                        {bestFocusSuggestion.suggestion!.quantityFocus.toFixed(2)} rune(s) · {Math.round(bestFocusSuggestion.suggestion!.totalValueFocus).toLocaleString()} K (focus)
                       </span>
                     </button>
+                  )}
+                  {bestFocusSuggestion && bestFocusSuggestion.noneQualify && !hasFocus && (
+                    <div className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-600/40 text-[10px] text-slate-400 -mt-1">
+                      <Info className="h-3.5 w-3.5 shrink-0" />
+                      Aucun focus recommandé (runes &lt; 1 en focus) — préférez le brisage Standard.
+                    </div>
                   )}
 
                   {/* Rune table */}
@@ -1167,7 +1191,21 @@ export default function BreakingSimulator() {
                                     {effectiveUnitPrice > 0 ? `${Math.round(l.valueStd).toLocaleString()} K` : '—'}
                                   </td>
                                   <td className="text-right py-2 px-3 font-mono text-purple-300">
-                                    {hasFocus ? l.quantityFocus.toFixed(2) : '—'}
+                                    {hasFocus ? (
+                                      l.quantityFocus < 1 ? (
+                                        <span
+                                          className="inline-flex items-center justify-end gap-1 text-amber-500 font-semibold cursor-help"
+                                          title="Quantité < 1 : risque élevé d'obtenir 0 rune"
+                                        >
+                                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                                          {l.quantityFocus.toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        l.quantityFocus.toFixed(2)
+                                      )
+                                    ) : (
+                                      '—'
+                                    )}
                                   </td>
                                   <td className={`text-right py-2 px-3 font-mono font-bold ${hasFocus && l.valueFocus > 0 ? 'text-purple-400' : 'text-slate-500'}`}>
                                     {hasFocus && effectiveUnitPrice > 0 ? `${Math.round(l.valueFocus).toLocaleString()} K` : '—'}
