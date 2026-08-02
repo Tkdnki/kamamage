@@ -4,6 +4,7 @@ import { useDofus } from '../context/DofusContext';
 import { useServer } from '../context/ServerContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
+import type { ScannerQueueItem } from '../context/NavigationContext';
 import { fetchCraftsByJob } from '../services/api';
 import type { CraftItem } from '../services/api';
 import {
@@ -15,12 +16,13 @@ import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
 import {
   BREAKING_JOBS, DOFUSDB_BASE_URL, FETCH_TIMEOUT,
-  calculateBreaking, getRunePriceKey,
+  calculateBreaking, getRunePriceKey, getEffectConfig, findMatchingRune,
 } from '../lib/breaking';
 import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking';
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
 import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients } from '../lib/sync';
+import { needsPriceScan } from '../lib/pricing';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -211,6 +213,63 @@ export default function BreakingSimulator() {
     return m;
   }, [hdvPrices, runeCommunityPrices]);
 
+  // ─── Scan HDV Métier (Équipements + Runes) ───────────────────────────────
+  // Runes uniques associées aux lignes de stats de tous les équipements du métier,
+  // résolues via le mapping Stat → Rune corrigé (findMatchingRune).
+  const jobRunes = useMemo<ScannerQueueItem[]>(() => {
+    const runeMap = new Map<string, ScannerQueueItem>();
+    for (const item of craftItems) {
+      for (const eff of item.possibleEffects ?? []) {
+        const cfg = getEffectConfig(eff.effectId);
+        if (!cfg) continue;
+        const rune = findMatchingRune(cfg.name, 0, cfg.unit);
+        if (!rune) continue;
+        const key = getRunePriceKey(rune);
+        if (!runeMap.has(key)) {
+          runeMap.set(key, { expectedName: rune.name, expectedId: key, type: 'Rune de forgemagie' });
+        }
+      }
+    }
+    return Array.from(runeMap.values());
+  }, [craftItems]);
+
+  const jobEquipments = useMemo<ScannerQueueItem[]>(
+    () => craftItems.map(item => ({ expectedName: item.name, expectedId: item._id, type: item.type })),
+    [craftItems],
+  );
+
+  // Tous les items à scanner du métier (équipements + runes).
+  const jobScanAll = useMemo(() => [...jobEquipments, ...jobRunes], [jobEquipments, jobRunes]);
+
+  // Un item/rune nécessite un scan si son prix est nul/manquant OU obsolète (> 10 jours).
+  const needsJobScan = useCallback(
+    (it: ScannerQueueItem) => {
+      const p = hdvPrices[it.expectedId];
+      return needsPriceScan(p?.unitAverage, p?.updatedAt);
+    },
+    [hdvPrices],
+  );
+
+  const jobEquipmentsToUpdate = useMemo(
+    () => jobEquipments.filter(needsJobScan),
+    [jobEquipments, needsJobScan],
+  );
+  const jobRunesToUpdate = useMemo(
+    () => jobRunes.filter(needsJobScan),
+    [jobRunes, needsJobScan],
+  );
+
+  // Ouvre le scanner HDV pré-rempli : mode "stale" (manquants + > 10 jours) s'il
+  // reste des prix à actualiser, sinon "full" (tous les équipements et runes).
+  const openJobScan = useCallback(() => {
+    const needs = [...jobEquipmentsToUpdate, ...jobRunesToUpdate];
+    const items = needs.length > 0 ? needs : jobScanAll;
+    openScanner(items, {
+      title: `Scan HDV Métier - ${activeJob}`,
+      initialScanMode: needs.length > 0 ? 'stale' : 'full',
+    });
+  }, [jobEquipmentsToUpdate, jobRunesToUpdate, jobScanAll, openScanner, activeJob]);
+
   // ─── Rentabilité estimée de chaque item (tri de la liste) ───────────────
   // (Valeur totale estimée des runes obtenues × coefficient) − Prix d'achat.
   // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
@@ -384,6 +443,32 @@ export default function BreakingSimulator() {
               className="w-full bg-[#070a12] border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40"
             />
           </div>
+
+          {/* Scan HDV Métier : équipements + runes (prix manquants ou obsolètes > 10 jours) */}
+          {!isLoadingItems && jobScanAll.length > 0 && (
+            <button
+              type="button"
+              onClick={openJobScan}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all border bg-slate-800/20 border-amber-500/30 hover:bg-amber-500/10 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
+              title={`Scanner en HDV les équipements et runes du métier ${activeJob} (prix manquants ou obsolètes > 10 jours)`}
+            >
+              <span className="flex items-center gap-1.5 min-w-0">
+                <Camera className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Scan HDV Métier - {activeJob}</span>
+              </span>
+              {jobEquipmentsToUpdate.length + jobRunesToUpdate.length > 0 ? (
+                <span className="shrink-0 flex items-center gap-1 text-[9px] bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  {jobEquipmentsToUpdate.length} équip. · {jobRunesToUpdate.length} runes à actualiser
+                </span>
+              ) : (
+                <span className="shrink-0 flex items-center gap-1 text-[9px] bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                  <Camera className="h-2.5 w-2.5" />
+                  {jobScanAll.length} items à jour
+                </span>
+              )}
+            </button>
+          )}
 
           {isLoadingItems && (
             <div className="flex items-center justify-center py-12">

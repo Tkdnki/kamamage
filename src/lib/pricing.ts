@@ -4,6 +4,27 @@ import type { PriceData, HdvPrices } from '../context/DofusContext';
 export const STALE_PRICE_MS = 10 * 24 * 60 * 60 * 1000;
 
 /**
+ * Un prix est obsolète si sa dernière mise à jour date de plus de
+ * `daysThreshold` jours (ou si la date est absente/invalide).
+ */
+export function isPriceOutdated(updatedAt?: string | null, daysThreshold = 10): boolean {
+  if (!updatedAt) return true;
+  const t = new Date(updatedAt).getTime();
+  if (Number.isNaN(t)) return true;
+  const ageMs = Date.now() - t;
+  return ageMs > daysThreshold * 24 * 60 * 60 * 1000;
+}
+
+/**
+ * Un item/rune nécessite un scan HDV si son prix est nul/manquant
+ * OU si sa dernière mise à jour date de plus de `daysThreshold` jours.
+ */
+export function needsPriceScan(price: number | undefined, updatedAt?: string | null, daysThreshold = 10): boolean {
+  if (!price || price <= 0) return true;
+  return isPriceOutdated(updatedAt, daysThreshold);
+}
+
+/**
  * Un prix est "à actualiser" (obsolète ou manquant) s'il est absent, sans lot
  * renseigné, sans date de mise à jour, ou plus vieux que STALE_PRICE_MS.
  */
@@ -12,10 +33,7 @@ export function isPriceStaleOrMissing(itemId: string, hdvPrices: HdvPrices): boo
   if (!p) return true;
   const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
   if (!hasAnyPrice) return true;
-  if (!p.updatedAt) return true;
-  const ageMs = Date.now() - new Date(p.updatedAt).getTime();
-  if (Number.isNaN(ageMs)) return true;
-  return ageMs > STALE_PRICE_MS;
+  return isPriceOutdated(p.updatedAt, 10);
 }
 
 interface LotOption {
