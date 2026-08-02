@@ -23,13 +23,15 @@ const MAX_RETRIES = 3;
 // de 60s sous charge : on re-tente au lieu de perdre l'image.
 const MAX_TIMEOUT_RETRIES = 3;
 
-// Backoff de base pour un 503 (Over Capacity) : délai fixe de 3s.
+// Backoff de base exponentiel pour l'erreur 429 (Rate Limit) :
+// Math.pow(2, retries - 1) * 3000 → retry 1 → 3s, retry 2 → 6s, retry 3 → 12s.
 const RETRY_BASE_DELAY_MS = 3000;
 
-// Backoff pour un 429 (Rate Limit) : Math.pow(2, retries) * 5000
-// (retry 1 → 10s, retry 2 → 20s) car la fenêtre de réinitialisation du
-// provider IA est généralement ~60s.
-const RATE_LIMIT_BASE_DELAY_MS = 5000;
+// Backoff de base exponentiel pour l'erreur 503 (Over Capacity / Surcharge Groq) :
+// délai plus long pour laisser les serveurs Groq récupérer avant la nouvelle
+// tentative : Math.pow(2, retries - 1) * 5000 → retry 1 → 5s, retry 2 → 10s,
+// retry 3 → 20s.
+const GROQ_OVERLOAD_BASE_DELAY_MS = 5000;
 
 // Durée de pause automatique de la file après épuisement des retries (429) :
 // reprise automatique après 30s, ou immédiatement au clic.
@@ -79,7 +81,7 @@ interface HdvScannerModalProps {
 }
 
 export default function HdvScannerModal({ isOpen, onClose, initialQueue, targetedItem, title, initialScanMode }: HdvScannerModalProps) {
-  const { setHdvPrice, hdvPrices } = useDofus();
+  const { setHdvPrice, hdvPrices, setIsScanning } = useDofus();
   const { user } = useAuth();
 
   const [queue, setQueue] = useState<QueueEntry[]>([]);
@@ -99,6 +101,19 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Un scan est "en cours" dès qu'une image est en file ou que le traitement est
+  // actif (y compris pendant les pauses quota). On le signale au DofusContext
+  // pour suspendre le polling Supabase en arrière-plan le temps du scan.
+  const isScanningActive = isProcessing || queue.length > 0;
+  useEffect(() => {
+    setIsScanning(isScanningActive);
+  }, [isScanningActive, setIsScanning]);
+
+  // Sécurité : si la modale est démontée en plein scan, on relâche le flag.
+  useEffect(() => {
+    return () => setIsScanning(false);
+  }, [setIsScanning]);
 
   // Double méthode de scan : "full" = tous les items attendus, "stale" = uniquement
   // les prix manquants ou obsolètes (> 10 jours).
@@ -402,15 +417,15 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             continue;
           }
 
-          // EXPONENTIAL BACKOFF adapté au type d'erreur :
-          // - 429 (Rate Limit) : la fenêtre de réinitialisation du provider est
-          //   ~60s → Math.pow(2, retries) * 5000 (retry 1 → 10s, retry 2 → 20s).
-          // - 503 (Over Capacity) : délai fixe de 3s.
-          // Si la route renvoie un champ `retryAfter` (JSON ou header), on
-          // l'utilise exactement via le setTimeout bloquant ci-dessous.
+          // EXPONENTIAL BACKOFF spécifique au type d'erreur :
+          // - 429 (Rate Limit) : Math.pow(2, retries - 1) * 3000 → 3s, 6s, 12s.
+          // - 503 (Over Capacity / Surcharge Groq) : Math.pow(2, retries - 1) * 5000
+          //   → 5s, 10s, 20s : pause plus longue pour laisser Groq récupérer.
+          // Si la route renvoie un champ `retryAfter` (JSON ou header), on l'utilise
+          // exactement via le setTimeout bloquant ci-dessous.
           const backoffDelay = isRateLimit
-            ? Math.pow(2, retries) * RATE_LIMIT_BASE_DELAY_MS
-            : RETRY_BASE_DELAY_MS;
+            ? Math.pow(2, retries - 1) * RETRY_BASE_DELAY_MS
+            : Math.pow(2, retries - 1) * GROQ_OVERLOAD_BASE_DELAY_MS;
           const waitSeconds = Math.max(backoffDelay / 1000, retryAfter ?? 0);
           const waited = await waitWithCountdown(waitSeconds, 'Surcharge API — attente de');
           if (!waited) break;

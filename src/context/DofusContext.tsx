@@ -27,6 +27,9 @@ interface DofusContextType {
   hdvPrices: HdvPrices;
   trackedItemIds: string[];
   customItems: DofusItem[];
+  /** Vrai pendant qu'un scan HDV est en cours (file non vide ou traitement actif). */
+  isScanning: boolean;
+  setIsScanning: (scanning: boolean) => void;
   setHdvPrice: (itemId: string, x1: number, x10: number, x100: number, x1000: number) => void;
   setMonthlySalesVolume: (itemId: string, volume: number) => void;
   trackItem: (item: DofusItem) => void;
@@ -119,6 +122,15 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
   // hdvPrices est un état local, initialisé depuis le cache localStorage
   const [hdvPrices, setHdvPrices] = useState<HdvPrices>(() => loadCache(storageKey));
+
+  // Flag global "un scan HDV est en cours" : le polling Supabase en arrière-plan
+  // est suspendu pendant ce temps (le scanner écrit des prix, on évite de re-fetch
+  // en parallèle). Un ref permet au poll de lire la valeur sans re-créer l'intervalle.
+  const [isScanning, setIsScanning] = useState(false);
+  const isScanningRef = useRef(false);
+  useEffect(() => {
+    isScanningRef.current = isScanning;
+  }, [isScanning]);
 
   // Clés des items déjà synchronisés vers Supabase (persistées par serveur).
   // Permet au re-sync (login) de ne pousser QUE les items réellement non sync
@@ -214,6 +226,9 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const poll = async () => {
+      // Scan HDV en cours → on suspend le polling (évite de re-fetch pendant
+      // les écritures du scanner). Reprise automatique au tick suivant.
+      if (isScanningRef.current) return;
       const remote = await fetchHdvPricesFromServer(selectedServer);
       if (cancelled || !remote || Object.keys(remote).length === 0) return;
       setHdvPrices(prev => {
@@ -365,6 +380,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       hdvPrices,
       trackedItemIds,
       customItems,
+      isScanning,
+      setIsScanning,
       setHdvPrice,
       setMonthlySalesVolume,
       trackItem,
