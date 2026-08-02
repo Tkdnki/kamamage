@@ -634,7 +634,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           const first = scanResult.items[0];
           const prices = first?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
           console.log(`[scan] 🎯 Scan forcé : prix attribués à "${t.expectedName}" (ID ${t.expectedId})`, prices);
-          setHdvPrice(t.expectedId, prices.x1, prices.x10, prices.x100, prices.x1000);
+          setHdvPrice(t.expectedId, prices.x1, prices.x10, prices.x100, prices.x1000, { explicit: true });
 
           const newResolved = new Set(resolvedIdsRef.current);
           newResolved.add(t.expectedId);
@@ -675,7 +675,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             // Sauvegarde directe avec l'expectedId et l'expectedName EXACTS de la file
             console.log(`[scan] ✅ Match bilatéral réussi (file d'attente): OCR "${item.name}" -> Nom exact "${matchedExpected.expectedName}" (ID "${matchedExpected.expectedId}")`, item.prices);
             
-            setHdvPrice(matchedExpected.expectedId, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
+            setHdvPrice(matchedExpected.expectedId, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000, { explicit: true });
             newResolved.add(matchedExpected.expectedId);
 
             const dofusItem = { _id: matchedExpected.expectedId, name: matchedExpected.expectedName } as DofusItem;
@@ -710,7 +710,7 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
             if (dofusItem) {
               // Intégrité des données : On conserve l'objet complet avec son nom d'origine issu de DofusDB (ex: "Casque de l'Écumouth")
               console.log(`[scan] ✅ Match bilatéral DofusDB réussi : OCR "${item.name}" -> Nom DofusDB exact "${dofusItem.name}" (ID "${dofusItem._id}")`, item.prices);
-              setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000);
+              setHdvPrice(dofusItem._id, item.prices.x1, item.prices.x10, item.prices.x100, item.prices.x1000, { explicit: true });
               if (activeExpectedRef.current.some(e => e.expectedId === dofusItem!._id)) {
                 newResolved.add(dofusItem._id);
               }

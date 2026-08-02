@@ -1,7 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Durée maximale d'exécution de la fonction Vercel (en secondes). On garde une
+// marge par rapport au timeout interne Groq (GROQ_TIMEOUT_MS) pour que la
+// fonction réponde en JSON propre AVANT que Vercel ne coupe avec une page HTML.
+export const maxDuration = 30;
+
 // Nombre max de réessais après un échec de validation JSON du modèle (tentatives = retries + 1).
 const MAX_JSON_RETRIES = 2;
+
+// Timeout de sécurité sur l'appel Groq Vision : on coupe à 25s (sous la limite
+// Vercel de 30s) pour intercepter la fin du temps et renvoyer un JSON propre
+// { error: "Timeout Groq" } au lieu de laisser Vercel couper la réponse avec une
+// page d'erreur HTML (ex. "Unexpected token 'A'" côté client).
+const GROQ_TIMEOUT_MS = 25000;
 
 // Index de rotation Round-Robin : alterne la clé de départ à chaque requête
 // pour répartir la charge sur toutes les clés Groq configurées.
@@ -145,6 +156,8 @@ interface GroqVisionResult {
   rawText: string;
   headers: Headers;
   isJsonValidationError: boolean;
+  /** Vrai si l'appel a été interrompu par le timeout interne (GROQ_TIMEOUT_MS). */
+  timedOut: boolean;
 }
 
 // "Rate limit reached. Please try again in 10.5s" (Groq inclut souvent le délai recommandé).
@@ -178,45 +191,63 @@ function isDailyLimitError(result: GroqVisionResult): boolean {
 }
 
 async function callGroqVision(apiKey: string, model: string, systemPrompt: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: promptText },
-            {
-              type: 'image_url',
-              image_url: { url: imageUrl }
-            }
-          ]
-        }
-      ],
-      // Mode JSON strict Groq : la réponse DOIT être un objet JSON valide.
-      response_format: { type: 'json_object' },
-      // Température très basse pour forcer un rendu déterministe.
-      temperature: 0.1
-    })
-  });
+  // Timeout de sécurité : interrompt l'appel Groq à GROQ_TIMEOUT_MS. Si la coupe
+  // survient, on renvoie un résultat marqué `timedOut` (JSON propre côté client)
+  // au lieu de laisser la requête pendre jusqu'à la limite Vercel (maxDuration).
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
 
-  const rawText = await response.text();
-  let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } | null = null;
   try {
-    body = JSON.parse(rawText) as typeof body;
-  } catch { /* corps non-JSON (rare) */ }
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: promptText },
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl }
+              }
+            ]
+          }
+        ],
+        // Mode JSON strict Groq : la réponse DOIT être un objet JSON valide.
+        response_format: { type: 'json_object' },
+        // Température très basse pour forcer un rendu déterministe.
+        temperature: 0.1
+      }),
+      signal: controller.signal
+    });
 
-  const isJsonValidationError =
-    response.status === 400 &&
-    (body?.error?.code === 'json_validate_failed' || rawText.includes('json_validate_failed'));
+    const rawText = await response.text();
+    let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } | null = null;
+    try {
+      body = JSON.parse(rawText) as typeof body;
+    } catch { /* corps non-JSON (rare) */ }
 
-  return { ok: response.ok, status: response.status, body, rawText, headers: response.headers, isJsonValidationError };
+    const isJsonValidationError =
+      response.status === 400 &&
+      (body?.error?.code === 'json_validate_failed' || rawText.includes('json_validate_failed'));
+
+    return { ok: response.ok, status: response.status, body, rawText, headers: response.headers, isJsonValidationError, timedOut: false };
+  } catch (err: unknown) {
+    // Interruption volontaire par notre AbortController (GROQ_TIMEOUT_MS) :
+    // on signale le timeout pour que le handler réponde en JSON propre.
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, status: 0, body: null, rawText: '', headers: new Headers(), isJsonValidationError: false, timedOut: true };
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -294,6 +325,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       | { kind: 'success'; payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } }
       | { kind: 'quota'; status: number; retryAfter: number; isDailyLimit: boolean }
       | { kind: 'jsonValidationFailed'; detail: string }
+      | { kind: 'timeout' }
       | { kind: 'modelFailure'; detail: string }
     > => {
       let lastError = '';
@@ -304,6 +336,14 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
         for (let attempt = 0; attempt <= MAX_JSON_RETRIES; attempt++) {
           try {
             const result = await callGroqVision(apiKey, model, systemPrompt, promptText, imageUrl);
+
+            // Timeout interne (GROQ_TIMEOUT_MS) : la marge restante avant la
+            // limite Vercel (maxDuration) est trop courte pour réessayer une
+            // autre clé/modèle → on renvoie immédiatement un JSON propre.
+            if (result.timedOut) {
+              console.warn(`[scan-hdv] ⏱️ Timeout Groq (${GROQ_TIMEOUT_MS}ms) sur "${model}".`);
+              return { kind: 'timeout' };
+            }
 
             // Erreurs de quota Groq (429 Rate Limit / 503 Over Capacity) : on
             // laisse la boucle multi-clés décider (basculement sur une autre clé).
@@ -420,6 +460,12 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
           error: 'Le modèle vision n\'a pas produit de JSON valide.',
           detail: outcome.detail,
         });
+      }
+
+      if (outcome.kind === 'timeout') {
+        // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on répond en JSON propre
+        // (504) plutôt que de laisser Vercel couper la réponse avec une page HTML.
+        return res.status(504).json({ error: 'Timeout Groq' });
       }
 
       // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle.
