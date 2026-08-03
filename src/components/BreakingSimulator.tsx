@@ -22,7 +22,7 @@ import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking'
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
 import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients, deleteItemCoefficient } from '../lib/sync';
-import { getOptimalCost, needsPriceScan } from '../lib/pricing';
+import { getOptimalCost, isPriceStaleOrMissing } from '../lib/pricing';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -303,12 +303,12 @@ export default function BreakingSimulator() {
   // Tous les items à scanner du métier (équipements + runes).
   const jobScanAll = useMemo(() => [...jobEquipments, ...jobRunes], [jobEquipments, jobRunes]);
 
-  // Un item/rune nécessite un scan si son prix est nul/manquant OU obsolète (> 10 jours).
+  // Un item/rune nécessite un scan si son prix est absent/nul (tous lots à 0)
+  // OU obsolète (> 10 jours). On réutilise la même logique que l'HdvScannerModal
+  // (isPriceStaleOrMissing) pour que le badge et la file soient cohérents : un
+  // équipement avec un prix récent > 0 n'est pas compté comme « à actualiser ».
   const needsJobScan = useCallback(
-    (it: ScannerQueueItem) => {
-      const p = hdvPrices[it.expectedId];
-      return needsPriceScan(p?.unitAverage, p?.updatedAt);
-    },
+    (it: ScannerQueueItem) => isPriceStaleOrMissing(it.expectedId, hdvPrices),
     [hdvPrices],
   );
 
