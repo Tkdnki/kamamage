@@ -6,11 +6,11 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '../context/NavigationContext';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { fetchCraftsByJob } from '../services/api';
-import type { CraftItem } from '../services/api';
+import type { CraftItem, NormalizedRecipeIngredient } from '../services/api';
 import {
   Gem, Scissors, Shield, Flame, Wand2, Heart,
   Loader2, Search, AlertTriangle, Coins, Info, Hammer, GraduationCap, Crosshair, Plus,
-  Copy, ExternalLink, Camera,
+  Copy, ExternalLink, Camera, PenLine, Check,
 } from 'lucide-react';
 import ItemImage from './ItemImage';
 import QuickPriceInput from './QuickPriceInput';
@@ -58,6 +58,9 @@ export default function BreakingSimulator() {
   const [focusEffectIndex, setFocusEffectIndex] = useState<number | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Saisie rapide des prix d'ingrédients manquants (ouvre la popup dédiée).
+  const [quickEntryOpen, setQuickEntryOpen] = useState(false);
 
   const copyToClipboard = async (text: string, id: string) => {
     try {
@@ -454,15 +457,17 @@ export default function BreakingSimulator() {
   const selectedCraftCost = useMemo(() => {
     let total = 0;
     let hasMissing = false;
+    const missing: NormalizedRecipeIngredient[] = [];
     for (const ing of selectedItem?.recipeIngredients ?? []) {
       const c = getOptimalCost(hdvPrices[ing.id], ing.quantity);
       if (c === null) {
         hasMissing = true;
+        missing.push(ing);
         continue;
       }
       total += c;
     }
-    return { total, hasMissing };
+    return { total, hasMissing, missingIngredients: missing };
   }, [selectedItem, hdvPrices]);
 
   // Rentabilité via craft (récupère les mêmes lignes de runes, seul le coût diffère).
@@ -549,6 +554,29 @@ export default function BreakingSimulator() {
       ...[...runesById.values()].map(r => ({ expectedName: r.name, expectedId: getRunePriceKey(r), type: 'Rune de forgemagie' })),
     ]);
   }, [selectedItem, breaking, openScanner]);
+
+  // Ouvre le scanner HDV sur UNIQUEMENT les ingrédients sans prix de la recette
+  // (HDV Ressources). Chaque prix scanné est écrit dans hdvPrices sous l'ID de la
+  // ressource → recalcul immédiat du coût de craft.
+  const scanMissingRecipe = useCallback(() => {
+    const missing = selectedCraftCost.missingIngredients;
+    if (missing.length === 0 || !selectedItem) return;
+    const queue: ScannerQueueItem[] = missing.map(ing => ({
+      expectedName: ing.name,
+      expectedId: ing.id,
+      type: ing.type || 'Ressource',
+    }));
+    openScanner(queue, {
+      title: `Ingrédients manquants - ${selectedItem.name}`,
+      initialScanMode: 'full',
+    });
+  }, [selectedItem, selectedCraftCost.missingIngredients, openScanner]);
+
+  // Sauvegarde rapide manuelle d'un prix d'ingrédient (x1 = prix renseigné).
+  const saveQuickIngredientPrice = useCallback((ing: NormalizedRecipeIngredient, price: number) => {
+    if (price <= 0) return;
+    setHdvPrice(ing.id, price, 0, 0, 0, { explicit: true });
+  }, [setHdvPrice]);
 
   const addExo = () => {
     if (!exoSelectRuneId || exoQuantity <= 0) return;
@@ -1074,8 +1102,39 @@ export default function BreakingSimulator() {
                   {/* Rentabilité via craft */}
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400">Via craft</span>
+                    {selectedItem.recipeIngredients && selectedItem.recipeIngredients.length > 0 && (
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                        selectedCraftCost.hasMissing
+                          ? 'text-amber-300 bg-amber-500/10 border-amber-500/30'
+                          : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30'
+                      }`}>
+                        {`${selectedItem.recipeIngredients.length - selectedCraftCost.missingIngredients.length}/${selectedItem.recipeIngredients.length} ingrédients renseignés`}
+                      </span>
+                    )}
                     <div className="h-px flex-1 bg-white/5" />
                   </div>
+                  {selectedCraftCost.hasMissing && selectedCraftCost.missingIngredients.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={scanMissingRecipe}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold transition-all border bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                        title={`Scanner en HDV les ${selectedCraftCost.missingIngredients.length} ingrédients sans prix de la recette`}
+                      >
+                        <Camera className="h-3.5 w-3.5 shrink-0" />
+                        Scanner les {selectedCraftCost.missingIngredients.length} ingrédients manquants
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickEntryOpen(true)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold transition-all border bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20"
+                        title="Saisir manuellement les prix des ingrédients manquants (sans scan)"
+                      >
+                        <PenLine className="h-3.5 w-3.5 shrink-0" />
+                        Saisie rapide
+                      </button>
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-emerald-900/10 rounded-xl p-3 text-center border border-emerald-500/20">
                       <p className="text-[9px] text-emerald-400/80 uppercase tracking-wider mb-1">Coût des ingrédients</p>
@@ -1465,6 +1524,50 @@ export default function BreakingSimulator() {
           )}
         </div>
       </div>
+{/* Popup de saisie rapide des prix d'ingrédients manquants */}
+      {quickEntryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setQuickEntryOpen(false)} />
+          <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-[#0b1020] border border-white/10 rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-white/5">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-sky-400" />
+                  Saisie rapide des ingrédients
+                </h3>
+                <p className="text-[10px] text-slate-400">
+                  {selectedCraftCost.missingIngredients.length} ingrédient(s) sans prix — {selectedItem?.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickEntryOpen(false)}
+                className="text-slate-500 hover:text-white transition-all"
+                aria-label="Fermer"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 p-4">
+              {selectedCraftCost.missingIngredients.map(ing => (
+                <QuickIngredientRow key={ing.id} ing={ing} onSave={saveQuickIngredientPrice} />
+              ))}
+              {selectedCraftCost.missingIngredients.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  Tous les ingrédients ont un prix. La rentabilité via craft est calculée.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setQuickEntryOpen(false)}
+                className="w-full mt-1 px-3 py-2 rounded-lg text-[11px] font-bold bg-slate-700/30 border border-white/10 text-slate-300 hover:bg-slate-700/50 transition-all"
+              >
+                Terminé
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1480,5 +1583,56 @@ function RuneIcon({ rune, size = 18 }: { rune: { imgUrl?: string; name?: string;
       className="shrink-0 object-contain"
       style={{ width: size, height: size }}
     />
+  );
+}
+
+function QuickIngredientRow({ ing, onSave }: { ing: NormalizedRecipeIngredient; onSave: (ing: NormalizedRecipeIngredient, price: number) => void }) {
+  const [draft, setDraft] = useState('');
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const handleSave = () => {
+    const v = parseFloat(draft.replace(',', '.'));
+    if (!Number.isFinite(v) || v <= 0) return;
+    onSave(ing, v);
+    setSaved(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaved(false), 1200);
+  };
+  useEffect(() => {
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, []);
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-800/20 border border-white/5">
+      <ItemImage item={ing} className="h-8 w-8 bg-slate-800/30 rounded-md p-0.5 border border-slate-700/30 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] text-slate-200 font-semibold truncate">{ing.name}</p>
+        <p className="text-[9px] text-slate-500">×{ing.quantity}</p>
+      </div>
+      <div className="relative shrink-0">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSave(); } }}
+          placeholder="0"
+          className="w-24 bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-[11px] text-white text-right placeholder-slate-600 focus:outline-none focus:border-amber-500/40"
+        />
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 pointer-events-none">K</span>
+      </div>
+      <button
+        type="button"
+        onClick={handleSave}
+        className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border transition-all duration-300 ${
+          saved
+            ? 'bg-emerald-500/30 border-emerald-400/60 text-emerald-300'
+            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+        }`}
+        title="Sauvegarder ce prix"
+      >
+        <Check className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
