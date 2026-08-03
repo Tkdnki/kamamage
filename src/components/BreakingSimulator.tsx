@@ -303,17 +303,21 @@ export default function BreakingSimulator() {
   // Tous les items à scanner du métier (équipements + runes).
   const jobScanAll = useMemo(() => [...jobEquipments, ...jobRunes], [jobEquipments, jobRunes]);
 
-  // Un ÉQUIPEMENT est « à jour » si son prix à l'unité (x1/unitAverage) est
-  // strictement positif ET date de moins de 10 jours. À actualiser sinon. Les
-  // équipements n'ont qu'un prix à l'unité (pas de lots x10/x100/x1000), donc on
-  // écarte la logique « lots » réservée aux ressources/runes.
+  // Un ÉQUIPEMENT est « à jour » si son prix à l'unité (unitAverage, source EXACTE
+  // affichée sur la carte d'item) est strictement positif. Un prix présent mais
+  // sans date de mise à jour valide est conservé (cohérent avec l'affichage).
+  // À actualiser uniquement si le prix est absent/nul OU la date attestée date
+  // de plus de 10 jours. Les équipements n'ont qu'un prix à l'unité (pas de lots
+  // x10/x100/x1000), donc on écarte la logique « lots » réservée aux ressources.
   const needsEquipmentScan = useCallback((eq: ScannerQueueItem): boolean => {
     const key = eq.expectedId ?? eq.expectedName;
     const p = hdvPrices[key];
-    if (!p) return true;
-    const unitPrice = (p?.unitAverage ?? 0) > 0 ? p.unitAverage! : (p?.x1 ?? 0);
-    if (unitPrice <= 0) return true;
-    return isPriceOutdated(p?.updatedAt, 10);
+    // Même source de prix que la carte d'item (hdvPrices[_id].unitAverage).
+    const hasValidPrice = typeof p?.unitAverage === 'number' && p.unitAverage > 0;
+    if (!hasValidPrice) return true;
+    // Péremption : ne s'applique que si une date existe et date de > 10 jours.
+    if (!p?.updatedAt) return false;
+    return isPriceOutdated(p.updatedAt, 10);
   }, [hdvPrices]);
 
   // Une ressource/rune nécessite un scan si son prix (lots) est absent/nul OU
