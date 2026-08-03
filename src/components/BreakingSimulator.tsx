@@ -39,6 +39,9 @@ export default function BreakingSimulator() {
   const [craftItems, setCraftItems] = useState<CraftItem[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [minLevelFilter, setMinLevelFilter] = useState('');
+  const [maxLevelFilter, setMaxLevelFilter ] = useState('');
+  const [selectedTargetRunes, setSelectedTargetRunes] = useState<string[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [coefficient, setCoefficient] = useState<number | null>(null);
   const [rollMode, setRollMode] = useState<'avg' | 'min' | 'max'>('avg');
@@ -228,12 +231,47 @@ export default function BreakingSimulator() {
     return m;
   }, [hdvPrices, runeCommunityPrices]);
 
+  // ─── Filtrage par niveau (Niveau Min/Max) ────────────────────────────────
+  // Appliqué aux items du métier (liste de gauche) ET au scan HDV (compteur).
+  // Champs vides = pas de borne (tous les niveaux).
+  const levelFilteredItems = useMemo(() => {
+    const minRaw = minLevelFilter.trim();
+    const maxRaw = maxLevelFilter.trim();
+    const min = minRaw === '' ? null : Number(minRaw);
+    const max = maxRaw === '' ? null : Number(maxRaw);
+    const hasMin = min !== null && !Number.isNaN(min);
+    const hasMax = max !== null && !Number.isNaN(max);
+    if (!hasMin && !hasMax) return craftItems;
+    return craftItems.filter(item => {
+      if (hasMin && item.level < min) return false;
+      if (hasMax && item.level > max) return false;
+      return true;
+    });
+  }, [craftItems, minLevelFilter, maxLevelFilter]);
+
+  // Codes de runes générés par chaque item (résolus via findMatchingRune),
+  // pour le filtre par rune(s) cible(s).
+  const itemRuneCodes = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const item of craftItems) {
+      const codes: string[] = [];
+      for (const eff of item.possibleEffects ?? []) {
+        const cfg = getEffectConfig(eff.effectId);
+        if (!cfg) continue;
+        const rune = findMatchingRune(cfg.name, 0, cfg.unit);
+        if (rune) codes.push(rune.code);
+      }
+      map.set(item._id, codes);
+    }
+    return map;
+  }, [craftItems]);
+
   // ─── Scan HDV Métier (Équipements + Runes) ───────────────────────────────
-  // Runes uniques associées aux lignes de stats de tous les équipements du métier,
-  // résolues via le mapping Stat → Rune corrigé (findMatchingRune).
+  // Runes uniques associées aux lignes de stats des équipements de la tranche de
+  // niveau, résolues via le mapping Stat → Rune corrigé (findMatchingRune).
   const jobRunes = useMemo<ScannerQueueItem[]>(() => {
     const runeMap = new Map<string, ScannerQueueItem>();
-    for (const item of craftItems) {
+    for (const item of levelFilteredItems) {
       for (const eff of item.possibleEffects ?? []) {
         const cfg = getEffectConfig(eff.effectId);
         if (!cfg) continue;
@@ -246,11 +284,11 @@ export default function BreakingSimulator() {
       }
     }
     return Array.from(runeMap.values());
-  }, [craftItems]);
+  }, [levelFilteredItems]);
 
   const jobEquipments = useMemo<ScannerQueueItem[]>(
-    () => craftItems.map(item => ({ expectedName: item.name, expectedId: item._id, type: item.type })),
-    [craftItems],
+    () => levelFilteredItems.map(item => ({ expectedName: item.name, expectedId: item._id, type: item.type })),
+    [levelFilteredItems],
   );
 
   // Tous les items à scanner du métier (équipements + runes).
@@ -373,10 +411,13 @@ export default function BreakingSimulator() {
     return m;
   }, [itemsWithProfit]);
 
-  // Filtre par recherche puis tri décroissant par rentabilité (du plus au moins rentable).
+  // Filtre par niveau, rune(s) cible(s) et recherche, puis tri par rentabilite.
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const base = !q ? [...craftItems] : craftItems.filter(i => i.name.toLowerCase().includes(q));
+    const base = levelFilteredItems.filter(i =>
+      (!q || i.name.toLowerCase().includes(q)) &&
+      (selectedTargetRunes.length === 0 || (itemRuneCodes.get(i._id) ?? []).some(c => selectedTargetRunes.includes(c)))
+    );
     base.sort((a, b) => {
       const pa = profitById[a._id] ?? Number.NEGATIVE_INFINITY;
       const pb = profitById[b._id] ?? Number.NEGATIVE_INFINITY;
@@ -384,8 +425,7 @@ export default function BreakingSimulator() {
       return pb - pa;
     });
     return base;
-  }, [craftItems, searchQuery, profitById]);
-
+  }, [levelFilteredItems, searchQuery, selectedTargetRunes, itemRuneCodes, profitById]);
   // Coefficient effectif : si non renseigné, on utilise un coef théorique de 100 %
   // pour estimer les runes/focus, tout en signalant que la valeur n'est pas validée.
   const effectiveCoefficient = coefficient !== null && coefficient >= 1 ? coefficient : 100;
@@ -578,6 +618,61 @@ export default function BreakingSimulator() {
               placeholder="Rechercher un équipement…"
               className="w-full bg-[#070a12] border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40"
             />
+          </div>
+          {/* Filtre par niveau (Niveau Min/Max) — champs vides = tous les niveaux */}
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={1}
+              value={minLevelFilter}
+              onChange={e => setMinLevelFilter(e.target.value)}
+              placeholder="Niv. min"
+              className="w-20 bg-[#070a12] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40"
+            />
+            <span className="text-slate-600 text-xs">→</span>
+            <input
+              type="number"
+              min={1}
+              value={maxLevelFilter}
+              onChange={e => setMaxLevelFilter(e.target.value)}
+              placeholder="Niv. max"
+              className="w-20 bg-[#070a12] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40"
+            />
+            {(minLevelFilter.trim() !== '' || maxLevelFilter.trim() !== '' || selectedTargetRunes.length > 0) && (
+              <button
+                type="button"
+                onClick={() => { setMinLevelFilter(''); setMaxLevelFilter(''); setSelectedTargetRunes([]); }}
+                className="ml-auto text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2 shrink-0"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+
+          {/* Runes cibles (multi-sélection) */}
+          <div className="flex flex-wrap gap-1">
+            {DOFUS_RUNES.map(rune => {
+              const active = selectedTargetRunes.includes(rune.code);
+              return (
+                <button
+                  key={rune.code}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTargetRunes(prev =>
+                      active ? prev.filter(c => c !== rune.code) : [...prev, rune.code],
+                    )
+                  }
+                  title={`Filtrer les équipements produisant la ${rune.name}`}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                    active
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-slate-800/30 border-slate-700/40 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {rune.code}
+                </button>
+              );
+            })}
           </div>
 
           {/* Scan HDV Métier : équipements + runes (prix manquants ou obsolètes > 10 jours) */}
