@@ -6,7 +6,7 @@ import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
-import { isPriceStaleOrMissing as isStaleShared } from '../lib/pricing';
+import { getPriceRecord, isPriceOutdated } from '../lib/pricing';
 import { compressImage } from '../lib/imageUtils';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
@@ -326,11 +326,15 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // Un prix est "à actualiser" s'il est absent, sans lot renseigné, sans date de
   // mise à jour, ou plus vieux que STALE_PRICE_MS (10 jours).
   const isPriceStaleOrMissing = useCallback((item: ScannerQueueItem): boolean => {
-    return isStaleShared(item.expectedId, hdvPrices);
+    const p = getPriceRecord(item, hdvPrices);
+    if (!p) return true;
+    const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
+    if (!hasAnyPrice) return true;
+    return isPriceOutdated(p.updatedAt, 10);
   }, [hdvPrices]);
 
   const getItemAgeLabel = useCallback((item: ScannerQueueItem): string => {
-    const p = hdvPrices[item.expectedId];
+    const p = getPriceRecord(item, hdvPrices);
     if (!p) return 'Prix absent';
     const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
     if (!hasAnyPrice) return 'Prix absent';

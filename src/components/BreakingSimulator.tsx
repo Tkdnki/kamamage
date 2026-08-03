@@ -22,7 +22,7 @@ import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking'
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
 import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients, deleteItemCoefficient } from '../lib/sync';
-import { getOptimalCost, isPriceStaleOrMissing, isPriceOutdated } from '../lib/pricing';
+import { getOptimalCost, getPriceRecord, isPriceStaleOrMissing, isPriceOutdated } from '../lib/pricing';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -310,8 +310,8 @@ export default function BreakingSimulator() {
   // de plus de 10 jours. Les équipements n'ont qu'un prix à l'unité (pas de lots
   // x10/x100/x1000), donc on écarte la logique « lots » réservée aux ressources.
   const needsEquipmentScan = useCallback((eq: ScannerQueueItem): boolean => {
-    const key = eq.expectedId ?? eq.expectedName;
-    const p = hdvPrices[key];
+    // Résolveur partagé : même source que la carte d'item (getPriceRecord).
+    const p = getPriceRecord(eq, hdvPrices);
     // Même source de prix que la carte d'item (hdvPrices[_id].unitAverage).
     const hasValidPrice = typeof p?.unitAverage === 'number' && p.unitAverage > 0;
     if (!hasValidPrice) return true;
@@ -857,7 +857,7 @@ export default function BreakingSimulator() {
           <div className="flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto pr-1">
             {filteredItems.map(item => {
               const isSelected = selectedItemId === item._id;
-              const priceData = hdvPrices[item._id];
+              const priceData = getPriceRecord(item, hdvPrices);
               const hasPrice = priceData && priceData.unitAverage > 0;
               const profit = profitById[item._id] ?? Number.NEGATIVE_INFINITY;
               const status = statusById[item._id] ?? 'no-stats';

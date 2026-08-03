@@ -25,6 +25,42 @@ export function needsPriceScan(price: number | undefined, updatedAt?: string | n
 }
 
 /**
+ * Résout de façon robuste l'enregistrement de prix HDV d'un item équipement.
+ * Une même fiche peut être retrouvée via plusieurs clés (DofusDB utilise un id
+ * numérique converti en string) : `expectedId`, `_id`, `id` puis le nom en
+ * dernier recours. Partout où on lit un prix d'équipement, on passe par ce
+ * résolveur pour garantir que la carte, le badge "à librariser" et le scanner
+ * HDV lisent STRICTEMENT la même valeur (pas de décompte à 578 fantôme).
+ */
+export type HdvPriceLookupItem = {
+  expectedId?: string;
+  _id?: string;
+  id?: string;
+  name?: string;
+  expectedName?: string;
+};
+
+export function getPriceRecord(
+  item: string | HdvPriceLookupItem | null | undefined,
+  hdvPrices: HdvPrices,
+): PriceData | undefined {
+  if (!item || !hdvPrices) return undefined;
+  if (typeof item === 'string') return hdvPrices[item];
+  const keys = [
+    item.expectedId,
+    item._id,
+    item.id,
+    item.expectedName,
+    item.name,
+  ].filter((k): k is string => typeof k === 'string' && k.length > 0);
+  for (const key of keys) {
+    const p = hdvPrices[key];
+    if (p) return p;
+  }
+  return undefined;
+}
+
+/**
  * Un prix est "à actualiser" (obsolète ou manquant) s'il est absent, sans lot
  * renseigné, sans date de mise à jour, ou plus vieux que STALE_PRICE_MS.
  */
