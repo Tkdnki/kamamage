@@ -431,10 +431,10 @@ export default function BreakingSimulator() {
 
   // Filtre par niveau, rune(s) cible(s), présence/fraîcheur des prix, seuil de
   // rentabilité via Achat, puis tri par rentabilité.
+  const breakEvenThresholdNum = parseFloat(breakEvenThreshold.replace(',', '.'));
+  const hasBreakEvenThreshold = filterBreakEvenEnabled && !Number.isNaN(breakEvenThresholdNum) && breakEvenThresholdNum > 0;
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const threshold = parseFloat(breakEvenThreshold.replace(',', '.'));
-    const hasThreshold = filterBreakEvenEnabled && !Number.isNaN(threshold) && threshold > 0;
     const base = levelFilteredItems.filter(i => {
       // Recherche
       if (q && !i.name.toLowerCase().includes(q)) return false;
@@ -449,9 +449,9 @@ export default function BreakingSimulator() {
       // « Prix HDV item à jour » : prix de vente équipement renseigné (> 0).
       if (filterItemPriced && !((hdvPrices[i._id]?.unitAverage ?? 0) > 0)) return false;
       // « Rentable dès ≤ X % via Achat » : breakEvenCoeff non nul et ≤ seuil.
-      if (hasThreshold) {
+      if (hasBreakEvenThreshold) {
         const bec = breakEvenCoefById[i._id];
-        if (bec === null || bec === undefined || !(bec <= threshold)) return false;
+        if (bec === null || bec === undefined || !(bec <= breakEvenThresholdNum)) return false;
       }
       return true;
     });
@@ -462,7 +462,7 @@ export default function BreakingSimulator() {
       return pb - pa;
     });
     return base;
-  }, [levelFilteredItems, searchQuery, selectedTargetRunes, itemRuneCodes, profitById, filterCraftComplete, filterItemPriced, hasThreshold, threshold, breakEvenCoefById, hdvPrices]);
+  }, [levelFilteredItems, searchQuery, selectedTargetRunes, itemRuneCodes, profitById, filterCraftComplete, filterItemPriced, hasBreakEvenThreshold, breakEvenThresholdNum, breakEvenCoefById, hdvPrices]);
   // Coefficient effectif : si non renseigné, on utilise un coef théorique de 100 %
   // pour estimer les runes/focus, tout en signalant que la valeur n'est pas validée.
   const effectiveCoefficient = coefficient !== null && coefficient >= 1 ? coefficient : 100;
