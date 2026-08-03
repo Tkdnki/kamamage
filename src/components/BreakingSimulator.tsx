@@ -333,6 +333,18 @@ export default function BreakingSimulator() {
     () => jobRunes.filter(needsRuneScan),
     [jobRunes, needsRuneScan],
   );
+
+  // Ouvre le scanner HDV pré-rempli pour le métier : mode "stale" (manquants +
+  // > 10 jours) s'il reste des prix à actualiser, sinon "full" (tous les
+  // équipements et runes de la tranche de niveau).
+  const openJobScan = useCallback(() => {
+    const needs = [...jobEquipmentsToUpdate, ...jobRunesToUpdate];
+    const items = needs.length > 0 ? needs : jobScanAll;
+    openScanner(items, {
+      title: `Scan HDV Métier - ${activeJob}`,
+      initialScanMode: needs.length > 0 ? 'stale' : 'full',
+    });
+  }, [jobEquipmentsToUpdate, jobRunesToUpdate, jobScanAll, openScanner, activeJob]);
   // ─── Rentabilité estimée de chaque item (tri de la liste) ───────────────
   // (Valeur totale estimée des runes obtenues × coefficient) − Prix d'achat.
   // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
