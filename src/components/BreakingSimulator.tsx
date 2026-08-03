@@ -1169,6 +1169,11 @@ export default function BreakingSimulator() {
                       <span className={breaking.breakEvenCoefStd <= 100 ? 'text-emerald-400/90' : 'text-amber-400/90'}>
                         Rentable dès <b>{breaking.breakEvenCoefStd} %</b> de coef via Achat
                       </span>
+                      {breaking.totalValueStd > 0 && (
+                        <span className="block text-slate-500">
+                          Prix d'achat max : <b className="text-slate-300">{Math.round(breaking.totalValueStd).toLocaleString()} K</b> d'achat
+                        </span>
+                      )}
                     </div>
                   )}
                   {breaking.hasMissingPrices && (
@@ -1293,6 +1298,11 @@ export default function BreakingSimulator() {
                       <span className={breakingCraft.breakEvenCoefStd <= 100 ? 'text-emerald-400/90' : 'text-amber-400/90'}>
                         Rentable dès <b>{breakingCraft.breakEvenCoefStd} %</b> de coef via Craft
                       </span>
+                      {breakingCraft.totalValueStd > 0 && (
+                        <span className="block text-slate-500">
+                          Coût craft max : <b className="text-slate-300">{Math.round(breakingCraft.totalValueStd).toLocaleString()} K</b> de craft
+                        </span>
+                      )}
                     </div>
                   )}
                   {selectedCraftCost.hasMissing && (
