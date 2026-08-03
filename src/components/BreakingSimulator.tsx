@@ -22,7 +22,7 @@ import type { BreakingResult, DofusDbItemFull, ExoEntry } from '../lib/breaking'
 import { DOFUS_RUNES } from '../data/mockData';
 import type { Rune } from '../data/mockData';
 import { fetchRunePricesWithAuthor, fetchItemCoefficient, pushItemCoefficient, fetchAllItemCoefficients, deleteItemCoefficient } from '../lib/sync';
-import { getOptimalCost, isPriceStaleOrMissing } from '../lib/pricing';
+import { getOptimalCost, isPriceStaleOrMissing, isPriceOutdated } from '../lib/pricing';
 
 const JOB_ICONS: Record<string, FC<any>> = {
   Bijoutier: Gem, Cordonnier: Scissors, Façonneur: Shield,
@@ -303,35 +303,36 @@ export default function BreakingSimulator() {
   // Tous les items à scanner du métier (équipements + runes).
   const jobScanAll = useMemo(() => [...jobEquipments, ...jobRunes], [jobEquipments, jobRunes]);
 
-  // Un item/rune nécessite un scan si son prix est absent/nul (tous lots à 0)
-  // OU obsolète (> 10 jours). On réutilise la même logique que l'HdvScannerModal
-  // (isPriceStaleOrMissing) pour que le badge et la file soient cohérents : un
-  // équipement avec un prix récent > 0 n'est pas compté comme « à actualiser ».
-  const needsJobScan = useCallback(
+  // Un ÉQUIPEMENT est « à jour » si son prix à l'unité (x1/unitAverage) est
+  // strictement positif ET date de moins de 10 jours. À actualiser sinon. Les
+  // équipements n'ont qu'un prix à l'unité (pas de lots x10/x100/x1000), donc on
+  // écarte la logique « lots » réservée aux ressources/runes.
+  const needsEquipmentScan = useCallback((eq: ScannerQueueItem): boolean => {
+    const key = eq.expectedId ?? eq.expectedName;
+    const p = hdvPrices[key];
+    if (!p) return true;
+    const unitPrice = (p?.unitAverage ?? 0) > 0 ? p.unitAverage! : (p?.x1 ?? 0);
+    if (unitPrice <= 0) return true;
+    return isPriceOutdated(p?.updatedAt, 10);
+  }, [hdvPrices]);
+
+  // Une ressource/rune nécessite un scan si son prix (lots) est absent/nul OU
+  // obsolète (> 10 jours). On réutilise la logique partagée de l'HdvScannerModal.
+  const needsRuneScan = useCallback(
     (it: ScannerQueueItem) => isPriceStaleOrMissing(it.expectedId, hdvPrices),
     [hdvPrices],
   );
 
+  // La tranche de niveau s'applique déjà via jobEquipments/jobRunes (construits
+  // sur levelFilteredItems) : le décompte baisse donc quand on filtre par niveau.
   const jobEquipmentsToUpdate = useMemo(
-    () => jobEquipments.filter(needsJobScan),
-    [jobEquipments, needsJobScan],
+    () => jobEquipments.filter(needsEquipmentScan),
+    [jobEquipments, needsEquipmentScan],
   );
   const jobRunesToUpdate = useMemo(
-    () => jobRunes.filter(needsJobScan),
-    [jobRunes, needsJobScan],
+    () => jobRunes.filter(needsRuneScan),
+    [jobRunes, needsRuneScan],
   );
-
-  // Ouvre le scanner HDV pré-rempli : mode "stale" (manquants + > 10 jours) s'il
-  // reste des prix à actualiser, sinon "full" (tous les équipements et runes).
-  const openJobScan = useCallback(() => {
-    const needs = [...jobEquipmentsToUpdate, ...jobRunesToUpdate];
-    const items = needs.length > 0 ? needs : jobScanAll;
-    openScanner(items, {
-      title: `Scan HDV Métier - ${activeJob}`,
-      initialScanMode: needs.length > 0 ? 'stale' : 'full',
-    });
-  }, [jobEquipmentsToUpdate, jobRunesToUpdate, jobScanAll, openScanner, activeJob]);
-
   // ─── Rentabilité estimée de chaque item (tri de la liste) ───────────────
   // (Valeur totale estimée des runes obtenues × coefficient) − Prix d'achat.
   // Calcul réactif : se recalcule dès que les prix globaux (hdvPrices / runes)
