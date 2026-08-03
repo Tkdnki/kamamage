@@ -42,6 +42,12 @@ export default function BreakingSimulator() {
   const [minLevelFilter, setMinLevelFilter] = useState('');
   const [maxLevelFilter, setMaxLevelFilter ] = useState('');
   const [selectedTargetRunes, setSelectedTargetRunes] = useState<string[]>([]);
+  const [filterCraftComplete, setFilterCraftComplete] = useState(false);
+  const [filterItemPriced, setFilterItemPriced] = useState(false);
+  const [filterBreakEvenEnabled, setFilterBreakEvenEnabled] = useState(false);
+  // Seuil (en %) en dessous duquel un item est considéré rentable via Achat.
+  // 100 est la valeur par défaut (rentable dès ≤ 100 % de coef).
+  const [breakEvenThreshold, setBreakEvenThreshold] = useState('100');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [coefficient, setCoefficient] = useState<number | null>(null);
   const [rollMode, setRollMode] = useState<'avg' | 'min' | 'max'>('avg');
@@ -335,11 +341,12 @@ export default function BreakingSimulator() {
       item: CraftItem;
       profit: number;
       profitCraft: number | null;
+      breakEvenCoefStd: number | null;
       status: 'ok' | 'no-stats' | 'missing-price' | 'no-coefficient' | 'missing-ingredients';
     }[] = [];
     for (const item of craftItems) {
       if (!item.possibleEffects || item.possibleEffects.length === 0) {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'no-stats' });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, breakEvenCoefStd: null, status: 'no-stats' });
         continue;
       }
       // Coefficient non renseigné → classement basé sur un coef théorique de 100 %,
@@ -372,13 +379,14 @@ export default function BreakingSimulator() {
         );
         if (b.hasMissingPrices) {
           // Un prix indispensable (item ou rune) est manquant → le profit serait faux.
-          list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'missing-price' });
+          list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, breakEvenCoefStd: b.breakEvenCoefStd, status: 'missing-price' });
         } else if (hasMissingIngredients) {
-          // Achat possible mais recette incomplète → profit craft indisponible.
+          // Achat possible mais recette incomplète → profitCraft indisponible.
           list.push({
             item,
             profit: b.netProfitStd,
             profitCraft: null,
+            breakEvenCoefStd: b.breakEvenCoefStd,
             status: coeffMissing ? 'no-coefficient' : 'missing-ingredients',
           });
         } else {
@@ -386,11 +394,12 @@ export default function BreakingSimulator() {
             item,
             profit: b.netProfitStd,
             profitCraft: b.totalValueStd - recipeCost,
+            breakEvenCoefStd: b.breakEvenCoefStd,
             status: coeffMissing ? 'no-coefficient' : 'ok',
           });
         }
       } catch {
-        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, status: 'no-stats' });
+        list.push({ item, profit: Number.NEGATIVE_INFINITY, profitCraft: null, breakEvenCoefStd: null, status: 'no-stats' });
       }
     }
     return list;
@@ -414,13 +423,38 @@ export default function BreakingSimulator() {
     return m;
   }, [itemsWithProfit]);
 
-  // Filtre par niveau, rune(s) cible(s) et recherche, puis tri par rentabilite.
+  const breakEvenCoefById = useMemo(() => {
+    const m: Record<string, number | null> = {};
+    for (const p of itemsWithProfit) m[p.item._id] = p.breakEvenCoefStd;
+    return m;
+  }, [itemsWithProfit]);
+
+  // Filtre par niveau, rune(s) cible(s), présence/fraîcheur des prix, seuil de
+  // rentabilité via Achat, puis tri par rentabilité.
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const base = levelFilteredItems.filter(i =>
-      (!q || i.name.toLowerCase().includes(q)) &&
-      (selectedTargetRunes.length === 0 || (itemRuneCodes.get(i._id) ?? []).some(c => selectedTargetRunes.includes(c)))
-    );
+    const threshold = parseFloat(breakEvenThreshold.replace(',', '.'));
+    const hasThreshold = filterBreakEvenEnabled && !Number.isNaN(threshold) && threshold > 0;
+    const base = levelFilteredItems.filter(i => {
+      // Recherche
+      if (q && !i.name.toLowerCase().includes(q)) return false;
+      // Runes cibles
+      if (selectedTargetRunes.length > 0 && !(itemRuneCodes.get(i._id) ?? []).some(c => selectedTargetRunes.includes(c))) return false;
+      // « Prix de craft à jour » : tous les ingrédients ont un prix valide (> 0).
+      if (filterCraftComplete && i.recipeIngredients && i.recipeIngredients.length > 0) {
+        for (const ing of i.recipeIngredients) {
+          if (getOptimalCost(hdvPrices[ing.id], ing.quantity) === null) return false;
+        }
+      }
+      // « Prix HDV item à jour » : prix de vente équipement renseigné (> 0).
+      if (filterItemPriced && !((hdvPrices[i._id]?.unitAverage ?? 0) > 0)) return false;
+      // « Rentable dès ≤ X % via Achat » : breakEvenCoeff non nul et ≤ seuil.
+      if (hasThreshold) {
+        const bec = breakEvenCoefById[i._id];
+        if (bec === null || bec === undefined || !(bec <= threshold)) return false;
+      }
+      return true;
+    });
     base.sort((a, b) => {
       const pa = profitById[a._id] ?? Number.NEGATIVE_INFINITY;
       const pb = profitById[b._id] ?? Number.NEGATIVE_INFINITY;
@@ -428,7 +462,7 @@ export default function BreakingSimulator() {
       return pb - pa;
     });
     return base;
-  }, [levelFilteredItems, searchQuery, selectedTargetRunes, itemRuneCodes, profitById]);
+  }, [levelFilteredItems, searchQuery, selectedTargetRunes, itemRuneCodes, profitById, filterCraftComplete, filterItemPriced, hasThreshold, threshold, breakEvenCoefById, hdvPrices]);
   // Coefficient effectif : si non renseigné, on utilise un coef théorique de 100 %
   // pour estimer les runes/focus, tout en signalant que la valeur n'est pas validée.
   const effectiveCoefficient = coefficient !== null && coefficient >= 1 ? coefficient : 100;
@@ -666,10 +700,18 @@ export default function BreakingSimulator() {
               placeholder="Niv. max"
               className="w-20 bg-[#070a12] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40"
             />
-            {(minLevelFilter.trim() !== '' || maxLevelFilter.trim() !== '' || selectedTargetRunes.length > 0) && (
+            {(minLevelFilter.trim() !== '' || maxLevelFilter.trim() !== '' || selectedTargetRunes.length > 0 || filterCraftComplete || filterItemPriced || filterBreakEvenEnabled) && (
               <button
                 type="button"
-                onClick={() => { setMinLevelFilter(''); setMaxLevelFilter(''); setSelectedTargetRunes([]); }}
+                onClick={() => {
+                  setMinLevelFilter('');
+                  setMaxLevelFilter('');
+                  setSelectedTargetRunes([]);
+                  setFilterCraftComplete(false);
+                  setFilterItemPriced(false);
+                  setFilterBreakEvenEnabled(false);
+                  setBreakEvenThreshold('100');
+                }}
                 className="ml-auto text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2 shrink-0"
               >
                 Réinitialiser
@@ -703,6 +745,54 @@ export default function BreakingSimulator() {
             })}
           </div>
 
+          {/* Filtres de présence / fraîcheur des prix + seuil de rentabilité via Achat */}
+          <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-800/20 border border-white/5">
+            <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterCraftComplete}
+                onChange={e => setFilterCraftComplete(e.target.checked)}
+                className="accent-amber-500 h-3.5 w-3.5"
+              />
+              <span className="flex items-center gap-1">
+                <Hammer className="h-3 w-3 text-emerald-400" />
+                Craft complet (prix de tous les ingrédients à jour)
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterItemPriced}
+                onChange={e => setFilterItemPriced(e.target.checked)}
+                className="accent-amber-500 h-3.5 w-3.5"
+              />
+              <span className="flex items-center gap-1">
+                <Coins className="w-3 h-3 text-amber-400" />
+                Prix HDV item à jour
+              </span>
+            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filterBreakEvenEnabled}
+                  onChange={e => setFilterBreakEvenEnabled(e.target.checked)}
+                  className="accent-emerald-500 h-3.5 w-3.5"
+                />
+                <span className="whitespace-nowrap">Rentable dès ≤</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                disabled={!filterBreakEvenEnabled}
+                value={breakEvenThreshold}
+                onChange={e => setBreakEvenThreshold(e.target.value)}
+                placeholder="100"
+                className="w-16 bg-[#070a12] border border-white/10 rounded-md px-2 py-1 text-[11px] text-white text-right placeholder-slate-600 focus:outline-none focus:border-emerald-500/40 disabled:opacity-40"
+              />
+              <span className="text-[11px] text-slate-400">% via Achat</span>
+            </div>
+          </div>
           {/* Scan HDV Métier : équipements + runes (prix manquants ou obsolètes > 10 jours) */}
           {!isLoadingItems && jobScanAll.length > 0 && (
             <button
