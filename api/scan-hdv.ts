@@ -337,10 +337,13 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       | { kind: 'quota'; status: number; retryAfter: number; isDailyLimit: boolean }
       | { kind: 'jsonValidationFailed'; detail: string }
       | { kind: 'timeout' }
-      | { kind: 'modelFailure'; detail: string }
+      | { kind: 'modelFailure'; detail: string; details: Record<string, string> }
     > => {
       let lastError = '';
       let jsonValidationFailed = false;
+      // Détail EXACT de l'erreur par modèle testé (pour le log console.error et
+      // le retour JSON 500 détaillé si TOUS les modèles échouent).
+      const modelErrors: Record<string, string> = {};
 
       for (const model of visionModels) {
         // Réessais automatiques en cas d'échec de validation JSON (l'IA peut réussir au 2e essai).
@@ -417,11 +420,20 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
               continue;
             }
 
+            // Modèle invalide / erreur HTTP (ex: 404 model_not_found) : on capture
+            // le détail exact et on bascule sur le modèle suivant.
             lastError = `[${model}] ${result.status}: ${result.rawText.slice(0, 300)}`;
+            modelErrors[model] = lastError;
+            console.error(`[Groq OCR Error] Modèle ${model}:`, {
+              status: result.status,
+              message: result.body?.error?.message || result.rawText.slice(0, 300),
+            });
             console.warn(`[scan-hdv] Modèle ${model} non valide (${result.status}), test du suivant...`);
             break;
           } catch (err: unknown) {
             lastError = `[${model}] Exception: ${err instanceof Error ? err.message : String(err)}`;
+            modelErrors[model] = lastError;
+            console.error('[Groq OCR Error] Modèle ${model} (Exception):', err);
             break;
           }
         }
@@ -430,7 +442,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       if (jsonValidationFailed) {
         return { kind: 'jsonValidationFailed', detail: lastError };
       }
-      return { kind: 'modelFailure', detail: lastError };
+      return { kind: 'modelFailure', detail: lastError, details: modelErrors };
     };
 
     // Round-Robin : on démarre à la clé suivante (rotation par requête).
@@ -479,9 +491,12 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
         return res.status(504).json({ error: 'Timeout Groq' });
       }
 
-      // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle.
+      // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle, avec le
+      // détail exact par modèle (logs Groq / 404 model_not_found / etc.).
       return res.status(500).json({
-        error: `Aucun modèle vision Groq fonctionnel. Dernière erreur : ${outcome.detail}`
+        error: 'Aucun modèle vision Groq fonctionnel.',
+        detail: outcome.detail,
+        details: outcome.details,
       });
     }
 
