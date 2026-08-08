@@ -238,7 +238,11 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
     const rawText = await response.text();
     let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } = {};
     try {
-      const parsed = JSON.parse(rawText) as unknown;
+      // Qwen 27B renvoie parfois le JSON entouré de balises Markdown
+      // (```json ... ```) : on les retire AVANT le parse pour éviter des retries
+      // inutiles (chaque retry consomme du TPM → risque de 429).
+      const cleanJsonText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJsonText) as unknown;
       if (parsed && typeof parsed === 'object') {
         body = parsed as typeof body;
       }
@@ -262,10 +266,10 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
 }
 
 /**
-* FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
+ * FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
  * timeout, et qu'une clé GEMINI_API_KEY est configurée côté Vercel, on réessaie
- * l'OCR Vision sur Google Gemini (gemini-2.5-flash, avec repli éventuel sur
- * gemini-2.0-flash en cas de 404 model_not_found).
+ * l'OCR Vision sur Google Gemini (gemini-3.6-flash, avec repli éventuel sur
+ * gemini-3.1-flash-lite en cas de 404 model_not_found).
  * Renvoie un résultat au même format que callGroqVision pour réutiliser la
  * boucle de traitement (parse/sanitize). Retourne un statut 429 si Gemini est
  * indisponible pour que le client conserve son comportement de pause.
@@ -277,9 +281,9 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
   // Gemini attend l'image en base64 "inline_data", sans préfixe mime.
   const base64 = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
 
-  // Modèle de production actuel (gemini-2.5-flash) avec repli si 404
-  // (modèle décommissionné/renommé sur v1beta).
-  const geminiModelNames = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  // Génération 3 : gemini-3.6-flash (modèle de production, GA) avec repli sur
+  // gemini-3.1-flash-lite (moins cher) si 404 (modèle décommissionné/renommé).
+  const geminiModelNames = ['gemini-3.6-flash', 'gemini-3.1-flash-lite'];
 
   const content = [
     { text: `${systemPrompt}\n\n${promptText}` },
@@ -320,7 +324,10 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
       const rawText = await response.text();
       let data: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
       try {
-        data = JSON.parse(rawText) as typeof data;
+        // Même nettoyage Markdown que pour Groq (réponse model formatée très
+        // rarement en code-fence) : on retire les balises avant parse.
+        const cleanGeminiText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        data = JSON.parse(cleanGeminiText) as typeof data;
       } catch (parseErr: unknown) {
         lastErrorMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
         console.error(`[Gemini API Error] ${response.status}: réponse non-JSON — ${lastErrorMsg}`);
