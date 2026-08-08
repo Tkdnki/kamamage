@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap, Wrench, Camera } from 'lucide-react';
+import { Coins, Hammer, Sparkles, Wand2, ShoppingCart, LogIn, LogOut, User, Settings, Beef, GraduationCap, Wrench, Camera, PawPrint } from 'lucide-react';
 import { useServer, SERVER_CATEGORIES } from '../context/ServerContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
@@ -53,6 +53,14 @@ export default function Navigation() {
       description: 'Simulateur de brisage',
       color: 'from-red-500 to-orange-500',
       activeColor: 'text-red-400 border-red-500',
+    },
+    {
+      id: 'petxp' as ViewType,
+      label: 'Familiers',
+      icon: PawPrint,
+      description: 'Optimisation XP familier',
+      color: 'from-teal-500 to-emerald-500',
+      activeColor: 'text-teal-400 border-teal-500',
     },
     {
       id: 'elevage' as ViewType,

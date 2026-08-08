@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { DofusItem } from '../data/mockData';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
-export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'breaking' | 'elevage' | 'shopping' | 'profile';
+export type ViewType = 'hdv' | 'crafts' | 'leveling' | 'forgemagie' | 'breaking' | 'petxp' | 'elevage' | 'shopping' | 'profile';
 
 export interface ScannerQueueItem {
   expectedName: string;

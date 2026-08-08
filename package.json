@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "fetch-xp": "tsx scripts/fetch-xp-database.ts"
+    "fetch-xp": "tsx scripts/fetch-xp-database.ts",
+    "extract-pet-xp": "tsx scripts/extract-pet-xp.ts"
   },
   "dependencies": {
     "@supabase/auth-ui-react": "^0.4.7",
