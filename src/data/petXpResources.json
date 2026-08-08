@@ -1,9 +1,5 @@
 [
   {
-    "name": "Binar",
-    "xp": 3101
-  },
-  {
     "name": "Djim",
     "xp": 2900
   },
@@ -76,10 +72,6 @@
     "xp": 1480
   },
   {
-    "name": "Kyoub magistrale",
-    "xp": 1455
-  },
-  {
     "name": "Dagob majeure",
     "xp": 1431
   },
@@ -120,10 +112,6 @@
     "xp": 1155
   },
   {
-    "name": "Ultram",
-    "xp": 1140
-  },
-  {
     "name": "Domo magistrale",
     "xp": 1052
   },
@@ -140,20 +128,12 @@
     "xp": 1029
   },
   {
-    "name": "Dynamo magistrale",
-    "xp": 1009
-  },
-  {
     "name": "Bitte d&apos;amarrage",
     "xp": 1000
   },
   {
     "name": "Cuir synthétique",
     "xp": 1000
-  },
-  {
-    "name": "Yoche magistrale",
-    "xp": 988
   },
   {
     "name": "Bidoche Gâtée",
@@ -304,10 +284,6 @@
     "xp": 428
   },
   {
-    "name": "Yoche majeure",
-    "xp": 425
-  },
-  {
     "name": "Horize majeure",
     "xp": 409
   },
@@ -318,14 +294,6 @@
   {
     "name": "Rune Ga Pme",
     "xp": 405
-  },
-  {
-    "name": "Aroumb",
-    "xp": 401
-  },
-  {
-    "name": "Nékinéko",
-    "xp": 393
   },
   {
     "name": "Zaihn",
@@ -368,10 +336,6 @@
     "xp": 357
   },
   {
-    "name": "Dynamo majeure",
-    "xp": 342
-  },
-  {
     "name": "Culotte de Missiz Frizz",
     "xp": 338
   },
@@ -402,10 +366,6 @@
   {
     "name": "Sak",
     "xp": 331
-  },
-  {
-    "name": "Kyoub majeure",
-    "xp": 328
   },
   {
     "name": "Galet Solaire",
@@ -1612,10 +1572,6 @@
     "xp": 27
   },
   {
-    "name": "Kyoub",
-    "xp": 27
-  },
-  {
     "name": "Biscuit de chance",
     "xp": 26.4
   },
@@ -2300,15 +2256,7 @@
     "xp": 12
   },
   {
-    "name": "Muta",
-    "xp": 12
-  },
-  {
     "name": "Ougah",
-    "xp": 12
-  },
-  {
-    "name": "Yoche",
     "xp": 12
   },
   {
@@ -2932,10 +2880,6 @@
     "xp": 7
   },
   {
-    "name": "Dynamo",
-    "xp": 7
-  },
-  {
     "name": "Horize mineure",
     "xp": 7
   },
@@ -3208,10 +3152,6 @@
     "xp": 5
   },
   {
-    "name": "Yoche mineure",
-    "xp": 5
-  },
-  {
     "name": "Épaulette de Bourôliste",
     "xp": 5
   },
@@ -3373,10 +3313,6 @@
   },
   {
     "name": "Rune Ra Sa",
-    "xp": 4
-  },
-  {
-    "name": "Kyoub mineure",
     "xp": 4
   },
   {
@@ -5561,10 +5497,6 @@
   },
   {
     "name": "Soie chatoyante",
-    "xp": 0
-  },
-  {
-    "name": "Dynamo mineure",
     "xp": 0
   }
 ]

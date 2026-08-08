@@ -14,6 +14,38 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const XLSX_SOURCE = join(ROOT, 'Ressources_XP_familier_lvl100.xlsx');
 
+/**
+ * Idoles retirées de Dofus : on exclut les ressources dont le nom correspond
+ * exactement à l'une d'elles OU commence par leur nom (variantes "mineure",
+ * "majeure", "magistrale"...). La comparaison est insensible à la casse et aux
+ * accents, avec frontières de mot.
+ */
+const IDOL_BLACKLIST = [
+  'Aroumb', 'Binar', 'Corrozor', 'Dagore', 'Dakid', 'Dynamo', 'Horam', 'Huluhu',
+  'Kyoub', 'Lechane', 'Muta', 'Nekineko', 'Oubi', 'Paho', 'Penyu', 'Peon',
+  'Peto', 'Prohim', 'Symphète', 'Ultram', 'Yoche',
+];
+
+/** Normalise (minuscules, sans accents) — identique à l'app (lib/petXp.ts). */
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Échappe les caractères spéciaux regex. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Vrai si le nom désigne une idole (exact ou "nom + suffixe"). */
+function isIdolResource(name: string): boolean {
+  const norm = normalizeName(name);
+  if (!norm) return false;
+  return IDOL_BLACKLIST.some(idol => {
+    const i = normalizeName(idol);
+    return new RegExp(`(^|\\W)${escapeRegExp(i)}(\\W|$)`, 'i').test(norm);
+  });
+}
+
 /** Extrait toutes les toString() des noeuds <si> (shared strings). */
 function extractStrings(sstXml: string): string[] {
   const out: string[] = [];
@@ -115,10 +147,12 @@ function main() {
   }
 
   const target = join(ROOT, 'src', 'data', 'petXpResources.json');
-  writeFileSync(target, JSON.stringify(resources, null, 2) + '\n', 'utf8');
-  console.log(`✅ ${resources.length} ressources écrites dans ${target}`);
-  console.log('Aperçu (5 premiers) :', JSON.stringify(resources.slice(0, 5)));
-  console.log('Dernier échantillon :', JSON.stringify(resources.slice(-3)));
+  const filtered = resources.filter(r => !isIdolResource(r.name));
+  writeFileSync(target, JSON.stringify(filtered, null, 2) + '\n', 'utf8');
+  console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles exclues)`);
+  console.log('Aperçu (5 premiers) :', JSON.stringify(filtered.slice(0, 5)));
+  console.log('Dernier échantillon :', JSON.stringify(filtered.slice(-3)));
+  console.log('Aperçu des idoles exclues :', JSON.stringify(resources.filter(r => isIdolResource(r.name)).map(r => r.name).sort()));
 }
 
 import { existsSync } from 'node:fs';
