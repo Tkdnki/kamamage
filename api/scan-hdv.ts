@@ -18,10 +18,6 @@ const MAX_JSON_RETRIES = 2;
 // ignoré/plafonné à 10s sur le plan gratuit : on ne peut pas compter dessus.
 const GROQ_TIMEOUT_MS = 7500;
 
-// Index de rotation Round-Robin : alterne la clé de départ à chaque requête
-// pour répartir la charge sur toutes les clés Groq configurées.
-let currentKeyIndex = 0;
-
 /**
  * Résout la liste des clés Groq utilisables :
  * - La clé personnalisée du client (BYOK) prime toujours (une seule clé).
@@ -671,21 +667,28 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       }
     };
 
-    // Round-Robin : on démarre à la clé suivante (rotation par requête).
-    const startKeyIndex = currentKeyIndex;
-    let lastQuota: { status: number; retryAfter: number; isDailyLimit: boolean } | null = null;
+// Load Balancing STATELESS : chaque instance Serverless n'a AUCUNE mémoire
+// partagée (le Round-Robin par variable globale repartait à 0 à chaque
+// fork, d'où un seul compte Groq toujours utilisé → 429 prématurés).
+// On choisit donc la clé de départ AU HASARD à chaque requête (Math.random),
+// ce qui répartit la charge sur les N comptes avec l'API pour ce scan précis.
+const startKeyIndex = Math.floor(Math.random() * apiKeys.length);
+let lastQuota: { status: number; retryAfter: number; isDailyLimit: boolean } | null = null;
 
-    for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset++) {
-      const keyIndex = (startKeyIndex + keyOffset) % apiKeys.length;
-      const apiKey = apiKeys[keyIndex];
+for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset++) {
+  const keyIndex = (startKeyIndex + keyOffset) % apiKeys.length;
+  const apiKey = apiKeys[keyIndex];
 
-      const outcome = await attemptWithKey(apiKey);
+  // Log d'audit MASQUÉ (4 derniers caractères) pour vérifier la rotation
+  // des comptes Groq dans les logs Vercel : on doit voir des fins de clé
+  // différentes se succéder d'une requête à l'autre.
+  console.log(`[scan-hdv] 🔑 Utilisation de la clé Groq terminant par ...${apiKey.slice(-4)}`);
 
-      if (outcome.kind === 'success') {
-        // Succès : on fait avancer la rotation pour la prochaine requête.
-        currentKeyIndex = (keyIndex + 1) % apiKeys.length;
-        return res.status(200).json(outcome.payload);
-      }
+  const outcome = await attemptWithKey(apiKey);
+
+  if (outcome.kind === 'success') {
+    return res.status(200).json(outcome.payload);
+  }
 
       if (outcome.kind === 'quota') {
         lastQuota = { status: outcome.status, retryAfter: outcome.retryAfter, isDailyLimit: outcome.isDailyLimit };
