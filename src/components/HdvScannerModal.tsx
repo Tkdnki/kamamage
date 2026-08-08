@@ -10,10 +10,15 @@ import { getPriceRecord, isPriceOutdated } from '../lib/pricing';
 import { compressImage } from '../lib/imageUtils';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
-// Espacement obligatoire dans la file d'attente : pause systématique de 2s
+// Espacement obligatoire dans la file d'attente : pause systématique de 2.5s
 // entre deux images distinctes pour lisser les appels vers l'API IA et ne pas
-// déclencher le rate-limit RPM du provider.
-const QUEUE_THROTTLE_MS = 2000;
+// déclencher le rate-limit RPM du provider (modèle Qwen 27B : latence élevée).
+const QUEUE_THROTTLE_MS = 2500;
+
+// Pause minimale avant de re-tenter l'image courante après une erreur 429
+// (Rate Limit RNA/TPM) : courte mais suffisante pour laisser la fenêtre Groq se
+// réinitialiser partiellement avant le prochain essai de la MÊME image.
+const RATE_LIMIT_RETRY_DELAY_MS = 8000;
 
 // Nombre max de réessais (503) pour la MÊME image avant de l'abandonner.
 // NB : le 429 (Rate Limit RPM/TPM) ne compte PAS dans ce quota : c'est une pause
@@ -504,7 +509,13 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
           if (isRateLimit) {
             console.warn('[scan] ⏳ 429 Rate Limit (RPM/TPM) — pause globale de la file (retries de l\'image préservés).');
             showToast('error', 'Quota IA (RPM) atteint. Pause de 65s...');
-            const pauseMs = Math.max((retryAfter ?? 0) * 1000, RPM_QUOTA_PAUSE_MS);
+            // Pause minimale garantie de 8s (RATE_LIMIT_RETRY_DELAY_MS), le cas
+            // échéant étendue à la fenêtre RPM complète (RPM_QUOTA_PAUSE_MS).
+            const pauseMs = Math.max(
+              (retryAfter ?? 0) * 1000,
+              RATE_LIMIT_RETRY_DELAY_MS,
+              RPM_QUOTA_PAUSE_MS,
+            );
             const resumed = await waitForQuotaResume(pauseMs, 'Scan en pause - Quota IA (RPM) atteint.');
             if (!resumed) break;
             // On re-pousse la MÊME image en tête de file : pas d'auto-skip.

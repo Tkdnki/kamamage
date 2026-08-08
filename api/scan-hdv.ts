@@ -258,6 +258,80 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
   }
 }
 
+/**
+ * FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
+ * timeout, et qu'une clé GEMINI_API_KEY est configurée côté Vercel, on réessaie
+ * l'OCR Vision sur Google Gemini (gemini-1.5-flash, rapide et bon en OCR).
+ * Renvoie un résultat au même format que callGroqVision pour réutiliser la
+ * boucle de traitement (parse/sanitize). Retourne un statut 429 si Gemini est
+ * indisponible pour que le client conserve son comportement de pause.
+ */
+async function callGeminiVision(geminiKey: string, systemPrompt: string, promptText: string, imageUrl: string): Promise<GroqVisionResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+
+  // Gemini attend l'image en base64 "inline_data", sans préfixe mime.
+  const base64 = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
+
+  try {
+    const content = [
+      { text: `${systemPrompt}\n\n${promptText}` },
+      {
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: base64,
+        },
+      },
+    ];
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: content }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 512,
+            responseMimeType: 'application/json',
+          },
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    const rawText = await response.text();
+    let geminiBody: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
+    try {
+      geminiBody = JSON.parse(rawText) as typeof geminiBody;
+    } catch { /* corps non-JSON */ }
+
+    // Reconstruit un corps compatible Groq-ROMAN pour la boucle de parsing.
+    const contentText = geminiBody?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? '';
+    const body: GroqVisionResult['body'] = contentText
+      ? { choices: [{ message: { content: contentText } }] }
+      : { error: { message: geminiBody?.error?.message || 'Réponse Gemini vide' } };
+
+    return {
+      ok: response.ok && !!contentText,
+      status: response.status,
+      body,
+      rawText,
+      headers: response.headers,
+      isJsonValidationError: false,
+      timedOut: false,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return { ok: false, status: 0, body: null, rawText: '', headers: new Headers(), isJsonValidationError: false, timedOut: true };
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
@@ -445,6 +519,49 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       return { kind: 'modelFailure', detail: lastError, details: modelErrors };
     };
 
+    // ── FALLBACK GEMINI (dégradation gracieuse si Groq est saturé/timeout) ──
+    // Exécute l'OCR Vision sur Google Gemini et, en cas de succès, renvoie un
+    // payload identique à celui de Groq (mêmes règles de nettoyage, même mode
+    // ciblé). Retourne null si Gemini n'est pas configuré ou a échoué.
+    const geminiApiKey = process.env.GEMINI_API_KEY || '';
+    const attemptGemini = async (): Promise<
+      | { kind: 'success'; payload: AiResponse & { tokens?: { remaining: number; limit: number; used: number } } }
+      | null
+    > => {
+      if (!geminiApiKey.trim()) return null;
+      console.log('[scan-hdv] 🛰️ FALLBACK Gemini (Groq saturé/timeout) — tentative OCR Gemini...');
+      const result = await callGeminiVision(geminiApiKey, systemPrompt, promptText, imageUrl);
+
+      if (result.timedOut) {
+        console.warn('[scan-hdv] ⏱️ Timeout Gemini également.');
+        return null;
+      }
+      if (!result.ok) {
+        console.warn(`[scan-hdv] Gemini échoué (${result.status}) : ${result.rawText.slice(0, 300)}`);
+        return null;
+      }
+
+      const content = result.body?.choices?.[0]?.message?.content;
+      if (!content) return null;
+
+      try {
+        const parsedData = parseJsonContent(content) as AiResponse;
+        console.log('[scan-hdv] Gemini brut:', JSON.stringify(parsedData));
+        const sanitized = sanitizeResponse(parsedData);
+
+        if (isTargeted) {
+          const forcedPrices = sanitized.items?.[0]?.prices ?? { x1: 0, x10: 0, x100: 0, x1000: 0 };
+          sanitized.items = [{ name: targetedItemName as string, prices: forcedPrices }];
+        }
+
+        console.log('[scan-hdv] Gemini sanitized:', JSON.stringify(sanitized));
+        return { kind: 'success', payload: sanitized };
+      } catch (parseErr: unknown) {
+        console.warn('[scan-hdv] JSON Gemini illisible :', parseErr instanceof Error ? parseErr.message : String(parseErr));
+        return null;
+      }
+    };
+
     // Round-Robin : on démarre à la clé suivante (rotation par requête).
     const startKeyIndex = currentKeyIndex;
     let lastQuota: { status: number; retryAfter: number; isDailyLimit: boolean } | null = null;
@@ -467,7 +584,12 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
           console.warn(`[Groq Multi-Key] Clé ${keyOffset + 1}/${apiKeys.length} bloquée (${outcome.status}), basculement...`);
           continue;
         }
-        // Toutes les clés ont été testées et échouent (quota) → réponse 429 au client.
+        // Toutes les clés Groq sont saturées → fallback Gemini (si configuré)
+        // avant de répondre 429 au client.
+        const geminiOutcome = await attemptGemini();
+        if (geminiOutcome) {
+          return res.status(200).json(geminiOutcome.payload);
+        }
         // Si le quota QUOTIDIEN est atteint (TPD/RPD), on le signale via
         // `isDailyLimit: true` pour que le client stoppe la file au lieu de
         // re-tenter en boucle avec une pause inutile.
@@ -486,8 +608,13 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       }
 
       if (outcome.kind === 'timeout') {
-        // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on répond en JSON propre
-        // (504) plutôt que de laisser Vercel couper la réponse avec une page HTML.
+        // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on tente Gemini en dernier
+        // recours, sinon on répond JSON propre (504) plutôt que de laisser Vercel
+        // couper la réponse avec une page HTML.
+        const geminiOutcome = await attemptGemini();
+        if (geminiOutcome) {
+          return res.status(200).json(geminiOutcome.payload);
+        }
         return res.status(504).json({ error: 'Timeout Groq' });
       }
 
