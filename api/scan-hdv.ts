@@ -264,8 +264,8 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
 /**
 * FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
  * timeout, et qu'une clé GEMINI_API_KEY est configurée côté Vercel, on réessaie
- * l'OCR Vision sur Google Gemini (gemini-2.0-flash, avec repli éventuel sur
- * gemini-1.5-flash-8b en cas de 404 model_not_found).
+ * l'OCR Vision sur Google Gemini (gemini-2.5-flash, avec repli éventuel sur
+ * gemini-2.0-flash en cas de 404 model_not_found).
  * Renvoie un résultat au même format que callGroqVision pour réutiliser la
  * boucle de traitement (parse/sanitize). Retourne un statut 429 si Gemini est
  * indisponible pour que le client conserve son comportement de pause.
@@ -277,8 +277,9 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
   // Gemini attend l'image en base64 "inline_data", sans préfixe mime.
   const base64 = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
 
-  // Modèle principal, avec fallback si 404 (modèle décommissionné/renommé).
-  const geminiModelNames = ['gemini-2.0-flash', 'gemini-1.5-flash-8b'];
+  // Modèle de production actuel (gemini-2.5-flash) avec repli si 404
+  // (modèle décommissionné/renommé sur v1beta).
+  const geminiModelNames = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   const content = [
     { text: `${systemPrompt}\n\n${promptText}` },
