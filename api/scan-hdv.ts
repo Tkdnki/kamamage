@@ -313,15 +313,15 @@ Réponds UNIQUEMENT avec un objet JSON valide au format exact suivant (SANS bali
 Si un seul item est visible, retourne-le dans le tableau avec un seul élément.`;
 
     // Modèles Vision Groq actifs : `llama-3.2-11b-vision-preview` a été
-    // « decommissioned » par Groq (erreur 400) → on utilise désormais la variante
-    // `-instruct`, avec replis sur les autres modèles actifs. Le 11b est testé en
-    // premier (le plus rapide pour les OCR de prix HDV) ; le 90b ne sert que de
-    // secours. Combiné au redimensionnement client (≤800px, JPEG 0.65), le temps
-    // de réponse reste <2s.
+    // « decommissioned » par Groq (erreur 400) → on utilise la variante
+    // `-instruct`. NOTE : Groq n'accepte PAS les préfixes d'organisation
+    // (« meta-llama/... » renvoie une 404 model_not_found), on garde donc
+    // uniquement les identifiants exacts reconnus par l'API. Le 11b est testé
+    // en premier (le plus rapide pour les OCR de prix HDV) ; le 90b ne sert
+    // que de secours.
     const visionModels = [
       'llama-3.2-11b-vision-instruct',
-      'llama-3.2-90b-vision-instruct',
-      'meta-llama/llama-3.2-11b-vision-instruct'
+      'llama-3.2-90b-vision-instruct'
     ];
 
     // Prompt système adapté : en mode ciblé, l'IA ne doit JAMAIS lire/écrire le nom
