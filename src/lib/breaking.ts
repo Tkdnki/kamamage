@@ -19,6 +19,7 @@ export function getRunePriceKey(rune: { itemId?: string; id: string }): string {
 /** Traduction des noms de stats (config → rune) */
 const STAT_NAME_TO_RUNE_NAME: Record<string, string> = {
   'Critique': 'Coup Critique',
+  'Esquive PA': 'Résistance PA',
   'Esquive PM': 'Résistance PM',
 };
 
@@ -46,6 +47,10 @@ const STAT_TO_RUNE_CODE: Record<string, string> = {
   'Portée': 'Po',
   'Tacle': 'Tac',
   'Fuite': 'Fui',
+  'Retrait PA': 'Ret Pa',
+  'Retrait PM': 'Ret Pme',
+  'Résistance PA': 'Es PA',
+  'Résistance PM': 'Es PM',
 };
 
 /** Normalise les écarts (singulier/pluriel, suffixe fixe) entre config et runes */

@@ -241,6 +241,8 @@ export function DofusProvider({ children }: { children: ReactNode }) {
     persistSyncedKeys();
   }, [persistSyncedKeys]);
 
+  const { user } = useAuth();
+
   // Persiste dans localStorage à chaque changement
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -301,7 +303,7 @@ export function DofusProvider({ children }: { children: ReactNode }) {
 
     loadFromServer();
     return () => { cancelled = true; };
-  }, [selectedServer, syncedStorageKey]);
+  }, [selectedServer, syncedStorageKey, user?.id]);
 
   // Rafraîchissement automatique des prix en arrière-plan : les prix distants
   // (Supabase) alimentent le state global de manière réactive sans attendre un
@@ -336,8 +338,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       clearInterval(intervalId);
     };
   }, [selectedServer]);
-
-  const { user } = useAuth();
 
   // Re-sync : quand un utilisateur se connecte, pousser UNIQUEMENT les prix
   // localStorage qui n'ont jamais été sync (ex: scan fait hors-ligne, ou onglet

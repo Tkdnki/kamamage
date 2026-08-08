@@ -104,7 +104,17 @@ export const DOFUS_RUNES: Rune[] = [
   { id: 're_f_feu', name: 'Rune Ré Feu', code: 'Ré Feu', weight: 2, statEffect: '+1 Résistance Feu', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78029.png', itemId: '7452' },
   { id: 're_f_eau', name: 'Rune Ré Eau', code: 'Ré Eau', weight: 2, statEffect: '+1 Résistance Eau', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78031.png', itemId: '7454' },
   { id: 're_f_air', name: 'Rune Ré Air', code: 'Ré Air', weight: 2, statEffect: '+1 Résistance Air', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78033.png', itemId: '7453' },
-  { id: 're_pm', name: 'Rune Ré PM', code: 'Ré PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78085.png', itemId: '11643' },
+  { id: 're_pm', name: 'Rune Ré Pme', code: 'Es PM', weight: 4, statEffect: '+1 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78085.png', itemId: '11643' },
+
+  // Esquives (Résistances PA/PM officielles : 11641-11644)
+  { id: 're_pa', name: 'Rune Ré Pa', code: 'Es PA', weight: 4, statEffect: '+1 Résistance PA', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78083.png', itemId: '11641' },
+  { id: 'pa_re_pa', name: 'Rune Pa Ré Pa', code: 'Pa Es PA', weight: 12, statEffect: '+3 Résistance PA', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78084.png', itemId: '11642' },
+  { id: 'pa_re_pm', name: 'Rune Pa Ré Pme', code: 'Pa Es PM', weight: 12, statEffect: '+3 Résistance PM', category: 'Resistances', imgUrl: 'https://api.dofusdb.fr/img/items/78086.png', itemId: '11644' },
+  // Retrait PA / PM ("Rune Ret Pa" / "Rune Ret Pme")
+  { id: 'ret_pa', name: 'Rune Ret Pa', code: 'Ret Pa', weight: 7, statEffect: '+1 Retrait PA', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78087.png', itemId: '11645' },
+  { id: 'pa_ret_pa', name: 'Rune Pa Ret Pa', code: 'Pa Ret Pa', weight: 21, statEffect: '+3 Retrait PA', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78088.png', itemId: '11646' },
+  { id: 'ret_pm', name: 'Rune Ret Pme', code: 'Ret Pme', weight: 7, statEffect: '+1 Retrait PM', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78089.png', itemId: '11647' },
+  { id: 'pa_ret_pm', name: 'Rune Pa Ret Pme', code: 'Pa Ret Pme', weight: 21, statEffect: '+3 Retrait PM', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78090.png', itemId: '11648' },
 
   // Utilitaires (Tacle, Fuite, Prospection, Pods, Initiative)
   { id: 'pa_tac', name: 'Rune Pa Tac', code: 'Pa Tac', weight: 12, statEffect: '+3 Tacle', category: 'Utilitaires', imgUrl: 'https://api.dofusdb.fr/img/items/78078.png', itemId: '11640' },
