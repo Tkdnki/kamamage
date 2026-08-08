@@ -236,14 +236,17 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
     });
 
     const rawText = await response.text();
-    let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } | null = null;
+    let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } = {};
     try {
-      body = JSON.parse(rawText) as typeof body;
-    } catch { /* corps non-JSON (rare) */ }
+      const parsed = JSON.parse(rawText) as unknown;
+      if (parsed && typeof parsed === 'object') {
+        body = parsed as typeof body;
+      }
+    } catch { /* (corps non-JSON : garde validate le body vide) */ }
 
     const isJsonValidationError =
       response.status === 400 &&
-      (body?.error?.code === 'json_validate_failed' || rawText.includes('json_validate_failed'));
+      (body.error?.code === 'json_validate_failed' || rawText.includes('json_validate_failed'));
 
     return { ok: response.ok, status: response.status, body, rawText, headers: response.headers, isJsonValidationError, timedOut: false };
   } catch (err: unknown) {
@@ -308,27 +311,67 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
         },
       );
 
+      lastStatus = response.status;
+
+      // Lecture stricte + chaînage optionnel : toute réponse non-JSON (Vercel,
+      // proxy, AWS, "A server error occurred...") déclenche le repli vers le
+      // modèle suivant au lieu d'un crash non géré en "Unexpected token 'A'".
       const rawText = await response.text();
-      let geminiBody: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
+      let data: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
       try {
-        geminiBody = JSON.parse(rawText) as typeof geminiBody;
-      } catch { /* (corps non-JSON) */ }
+        data = JSON.parse(rawText) as typeof data;
+      } catch (parseErr: unknown) {
+        lastErrorMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        console.error(`[Gemini API Error] ${response.status}: réponse non-JSON — ${lastErrorMsg}`);
+        if (response.status === 404) {
+          console.warn(`[scan-hdv] Gemini modèle "${model}" introuvable (404), repli sur le suivant.`);
+          continue;
+        }
+        return {
+          ok: false,
+          status: response.status,
+          body: { error: { message: `Réponse Gemini non-JSON : ${lastErrorMsg}` } },
+          rawText,
+          headers: response.headers,
+          isJsonValidationError: false,
+          timedOut: false,
+        };
+      }
+
+      // `data` est garanti non-null ici (le catch JSON ci-dessus return/continue).
+      const geminiBody: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } =
+        data ?? {};
+
+      if (!response.ok || geminiBody.error) {
+        const msg = geminiBody.error?.message || JSON.stringify(geminiBody);
+        lastErrorMsg = msg;
+        console.error(`[Gemini API Error] ${response.status}: ${msg}`);
+        if (response.status === 404) {
+          // Modèle absent/non supporté → on tente le modèle de repli.
+          console.warn(`[scan-hdv] Gemini modèle "${model}" introuvable (404), repli sur le suivant.`);
+          continue;
+        }
+        return {
+          ok: false,
+          status: response.status,
+          body: { error: { message: msg } },
+          rawText,
+          headers: response.headers,
+          isJsonValidationError: false,
+          timedOut: false,
+        };
+      }
+
+      // Chaînage optionnel strict : réponses vides ou bloquées par les règles
+      // de sécurité de Gemini (promptBlocked / safety) → repli sur modèle suivant.
+      const textResponse = geminiBody?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
 
       // Reconstruit un corps compatible Groq pour la boucle de parsing.
-      const contentText = geminiBody?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? '';
-      const body: GroqVisionResult['body'] = contentText
-        ? { choices: [{ message: { content: contentText } }] }
-        : { error: { message: geminiBody?.error?.message || 'Réponse Gemini vide' } };
+      const body: GroqVisionResult['body'] = textResponse
+        ? { choices: [{ message: { content: textResponse } }] }
+        : { error: { message: 'Réponse Gemini vide' } };
 
-      lastStatus = response.status;
-      lastErrorMsg = geminiBody?.error?.message || '';
-
-      if (response.status === 404) {
-        // Modèle absent/non supporté → on tente le modèle de repli.
-        console.warn(`[scan-hdv] Gemini modèle "${model}" introuvable (404), repli sur le suivant.`);
-        continue;
-      }
-      if (response.ok && !!contentText) {
+      if (response.ok && !!textResponse) {
         return {
           ok: true,
           status: response.status,
@@ -339,7 +382,14 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
           timedOut: false,
         };
       }
-      // Autre erreur (429, 500, ...) → on garde ce statut et on sort.
+
+      // Réponse sans candidat texte (safety / promptBlocked) → on tente le repli
+      // si c'est un 404, sinon on garde ce statut et on sort.
+      console.error('[Gemini API Error] Réponse sans candidat texte:', JSON.stringify(geminiBody));
+      if (response.status === 404) {
+        console.warn(`[scan-hdv] Gemini modèle "${model}" introuvable (404), repli sur le suivant.`);
+        continue;
+      }
       return {
         ok: false,
         status: response.status,
@@ -353,7 +403,9 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
       if (err instanceof Error && err.name === 'AbortError') {
         return { ok: false, status: 0, body: null, rawText: '', headers: new Headers(), isJsonValidationError: false, timedOut: true };
       }
-      throw err;
+      // Erreur réseau inattendue (DNS, proxy, ...) : logguée, repli sur modèle suivant.
+      lastErrorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[Gemini API Error] Exception réseau sur "${model}": ${lastErrorMsg}`);
     }
   }
 
@@ -367,11 +419,6 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
     isJsonValidationError: false,
     timedOut: false,
   };
-}
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
