@@ -1,9 +1,5 @@
 [
   {
-    "name": "Djim",
-    "xp": 2900
-  },
-  {
     "name": "Korria",
     "xp": 2760
   },
@@ -14,10 +10,6 @@
   {
     "name": "Teleb magistrale",
     "xp": 2669
-  },
-  {
-    "name": "Sak magistrale",
-    "xp": 2476
   },
   {
     "name": "Nahuatl",
@@ -98,10 +90,6 @@
   {
     "name": "Galet acajou",
     "xp": 1250
-  },
-  {
-    "name": "Sak majeure",
-    "xp": 1172
   },
   {
     "name": "Teleb majeure",
@@ -362,10 +350,6 @@
   {
     "name": "Dagob",
     "xp": 333
-  },
-  {
-    "name": "Sak",
-    "xp": 331
   },
   {
     "name": "Galet Solaire",
@@ -2981,10 +2965,6 @@
   },
   {
     "name": "Pikmi mineure",
-    "xp": 6
-  },
-  {
-    "name": "Sak mineure",
     "xp": 6
   },
   {

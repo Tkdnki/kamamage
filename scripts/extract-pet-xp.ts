@@ -21,9 +21,11 @@ const XLSX_SOURCE = join(ROOT, 'Ressources_XP_familier_lvl100.xlsx');
  * accents, avec frontières de mot.
  */
 const IDOL_BLACKLIST = [
-  'Aroumb', 'Binar', 'Corrozor', 'Dagore', 'Dakid', 'Dynamo', 'Horam', 'Huluhu',
-  'Kyoub', 'Lechane', 'Muta', 'Nekineko', 'Oubi', 'Paho', 'Penyu', 'Peon',
-  'Peto', 'Prohim', 'Symphète', 'Ultram', 'Yoche',
+  'Aroumb', 'Binar', 'Boboule', 'Corrozor', 'Dagore', 'Dakid',
+  'Djim', 'Domak', 'Dynamo', 'Horam', 'Huluhu', 'Kyoub',
+  'Lechane', 'Muta', 'Nekineko', 'Oubi', 'Paho', 'Penyu',
+  'Peon', 'Peto', 'Prohim', 'Protes', 'Sak', 'Symphète',
+  'Ultram', 'Yoche',
 ];
 
 /** Normalise (minuscules, sans accents) — identique à l'app (lib/petXp.ts). */
