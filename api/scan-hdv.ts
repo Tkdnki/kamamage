@@ -226,7 +226,11 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
         // Mode JSON strict Groq : la réponse DOIT être un objet JSON valide.
         response_format: { type: 'json_object' },
         // Température très basse pour forcer un rendu déterministe.
-        temperature: 0.1
+        temperature: 0.1,
+        // Plafond de tokens de sortie : l'extraction HDV est courte (quelques
+        // items). Limiter la sortie accélère la réponse du modèle 27B et évite
+        // des générations longues qui frôleraient la limite Vercel (10s).
+        max_tokens: 512
       }),
       signal: controller.signal
     });
@@ -252,53 +256,6 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-// Liste les modèles Vision réellement disponibles sur UNE clé Groq donnée en
-// interrogeant l'API `/models` (endpoint REST, pas de SDK requis). Les
-// identifiants de modèles Vision changent chez Groq (préfixes "meta-llama/",
-// "decommissioned", etc.) : plutôt que de les hardcoder, on détecte les modèles
-// actifs au moment de la requête. On privilégie les 11b (rapides pour l'OCR de
-// prix HDV) et on garde le 90b comme secours.
-async function fetchAvailableVisionModels(apiKey: string): Promise<string[]> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
-    const resp = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!resp.ok) {
-      console.warn(`[scan-hdv] GET /models échoué (${resp.status}) : ${(await resp.text()).slice(0, 200)}`);
-      return [];
-    }
-    const data = (await resp.json()) as { data?: Array<{ id: string }> };
-    const allIds = (data.data ?? []).map(m => m.id);
-    const visionIds = allIds.filter(id => id.toLowerCase().includes('vision'));
-    console.log('[scan-hdv] Modèles Vision détectés sur la clé Groq :', visionIds);
-    return visionIds;
-  } catch (err: unknown) {
-    console.warn('[scan-hdv] Échec de la détection Groq /models :', err instanceof Error ? err.message : String(err));
-    return [];
-  }
-}
-
-// Priorité des modèles Vision : on ordonne les modèles détectés pour que les
-// plus rapides soient testés en premier.
-const VISION_MODEL_PRIORITY = [
-  'llama-3.2-11b-vision-instruct',
-  'llama-3.2-90b-vision-instruct',
-  'llama-3.1-8b-instant',
-  'llama3-8b-8192',
-];
-
-function sortVisionModelsByPriority(visionIds: string[]): string[] {
-  const score = (id: string): number => {
-    const idx = VISION_MODEL_PRIORITY.indexOf(id);
-    return idx === -1 ? VISION_MODEL_PRIORITY.length : idx;
-  };
-  return [...visionIds].sort((a, b) => score(a) - score(b));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -359,19 +316,13 @@ Réponds UNIQUEMENT avec un objet JSON valide au format exact suivant (SANS bali
 
 Si un seul item est visible, retourne-le dans le tableau avec un seul élément.`;
 
-    // Détection DYNAMIQUE des modèles Vision disponibles sur la clé Groq : les
-    // identifiants hardcodés deviennent obsolètes (404 model_not_found) quand
-    // Groq met à jour sa plateforme. On interroge `/models` à la volée, on garde
-    // les modèles contenant "vision" et on les trie par priorité de vitesse
-    // (11b d'abord, 90b en secours). Si la détection échoue, on retombe sur la
-    // liste statique de secours.
-    const detectedVisionModels = sortVisionModelsByPriority(
-      await fetchAvailableVisionModels(apiKeys[0]),
-    );
-    const visionModels =
-      detectedVisionModels.length > 0
-        ? detectedVisionModels
-        : ['llama-3.2-11b-vision-instruct', 'llama-3.2-90b-vision-instruct'];
+    // MODÈLE UNIQUE : Groq a retiré Llama 3.2 Vision et ne supporte plus que
+    // `qwen/qwen3.6-27b` comme modèle Vision. On utilise UNIQUEMENT ce modèle
+    // pour /api/scan-hdv (les autres identifiants répondent 404 model_not_found).
+    // La détection dynamique /models est retirée : elle coûte un aller-retour
+    // HTTP supplémentaire (temps précieux sous la limite Vercel de 10s) et le
+    // modèle officiel est désormais stable.
+    const visionModels = ['qwen/qwen3.6-27b'];
 
     // Prompt système adapté : en mode ciblé, l'IA ne doit JAMAIS lire/écrire le nom
     // de l'item, uniquement extraire les prix du lot affiché.
