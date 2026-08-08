@@ -237,16 +237,21 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
 
     const rawText = await response.text();
     let body: { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } } = {};
-    try {
-      // Qwen 27B renvoie parfois le JSON entouré de balises Markdown
-      // (```json ... ```) : on les retire AVANT le parse pour éviter des retries
-      // inutiles (chaque retry consomme du TPM → risque de 429).
-      const cleanJsonText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJsonText) as unknown;
-      if (parsed && typeof parsed === 'object') {
-        body = parsed as typeof body;
+    // Qwen 27B entoure parfois le JSON de texte conversationnel ou de balises
+      // Markdown (```json ... ```). Un simple replace ne suffit pas : on extrait
+      // précisément le premier objet JSON ({ ... }) par regex avant de parser,
+      // ce qui évite des retries inutiles (chaque retry consomme du TPM → 429).
+      let cleanJsonText = rawText;
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanJsonText = jsonMatch[0].replace(/```json/gi, '').replace(/```/g, '').trim();
       }
-    } catch { /* (corps non-JSON : garde validate le body vide) */ }
+      try {
+        const parsed = JSON.parse(cleanJsonText) as unknown;
+        if (parsed && typeof parsed === 'object') {
+          body = parsed as typeof body;
+        }
+      } catch { /* (corps non-JSON : garde validate le body vide) */ }
 
     const isJsonValidationError =
       response.status === 400 &&
@@ -324,9 +329,13 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
       const rawText = await response.text();
       let data: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
       try {
-        // Même nettoyage Markdown que pour Groq (réponse model formatée très
-        // rarement en code-fence) : on retire les balises avant parse.
-        const cleanGeminiText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        // Même extraction regex que pour Groq : isole le premier objet JSON en
+        // retirant le texte conversationnel / code-fence Markdown autour.
+        let cleanGeminiText = rawText;
+        const genJsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (genJsonMatch) {
+          cleanGeminiText = genJsonMatch[0].replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
         data = JSON.parse(cleanGeminiText) as typeof data;
       } catch (parseErr: unknown) {
         lastErrorMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
