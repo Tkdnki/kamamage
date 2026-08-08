@@ -542,7 +542,10 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       }
 
       const content = result.body?.choices?.[0]?.message?.content;
-      if (!content) return null;
+      if (!content) {
+        console.warn('[scan-hdv] Gemini réponse ok mais contenu texte vide — probablement bloqué par safety settings.', result.rawText.slice(0, 300));
+        return null;
+      }
 
       try {
         const parsedData = parseJsonContent(content) as AiResponse;
@@ -586,6 +589,8 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
         }
         // Toutes les clés Groq sont saturées → fallback Gemini (si configuré)
         // avant de répondre 429 au client.
+        console.log('[scan-hdv] ⚠️ Fallback Gemini déclenché (429/503 sur toutes les clés Groq).');
+        console.log('[scan-hdv] Clé GEMINI_API_KEY présente ?', !!process.env.GEMINI_API_KEY);
         const geminiOutcome = await attemptGemini();
         if (geminiOutcome) {
           return res.status(200).json(geminiOutcome.payload);
@@ -611,6 +616,8 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
         // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on tente Gemini en dernier
         // recours, sinon on répond JSON propre (504) plutôt que de laisser Vercel
         // couper la réponse avec une page HTML.
+        console.log('[scan-hdv] ⚠️ Fallback Gemini déclenché (timeout Groq).');
+        console.log('[scan-hdv] Clé GEMINI_API_KEY présente ?', !!process.env.GEMINI_API_KEY);
         const geminiOutcome = await attemptGemini();
         if (geminiOutcome) {
           return res.status(200).json(geminiOutcome.payload);
