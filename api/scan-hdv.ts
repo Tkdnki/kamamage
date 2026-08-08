@@ -259,9 +259,10 @@ async function callGroqVision(apiKey: string, model: string, systemPrompt: strin
 }
 
 /**
- * FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
+* FALLBACK GEMINI : si Groq renvoie un 429 (Rate Limit / TPM saturé) ou un
  * timeout, et qu'une clé GEMINI_API_KEY est configurée côté Vercel, on réessaie
- * l'OCR Vision sur Google Gemini (gemini-1.5-flash, rapide et bon en OCR).
+ * l'OCR Vision sur Google Gemini (gemini-2.0-flash, avec repli éventuel sur
+ * gemini-1.5-flash-8b en cas de 404 model_not_found).
  * Renvoie un résultat au même format que callGroqVision pour réutiliser la
  * boucle de traitement (parse/sanitize). Retourne un statut 429 si Gemini est
  * indisponible pour que le client conserve son comportement de pause.
@@ -273,59 +274,100 @@ async function callGeminiVision(geminiKey: string, systemPrompt: string, promptT
   // Gemini attend l'image en base64 "inline_data", sans préfixe mime.
   const base64 = imageUrl.includes(',') ? imageUrl.split(',')[1] : imageUrl;
 
-  try {
-    const content = [
-      { text: `${systemPrompt}\n\n${promptText}` },
-      {
-        inline_data: {
-          mime_type: 'image/jpeg',
-          data: base64,
-        },
-      },
-    ];
+  // Modèle principal, avec fallback si 404 (modèle décommissionné/renommé).
+  const geminiModelNames = ['gemini-2.0-flash', 'gemini-1.5-flash-8b'];
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: content }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 512,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: controller.signal,
+  const content = [
+    { text: `${systemPrompt}\n\n${promptText}` },
+    {
+      inline_data: {
+        mime_type: 'image/jpeg',
+        data: base64,
       },
-    );
+    },
+  ];
 
-    const rawText = await response.text();
-    let geminiBody: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
+  let lastStatus = 0;
+  let lastErrorMsg = '';
+  for (const model of geminiModelNames) {
     try {
-      geminiBody = JSON.parse(rawText) as typeof geminiBody;
-    } catch { /* corps non-JSON */ }
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: content }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 512,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: controller.signal,
+        },
+      );
 
-    // Reconstruit un corps compatible Groq-ROMAN pour la boucle de parsing.
-    const contentText = geminiBody?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? '';
-    const body: GroqVisionResult['body'] = contentText
-      ? { choices: [{ message: { content: contentText } }] }
-      : { error: { message: geminiBody?.error?.message || 'Réponse Gemini vide' } };
+      const rawText = await response.text();
+      let geminiBody: { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } } | null = null;
+      try {
+        geminiBody = JSON.parse(rawText) as typeof geminiBody;
+      } catch { /* (corps non-JSON) */ }
 
-    return {
-      ok: response.ok && !!contentText,
-      status: response.status,
-      body,
-      rawText,
-      headers: response.headers,
-      isJsonValidationError: false,
-      timedOut: false,
-    };
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return { ok: false, status: 0, body: null, rawText: '', headers: new Headers(), isJsonValidationError: false, timedOut: true };
+      // Reconstruit un corps compatible Groq pour la boucle de parsing.
+      const contentText = geminiBody?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? '';
+      const body: GroqVisionResult['body'] = contentText
+        ? { choices: [{ message: { content: contentText } }] }
+        : { error: { message: geminiBody?.error?.message || 'Réponse Gemini vide' } };
+
+      lastStatus = response.status;
+      lastErrorMsg = geminiBody?.error?.message || '';
+
+      if (response.status === 404) {
+        // Modèle absent/non supporté → on tente le modèle de repli.
+        console.warn(`[scan-hdv] Gemini modèle "${model}" introuvable (404), repli sur le suivant.`);
+        continue;
+      }
+      if (response.ok && !!contentText) {
+        return {
+          ok: true,
+          status: response.status,
+          body,
+          rawText,
+          headers: response.headers,
+          isJsonValidationError: false,
+          timedOut: false,
+        };
+      }
+      // Autre erreur (429, 500, ...) → on garde ce statut et on sort.
+      return {
+        ok: false,
+        status: response.status,
+        body,
+        rawText,
+        headers: response.headers,
+        isJsonValidationError: false,
+        timedOut: false,
+      };
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { ok: false, status: 0, body: null, rawText: '', headers: new Headers(), isJsonValidationError: false, timedOut: true };
+      }
+      throw err;
     }
+  }
+
+  // Tous les modèles ont échoué (404/erreurs) → retour neutre avec le dernier statut.
+  return {
+    ok: false,
+    status: lastStatus || 0,
+    body: null,
+    rawText: '',
+    headers: new Headers(),
+    isJsonValidationError: false,
+    timedOut: false,
+  };
+}
     throw err;
   } finally {
     clearTimeout(timeoutId);

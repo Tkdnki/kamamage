@@ -3,20 +3,20 @@
  *
  * Les captures HD/4K envoyées en base64 explosent le nombre de tokens par
  * requête vision (et donc le quota RPM/TPM du provider). On limite la plus
- * grande dimension à 650px et on ré-encode en JPEG 0.55 pour diviser d'environ
+ * grande dimension à 500px et on ré-encode en JPEG 0.50 pour diviser d'environ
  * 50 % le nombre de tokens vision envoyés à Groq (modèle Qwen 27B). Image plus
  * légère → réponse plus rapide (reste sous les 10s Vercel) et saturation du TPM
- * évitée.
+ * évitée (~<1800 tokens/image, plusieurs scans/minute sous le plafond de 8000).
  */
 
 /** Dimension maximale (px) de la plus grande arête après redimensionnement. */
-export const MAX_IMAGE_DIMENSION = 650;
+export const MAX_IMAGE_DIMENSION = 500;
 
 /** Qualité JPEG d'export (0 = très compressé, 1 = perte minimale). */
-export const JPEG_QUALITY = 0.55;
+export const JPEG_QUALITY = 0.5;
 
 /**
- * Redimensionne proportionnellement (max 650x650) et compresse en JPEG 0.55.
+ * Redimensionne proportionnellement (max 500x500) et compresse en JPEG 0.50.
  * Accepte un dataURL base64 (avec ou sans préfixe `data:`) et renvoie un
  * dataURL JPEG allégé.
  */
