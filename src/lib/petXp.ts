@@ -11,8 +11,39 @@ export interface PetXpResource {
   xp: number;
 }
 
-/** XP totale Level 100 d'un familier (valeur par défaut). */
+/**
+ * Table de conversion Niveau → XP cumulée, indexée par niveau (PET_XP_LEVELS[0]
+ * est inutilisé). Respecte la courbe réelle des familiers Dofus : il faut 0 XP
+ * au niveau 1 et {MAX_XP} XP au niveau 100, avec une croissance exponentielle
+ * ~11 % par niveau (source communautaire dofusgadgets / dofustool).
+ */
+export const MAX_PET_LEVEL = 100;
+export const PET_XP_LEVELS = [
+  0,
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 10,
+  12, 14, 16, 18, 21, 24, 27, 31, 35, 40,
+  45, 51, 57, 64, 72, 81, 91, 102, 114, 127,
+  141, 157, 175, 195, 217, 241, 268, 298, 331, 368,
+  409, 455, 506, 562, 624, 693, 770, 855, 950, 1055,
+  1171, 1300, 1443, 1602, 1779, 1975, 2193, 2435, 2703, 3001,
+  3332, 3699, 4106, 4558, 5060, 5617, 6236, 6923, 7685, 8531,
+  9470, 10512, 11669, 12953, 14378, 15960, 17716, 19665, 21829, 24231,
+  26897, 29856, 33141, 36787, 40834, 45326, 50313, 55848, 61992, 68812,
+  76382, 84785, 94112, 104465, 115957, 128713, 142872, 158589, 176035, 195400,
+] as const;
+
+/** XP totale Level 100 d'un familier (valeur cible par défaut). */
 export const DEFAULT_MAX_XP = 195400;
+
+/**
+ * XP cumulée nécessaire pour être au niveau donné (1..100), ou 0 hors bornes.
+ * Le niveau 100 vaut DEFAULT_MAX_XP.
+ */
+export function xpForLevel(level: number): number {
+  const lvl = Math.floor(level);
+  if (!Number.isFinite(lvl) || lvl < 1 || lvl > PET_XP_LEVELS.length - 1) return 0;
+  return PET_XP_LEVELS[lvl];
+}
 
 /** Ligne calculée : croise XP ressource + prix HDV + coût. */
 export interface PetXpRow {
@@ -75,6 +106,13 @@ export function resolveItemId(name: string, index: Map<string, string>): string 
   return index.get(normalizeName(name)) ?? null;
 }
 
+/** Quantité nécessaire pour couvrir `remaining` XP avec l'XP offerte `r.xp`. */
+function quantityToFeed(remainingXp: number, xpPerUnit: number): number | null {
+  if (!Number.isFinite(xpPerUnit) || xpPerUnit <= 0) return null;
+  if (remainingXp <= 0) return 0;
+  return Math.ceil(remainingXp / xpPerUnit);
+}
+
 /**
  * Calcule la liste de rentabilité pour chaque ressource d'XP.
  * @param priceByKey map nomNormalisé → { itemId, unitPrice } (prix > 0)
@@ -93,9 +131,9 @@ export function computeRows(
     const unitPrice = matched?.unitPrice ?? 0;
     const itemId = matched?.itemId ?? null;
     const ratio = hasPrice ? unitPrice / r.xp : 0;
-    const quantityNeeded = hasPrice ? (remaining > 0 ? Math.ceil(remaining / r.xp) : 0) : null;
-    const totalCost = hasPrice ? quantityNeeded! * unitPrice : null;
-    return { name: r.name, itemId, xp: r.xp, unitPrice, ratio, quantityNeeded, totalCost, hasPrice };
+    const qty = quantityToFeed(remaining, r.xp);
+    const totalCost = hasPrice && qty !== null ? qty * unitPrice : null;
+    return { name: r.name, itemId, xp: r.xp, unitPrice, ratio, quantityNeeded: qty, totalCost, hasPrice };
   });
 }
 

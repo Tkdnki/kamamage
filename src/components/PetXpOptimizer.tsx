@@ -4,6 +4,8 @@ import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import petXpResources from '../data/petXpResources.json';
 import {
   DEFAULT_MAX_XP,
+  MAX_PET_LEVEL,
+  xpForLevel,
   computeRows,
   normalizeName,
   summarize,
@@ -25,15 +27,22 @@ type SortDir = 'asc' | 'desc';
 export default function PetXpOptimizer() {
   const { hdvPrices, customItems } = useDofus();
 
-  const [currentXpInput, setCurrentXpInput] = useState('0');
-  const [targetXpRaw, setTargetXpRaw] = useState(String(DEFAULT_MAX_XP));
+  const [currentLevelRaw, setCurrentLevelRaw] = useState('1');
+  const [targetLevelRaw, setTargetLevelRaw] = useState(String(MAX_PET_LEVEL));
   const [searchQuery, setSearchQuery] = useState('');
-  const [hideUnpriced, setHideUnpriced] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>('unitPrice');
+  const [hideUnpriced, setHideUnpriced] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  const currentXp = Number.isFinite(Number(currentXpInput.replace(',', '.'))) ? Number(currentXpInput.replace(',', '.')) : 0;
-  const targetXp = Number.isFinite(Number(targetXpRaw.replace(',', '.'))) ? Number(targetXpRaw.replace(',', '.')) : DEFAULT_MAX_XP;
+  const toLevel = (raw: string): number => {
+    const n = Math.floor(Number(raw.replace(',', '.')));
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(MAX_PET_LEVEL, Math.max(1, n));
+  };
+  const currentLevel = toLevel(currentLevelRaw);
+  const targetLevel = toLevel(targetLevelRaw);
+  const currentXp = xpForLevel(currentLevel);
+  const targetXp = xpForLevel(targetLevel);
   const xpRemaining = Math.max(0, targetXp - currentXp);
 
   // Index nom → id : permet de croiser le nom d'une ressource familier avec un
@@ -109,43 +118,48 @@ export default function PetXpOptimizer() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-400 leading-relaxed">
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
             <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">1. Prix HDV</div>
-            Renseignez / scannez les prix des ressources (onglet Prix HDV) pour activer les calculs de rentabilité.
+            Renseignez / scannez les prix des ressources (onglet Prix HDV) pour activer les calculs de rentabilité. Sans prix, la quantité reste calculée sur l'XP offerte.
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
-            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">2. XP de départ</div>
-            Indiquez l'XP actuelle du familier (Niveau 1 = 0 XP par défaut).
+            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">2. Niveau du familier</div>
+            Indiquez le niveau actuel (1) et le niveau ciblé (100). La conversion Niveau ↔ XP est automatique : le niveau 1 vaut 0 XP, le niveau {MAX_PET_LEVEL} vaut {DEFAULT_MAX_XP.toLocaleString()} XP.
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
-            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">3. XP cible</div>
-            Le niveau 100 correspond à {DEFAULT_MAX_XP.toLocaleString()} XP par défaut.
+            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">3. Quantité &amp; coût</div>
+            Chaque ligne montre la quantité à donner (par objet ayant l'XP offerte) et le coût total en Kamas si un prix HDV est disponible.
           </div>
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-4 mb-2">
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">XP de départ</label>
-          <input
-            type="number"
-            min={0}
-            value={currentXpInput}
-            onChange={e => setCurrentXpInput(e.target.value)}
-            className="w-36 bg-[#0c101d] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500/40"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">XP cible (niveau)</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Niveau actuel</label>
           <input
             type="number"
             min={1}
-            value={targetXpRaw}
-            onChange={e => setTargetXpRaw(e.target.value)}
+            max={MAX_PET_LEVEL}
+            value={currentLevelRaw}
+            onChange={e => setCurrentLevelRaw(e.target.value)}
             className="w-36 bg-[#0c101d] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500/40"
           />
+          <div className="text-[10px] text-slate-500 mt-0.5">{currentXp.toLocaleString()} XP cumulés</div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Niveau ciblé</label>
+          <input
+            type="number"
+            min={1}
+            max={MAX_PET_LEVEL}
+            value={targetLevelRaw}
+            onChange={e => setTargetLevelRaw(e.target.value)}
+            className="w-36 bg-[#0c101d] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500/40"
+          />
+          <div className="text-[10px] text-slate-500">{targetXp.toLocaleString()} XP au total</div>
         </div>
         <div className="bg-[#0c101d]/60 border border-amber-500/20 rounded-lg px-3 py-2 text-xs">
           <span className="text-slate-500 uppercase tracking-wider font-bold mr-2">XP restant</span>
           <span className="font-mono font-extrabold text-amber-400">{Math.round(xpRemaining).toLocaleString()}</span>
+          {xpRemaining <= 0 && <span className="ml-2 text-emerald-400 font-bold">Déjà max ✓</span>}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <div className="relative">
@@ -177,13 +191,13 @@ export default function PetXpOptimizer() {
           <div className="glass-panel rounded-xl p-4 border border-emerald-500/20 bg-gradient-to-r from-[#0d1512] to-[#122019] sm:col-span-1 flex flex-col items-center justify-center text-center gap-1">
             <TrendingDown className="h-5 w-5 text-emerald-400" />
             <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">La plus rentable en HDV</div>
-            <div className="text-base font-extrabold text-white truncate w-full">{summary.bestResource.name}</div>
+            <div className="text-base font-extrabold text-white truncate w-full" title={summary.bestResource.name}>{summary.bestResource.name}</div>
           </div>
           <div className="glass-panel rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center gap-1">
             <Target className="h-5 w-5 text-amber-400" />
             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quantité nécessaire</div>
             <div className="text-xl font-black text-amber-400">
-              {summary.quantity !== null ? summary.quantity.toLocaleString() : '—'}
+              {summary.quantity !== null && summary.quantity !== undefined ? summary.quantity.toLocaleString() : '—'}
             </div>
             <div className="text-[10px] text-slate-500">({summary.pricedCount} ressource(s) avec prix sur {summary.totalCount})</div>
           </div>
@@ -191,15 +205,15 @@ export default function PetXpOptimizer() {
             <Coins className="h-5 w-5 text-amber-400" />
             <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Coût total Level 100</div>
             <div className="text-xl font-black text-slate-100">
-              {summary.totalCost !== null ? `${Math.round(summary.totalCost).toLocaleString()} K` : '—'}
+              {summary.totalCost !== null && summary.totalCost !== undefined ? `${Math.round(summary.totalCost).toLocaleString()} K` : '—'}
             </div>
-            <div className="text-[10px] text-slate-500">en n'achetant que la {summary.bestResource.name}</div>
+            <div className="text-[10px] text-slate-500">en n'achetant que la {summary.bestResource?.name}</div>
           </div>
         </div>
       ) : (
         <div className="glass-panel rounded-xl p-5 border border-amber-500/20 bg-[#0d1117]/60 text-sm text-amber-400 flex items-center gap-3">
           <Info className="h-5 w-5 shrink-0" />
-          Aucune ressource avec un prix HDV renseigné. Renseignez ou scannez les prix des resources dans l'onglet Prix HDV pour activer les calculs.
+          Aucune ressource avec un prix HDV renseigné. Renseignez ou scannez les prix des resources dans l'onglet Prix HDV pour activer les calculs de rentabilité — la quantité nécessaire reste affichée sur l'XP offerte.
         </div>
       )}
 
@@ -213,7 +227,7 @@ export default function PetXpOptimizer() {
                 {renderSortHead({ label: 'XP offerte', k: 'xp' })}
                 {renderSortHead({ label: 'Prix HDV', k: 'unitPrice' })}
                 {renderSortHead({ label: 'Ratio K / XP', k: 'ratio' })}
-                {renderSortHead({ label: 'Qté nécessaire (Lvl 100)', k: 'quantityNeeded' })}
+                {renderSortHead({ label: 'Qté nécessaire', k: 'quantityNeeded' })}
                 {renderSortHead({ label: 'Coût total', k: 'totalCost' })}
               </tr>
             </thead>
@@ -264,7 +278,7 @@ export default function PetXpOptimizer() {
 
       <div className="text-[10px] text-slate-600 flex items-center gap-1.5">
         <Info className="h-3 w-3" />
-        Ratio = Prix HDV ÷ XP offerte (plus bas = plus rentable). La quantité et le coût sont calculés pour atteindre l'XP cible depuis l'XP de départ.
+        Ratio = Prix HDV ÷ XP offerte (plus bas = plus rentable). La Qté nécessaire est calculée sur l'XP offerte uniquement ; le Coût total nécessite un prix HDV. Sans prix, les colonnes Prix, Ratio et Coût affichent « — ».
       </div>
     </div>
   );
