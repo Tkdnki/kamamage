@@ -8,13 +8,15 @@ export const maxDuration = 30;
 // Nombre max de réessais après un échec de validation JSON du modèle (tentatives = retries + 1).
 const MAX_JSON_RETRIES = 2;
 
-// Timeout de sécurité sur l'appel Groq Vision : on coupe à 15s (largement sous
-// la limite Vercel de 30s) pour intercepter la fin du temps et renvoyer un JSON
-// propre { error: "Timeout de réponse Groq" } au lieu de laisser Vercel couper
-// la réponse avec une page d'erreur HTML (ex. "Unexpected token 'A'" côté
-// client). Couplé au redimensionnement client (max 1000px), Groq Vision répond
-// généralement en 2 à 4s, ce timeout n'est donc qu'un filet de sécurité.
-const GROQ_TIMEOUT_MS = 15000;
+// Timeout de sécurité sur l'appel Groq Vision : on coupe à 7,5s.
+//
+// IMPORTANT — Vercel HOBBY tue les Serverless Functions au bout de 10s (504).
+// Ce timeout doit donc rester NETTEMENT sous les 10s : si Groq dépasse 7,5s,
+// l'AbortController coupe la requête et renvoie un JSON propre 504
+// { error: 'Timeout Groq' } AVANT que Vercel ne coupe l'exécution en plein vol
+// (page HTML "Unexpected token 'A'"). Le maxDuration configuré plus haut est
+// ignoré/plafonné à 10s sur le plan gratuit : on ne peut pas compter dessus.
+const GROQ_TIMEOUT_MS = 7500;
 
 // Index de rotation Round-Robin : alterne la clé de départ à chaque requête
 // pour répartir la charge sur toutes les clés Groq configurées.
@@ -310,9 +312,12 @@ Réponds UNIQUEMENT avec un objet JSON valide au format exact suivant (SANS bali
 
 Si un seul item est visible, retourne-le dans le tableau avec un seul élément.`;
 
-    // Modèle Vision Groq actif actuel
+    // Modèle Vision Groq actif actuel : on utilise le modèle LE PLUS RAPIDE
+    // (llama-3.2-11b-vision-preview), nettement plus véloce que la version 90b
+    // pour les OCR de prix HDV. Combiné au redimensionnement client (≤800px,
+    // JPEG 0.65), le temps de réponse passe de ~8s à <2s.
     const visionModels = [
-      'qwen/qwen3.6-27b'
+      'llama-3.2-11b-vision-preview'
     ];
 
     // Prompt système adapté : en mode ciblé, l'IA ne doit JAMAIS lire/écrire le nom
@@ -467,7 +472,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       if (outcome.kind === 'timeout') {
         // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on répond en JSON propre
         // (504) plutôt que de laisser Vercel couper la réponse avec une page HTML.
-        return res.status(504).json({ error: 'Timeout de réponse Groq' });
+        return res.status(504).json({ error: 'Timeout Groq' });
       }
 
       // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle.
