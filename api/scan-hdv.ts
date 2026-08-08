@@ -312,12 +312,16 @@ Réponds UNIQUEMENT avec un objet JSON valide au format exact suivant (SANS bali
 
 Si un seul item est visible, retourne-le dans le tableau avec un seul élément.`;
 
-    // Modèle Vision Groq actif actuel : on utilise le modèle LE PLUS RAPIDE
-    // (llama-3.2-11b-vision-preview), nettement plus véloce que la version 90b
-    // pour les OCR de prix HDV. Combiné au redimensionnement client (≤800px,
-    // JPEG 0.65), le temps de réponse passe de ~8s à <2s.
+    // Modèles Vision Groq actifs : `llama-3.2-11b-vision-preview` a été
+    // « decommissioned » par Groq (erreur 400) → on utilise désormais la variante
+    // `-instruct`, avec replis sur les autres modèles actifs. Le 11b est testé en
+    // premier (le plus rapide pour les OCR de prix HDV) ; le 90b ne sert que de
+    // secours. Combiné au redimensionnement client (≤800px, JPEG 0.65), le temps
+    // de réponse reste <2s.
     const visionModels = [
-      'llama-3.2-11b-vision-preview'
+      'llama-3.2-11b-vision-instruct',
+      'llama-3.2-90b-vision-instruct',
+      'meta-llama/llama-3.2-11b-vision-instruct'
     ];
 
     // Prompt système adapté : en mode ciblé, l'IA ne doit JAMAIS lire/écrire le nom
