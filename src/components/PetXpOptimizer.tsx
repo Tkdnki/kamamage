@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useDofus } from '../context/DofusContext';
+import { useNavigation } from '../context/NavigationContext';
+import type { ScannerQueueItem } from '../context/NavigationContext';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import petXpResources from '../data/petXpResources.json';
 import {
   DEFAULT_MAX_XP,
   MAX_PET_LEVEL,
   xpForLevel,
+  bestUnitPrice,
   computeRows,
   normalizeName,
   summarize,
 } from '../lib/petXp';
-import type { PetXpRow } from '../lib/petXp';
+import type { PetXpRow, PetLots } from '../lib/petXp';
 import {
   PawPrint,
   TrendingDown,
@@ -19,13 +22,28 @@ import {
   Target,
   Coins,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 
 type SortKey = 'name' | 'xp' | 'unitPrice' | 'ratio' | 'quantityNeeded' | 'totalCost';
 type SortDir = 'asc' | 'desc';
+type LotKey = keyof PetLots;
+
+const LOT_LABELS: { key: LotKey; label: string }[] = [
+  { key: 'x1', label: 'x1' },
+  { key: 'x10', label: 'x10' },
+  { key: 'x100', label: 'x100' },
+  { key: 'x1000', label: 'x1000' },
+];
+
+/** Clé de stockage canonique d'une ressource de familier : `pet:<nomNormalisé>`. */
+function petKey(name: string): string {
+  return `pet:${normalizeName(name)}`;
+}
 
 export default function PetXpOptimizer() {
-  const { hdvPrices, customItems } = useDofus();
+  const { hdvPrices, customItems, setHdvPrice } = useDofus();
+  const { openScanner } = useNavigation();
 
   const [currentLevelRaw, setCurrentLevelRaw] = useState('1');
   const [targetLevelRaw, setTargetLevelRaw] = useState(String(MAX_PET_LEVEL));
@@ -45,28 +63,55 @@ export default function PetXpOptimizer() {
   const targetXp = xpForLevel(targetLevel);
   const xpRemaining = Math.max(0, targetXp - currentXp);
 
-  // Index nom → id : permet de croiser le nom d'une ressource familier avec un
-  // item connu (search HDV / mock) disposant d'un prix.
-  const priceByKey = useMemo(() => {
-    const map = new Map<string, { itemId: string; unitPrice: number }>();
-    const items = [...(customItems ?? []), ...DOFUS_MOCK_ITEMS];
-    for (const it of items) {
+  // Index nom → item DofusDB : seulement pour les resources qui ont un item
+  // réel (customItems + mock), pour croiser la fiche familier avec l'HDV.
+  const realItemByKey = useMemo(() => {
+    const m = new Map<string, { itemId: string; name: string }>();
+    for (const it of [...(customItems ?? []), ...DOFUS_MOCK_ITEMS]) {
       if (!it?.name || !it._id) continue;
-      const price = hdvPrices[it._id]?.unitAverage ?? 0;
-      if (price <= 0) continue;
       const key = normalizeName(it.name);
-      if (!map.has(key) || price < (map.get(key)!.unitPrice)) {
-        map.set(key, { itemId: it._id, unitPrice: price });
+      if (!m.has(key)) m.set(key, { itemId: it._id, name: it.name });
+    }
+    return m;
+  }, [customItems]);
+
+  /**
+   * Index complet nomNormalisé → prix par lot, sourcé :
+   *   1. la clé `pet:<nom>` (édition manuelle ici et dans l'onglet Familiers) ;
+   *   2. l'item DofusDB réel quand il existe (compat avec l'ancien format).
+   */
+const priceByKey = useMemo(() => {
+    const map = new Map<string, { itemId: string | null; lots: PetLots }>();
+    const lotsOf = (p: { x1: number; x10: number; x100: number; x1000: number; unitAverage?: number }): PetLots => ({
+      x1: p.x1 ?? 0,
+      x10: p.x10 ?? 0,
+      x100: p.x100 ?? 0,
+      x1000: p.x1000 ?? 0,
+    });
+    for (const res of petXpResources) {
+      const norm = normalizeName(res.name);
+      const petEntry = hdvPrices[petKey(res.name)];
+      const real = realItemByKey.get(norm);
+      const realEntry = real ? hdvPrices[real.itemId] : undefined;
+      const source = petEntry || realEntry;
+      const itemId = real?.itemId ?? null;
+      let lots = source ? lotsOf(source) : { x1: 0, x10: 0, x100: 0, x1000: 0 };
+      // Compat ancien format : un prix unique (uniquement unitAverage) devient x1.
+      if (!!source && lots.x1 === 0 && lots.x10 === 0 && lots.x100 === 0 && lots.x1000 === 0 && (source.unitAverage ?? 0) > 0) {
+        lots = { ...lots, x1: source.unitAverage ?? 0 };
       }
+      map.set(norm, { itemId, lots });
     }
     return map;
-  }, [hdvPrices, customItems]);
+  }, [hdvPrices, realItemByKey]);
 
   const rows = useMemo<PetXpRow[]>(() => {
     return computeRows(petXpResources, priceByKey, currentXp, targetXp);
   }, [priceByKey, currentXp, targetXp]);
 
   const summary = useMemo(() => summarize(rows), [rows]);
+
+  const pricedRows = useMemo(() => rows.filter(r => bestUnitPrice(r.lots) > 0).length, [rows]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -107,26 +152,72 @@ export default function PetXpOptimizer() {
     </th>
   );
 
+  /** Édition manuelle d'un lot : écrite en local + Supabase via le contexte. */
+  const updateLot = (resName: string, lot: LotKey, rawValue: string) => {
+    const key = petKey(resName);
+    const prev = hdvPrices[key];
+    const lots: PetLots = {
+      x1: prev?.x1 ?? 0,
+      x10: prev?.x10 ?? 0,
+      x100: prev?.x100 ?? 0,
+      x1000: prev?.x1000 ?? 0,
+    };
+    const n = Number(rawValue.replace(',', '.'));
+    lots[lot] = Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+    setHdvPrice(key, lots.x1, lots.x10, lots.x100, lots.x1000, { explicit: true });
+  };
+
+  // File de scan : ressources actuellement sans prix (à scanner). On limite la
+  // file à une taille raisonnable pour ne pas surcharger la modale et le mode
+  // "import par capture" reste accessible via l'onglet Prix HDV.
+  const scanQueue = useMemo<ScannerQueueItem[]>(() => {
+    const q: ScannerQueueItem[] = [];
+    for (const r of petXpResources) {
+      const norm = normalizeName(r.name);
+      const lots = priceByKey.get(norm)?.lots;
+      if (lots && (lots.x1 > 0 || lots.x10 > 0 || lots.x100 > 0 || lots.x1000 > 0)) continue;
+      q.push({ expectedName: r.name, expectedId: petKey(r.name), type: 'Ressource' });
+      if (q.length >= 100) break;
+    }
+    return q;
+  }, [priceByKey]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
       {/* En-tête du module */}
       <div className="glass-panel rounded-xl p-5 sm:p-6 border border-amber-500/20 shadow-xl bg-gradient-to-r from-[#0f1421] to-[#151f32]">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-3">
-          <PawPrint className="h-5 w-5 text-amber-400" />
-          Optimisation Familier — XP jusqu'au Niveau 100
-        </h2>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <PawPrint className="h-5 w-5 text-amber-400" />
+            Optimisation Familier — XP jusqu'au Niveau 100
+          </h2>
+          <button
+            onClick={() => openScanner(scanQueue.length > 0 ? scanQueue : undefined, { title: 'Scan HDV — Familiers' })}
+            disabled={scanQueue.length === 0}
+            className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg border transition-colors ${
+              scanQueue.length > 0
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-transparent shadow-lg hover:opacity-90'
+                : 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed'
+            }`}
+            title={scanQueue.length > 0 ? `${scanQueue.length} ressources sans prix à scanner` : 'Toutes les ressources ont un prix'}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Scanner une capture HDV
+            {scanQueue.length > 0 && <span className="ml-1 px-1.5 py-0.5 bg-black/30 rounded text-[10px]">{scanQueue.length}</span>}
+          </button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-400 leading-relaxed">
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
-            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">1. Prix HDV</div>
-            Renseignez / scannez les prix des ressources (onglet Prix HDV) pour activer les calculs de rentabilité. Sans prix, la quantité reste calculée sur l'XP offerte.
+            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">1. Prix par lot</div>
+            Les 4 cases <b>x1 · x10 · x100 · x1000</b> sont modifiables en ligne. Le prix unitaire tenant le plus économique est retenu automatiquement pour le ratio et le coût.
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
             <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">2. Niveau du familier</div>
-            Indiquez le niveau actuel (1) et le niveau ciblé (100). La conversion Niveau ↔ XP est automatique : le niveau 1 vaut 0 XP, le niveau {MAX_PET_LEVEL} vaut {DEFAULT_MAX_XP.toLocaleString()} XP.
+            Niveau actuel (1) → niveau ciblé (100). La conversion est automatique : niveau 1 = 0 XP, niveau {MAX_PET_LEVEL} = {DEFAULT_MAX_XP.toLocaleString()} XP.
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
-            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">3. Quantité &amp; coût</div>
-            Chaque ligne montre la quantité à donner (par objet ayant l'XP offerte) et le coût total en Kamas si un prix HDV est disponible.
+            <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">3. Scan HDV</div>
+            Scannez une capture de l'HDV pour remplir les 4 lots des ressources sans prix, puis recalcul instantané.
           </div>
         </div>
       </div>
@@ -199,7 +290,7 @@ export default function PetXpOptimizer() {
             <div className="text-xl font-black text-amber-400">
               {summary.quantity !== null && summary.quantity !== undefined ? summary.quantity.toLocaleString() : '—'}
             </div>
-            <div className="text-[10px] text-slate-500">({summary.pricedCount} ressource(s) avec prix sur {summary.totalCount})</div>
+            <div className="text-[10px] text-slate-500">({pricedRows} ressource(s) avec prix sur {rows.length})</div>
           </div>
           <div className="glass-panel rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center gap-1">
             <Coins className="h-5 w-5 text-amber-400" />
@@ -213,7 +304,7 @@ export default function PetXpOptimizer() {
       ) : (
         <div className="glass-panel rounded-xl p-5 border border-amber-500/20 bg-[#0d1117]/60 text-sm text-amber-400 flex items-center gap-3">
           <Info className="h-5 w-5 shrink-0" />
-          Aucune ressource avec un prix HDV renseigné. Renseignez ou scannez les prix des resources dans l'onglet Prix HDV pour activer les calculs de rentabilité — la quantité nécessaire reste affichée sur l'XP offerte.
+          Aucune ressource avec un prix HDV renseigné. Éditez les cases de prix ci-dessous ou scannez une capture HDV — la quantité nécessaire reste affichée sur l'XP offerte.
         </div>
       )}
 
@@ -225,7 +316,9 @@ export default function PetXpOptimizer() {
               <tr>
                 {renderSortHead({ label: 'Ressource', k: 'name', align: 'text-left' })}
                 {renderSortHead({ label: 'XP offerte', k: 'xp' })}
-                {renderSortHead({ label: 'Prix HDV', k: 'unitPrice' })}
+                <th className="text-right px-3 py-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  Prix HDV (lots)
+                </th>
                 {renderSortHead({ label: 'Ratio K / XP', k: 'ratio' })}
                 {renderSortHead({ label: 'Qté nécessaire', k: 'quantityNeeded' })}
                 {renderSortHead({ label: 'Coût total', k: 'totalCost' })}
@@ -248,11 +341,28 @@ export default function PetXpOptimizer() {
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-slate-400">{row.xp.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right font-mono text-slate-200">
-                    {row.hasPrice ? `${Math.round(row.unitPrice).toLocaleString()} K` : <span className="text-slate-600">—</span>}
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {LOT_LABELS.map(lot => (
+                        <label key={lot.key} className="flex flex-col items-center gap-0.5" title={`Prix ${lot.key}`}>
+                          <input
+                            type="number"
+                            min={0}
+                            value={row.lots[lot.key] > 0 ? row.lots[lot.key] : ''}
+                            placeholder={lot.label}
+                            onChange={e => updateLot(row.name, lot.key, e.target.value)}
+                            className="w-14 bg-[#0c101d] border border-white/10 rounded px-1 py-1 text-right font-mono text-[11px] text-slate-200 focus:outline-none focus:border-amber-500/40 placeholder:text-slate-600"
+                          />
+                          <span className="text-[8px] text-slate-600 uppercase">{lot.label === 'x1' ? '1' : lot.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">
+                      {row.unitPrice > 0 ? `unitaire le plus bas : ${row.unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} K` : '—'}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right font-mono">
-                    {row.hasPrice ? (
+                    {row.hasPrice && row.xp > 0 ? (
                       <span className="text-amber-400">{row.ratio.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                     ) : (
                       <span className="text-slate-600">—</span>
@@ -278,7 +388,7 @@ export default function PetXpOptimizer() {
 
       <div className="text-[10px] text-slate-600 flex items-center gap-1.5">
         <Info className="h-3 w-3" />
-        Ratio = Prix HDV ÷ XP offerte (plus bas = plus rentable). La Qté nécessaire est calculée sur l'XP offerte uniquement ; le Coût total nécessite un prix HDV. Sans prix, les colonnes Prix, Ratio et Coût affichent « — ».
+        Prix par lot : le prix unitaire le plus économique (x1, x10/10, x100/100, x1000/1000) sert au Ratio K/XP. Le Coût total est calculé en décomposant l'achat en x1000 → x100 → x10 → x1. Sans prix, les colonnes prix, ratio et coût affichent « — ».
       </div>
     </div>
   );

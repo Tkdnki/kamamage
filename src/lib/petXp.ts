@@ -5,6 +5,9 @@
  * nombre d'XP accordé par objet consommé au familier.
  */
 
+import { getOptimalCost } from './pricing';
+import type { PriceData } from '../context/DofusContext';
+
 /** Ressource du fichier exporté (une ligne de petXpResources.json). */
 export interface PetXpResource {
   name: string;
@@ -45,19 +48,32 @@ export function xpForLevel(level: number): number {
   return PET_XP_LEVELS[lvl];
 }
 
+/** Prix d'un même objet selon 4 lots HDV : x1, x10, x100, x1000. */
+export interface PetLots {
+  x1: number;
+  x10: number;
+  x100: number;
+  x1000: number;
+}
+
+/** Lots vides (aucun lot renseigné). */
+export const EMPTY_LOTS: PetLots = { x1: 0, x10: 0, x100: 0, x1000: 0 };
+
 /** Ligne calculée : croise XP ressource + prix HDV + coût. */
 export interface PetXpRow {
   name: string;
   /** ID DofusDB (item_key) du prix correspondant, s'il a pu être résolu. */
   itemId: string | null;
   xp: number;
-  /** Prix unitaire HDV (0 si non renseigné / non résolu). */
+  /** Prix par lot : 4 cases éditables (source du ratio/coût). */
+  lots: PetLots;
+  /** Prix unitaire le plus économique disponible (min x1, x10/10, x100/100, x1000/1000). 0 si aucun lot. */
   unitPrice: number;
-  /** Ratio Kamas par point d'XP (0 si pas de prix). */
+  /** Ratio Kamas par point d'XP (0 si pas de prix ou XP nulle). */
   ratio: number;
-  /** Quantité nécessaire pour XPs restantes (null si pas de prix). */
+  /** Quantité nécessaire pour XPs restantes. */
   quantityNeeded: number | null;
-  /** Coût total en Kamas (null si pas de prix). */
+  /** Coût total en Kamas, en décomposant l'achat en lots optimaux (null si aucun lot). */
   totalCost: number | null;
   hasPrice: boolean;
 }
@@ -113,13 +129,52 @@ function quantityToFeed(remainingXp: number, xpPerUnit: number): number | null {
   return Math.ceil(remainingXp / xpPerUnit);
 }
 
+/** Lots présentant au moins un lot > 0. */
+export function hasAnyLot(lots: PetLots | null | undefined): boolean {
+  return !!lots && (lots.x1 > 0 || lots.x10 > 0 || lots.x100 > 0 || lots.x1000 > 0);
+}
+
+/**
+ * Prix unitaire le plus économique parmi les lots disponibles.
+ * Retient le plus bas de chaque lot possible (x1, x10/10, x100/100, x1000/1000).
+ * Retourne 0 si aucun lot > 0.
+ */
+export function bestUnitPrice(lots: PetLots | null | undefined): number {
+  if (!hasAnyLot(lots)) return 0;
+  const cand: number[] = [];
+  const l = lots!;
+  if (l.x1 > 0) cand.push(l.x1);
+  if (l.x10 > 0) cand.push(l.x10 / 10);
+  if (l.x100 > 0) cand.push(l.x100 / 100);
+  if (l.x1000 > 0) cand.push(l.x1000 / 1000);
+  return Math.min(...cand);
+}
+
+/**
+ * Coût d'achat de `quantity` unités en décomposant au plus en paquets de
+ * 1000, 100, 10 puis 1 (réutilise la règle partagée de l'app, `getOptimalCost`,
+ * qui compare aussi l'achat d'un lot entier vs l'unité pour le reliquat).
+ */
+export function decomposeCost(lots: PetLots | null | undefined, quantity: number | null): number | null {
+  if (!hasAnyLot(lots) || quantity === null || quantity < 0) return null;
+  if (quantity === 0) return 0;
+  const priceData: PriceData = {
+    x1: lots!.x1,
+    x10: lots!.x10,
+    x100: lots!.x100,
+    x1000: lots!.x1000,
+    unitAverage: bestUnitPrice(lots),
+  };
+  return getOptimalCost(priceData, quantity);
+}
+
 /**
  * Calcule la liste de rentabilité pour chaque ressource d'XP.
- * @param priceByKey map nomNormalisé → { itemId, unitPrice } (prix > 0)
+ * @param priceByKey map nomNormalisé → { itemId, lots } (au moins un lot > 0)
  */
 export function computeRows(
   resources: PetXpResource[],
-  priceByKey: Map<string, { itemId: string; unitPrice: number }>,
+  priceByKey: Map<string, { itemId: string | null; lots: PetLots }>,
   currentXp: number,
   targetXp: number,
 ): PetXpRow[] {
@@ -127,13 +182,14 @@ export function computeRows(
   return resources.map(r => {
     const key = normalizeName(r.name);
     const matched = priceByKey.get(key);
-    const hasPrice = matched !== undefined;
-    const unitPrice = matched?.unitPrice ?? 0;
+    const lots = matched?.lots ?? EMPTY_LOTS;
+    const hasPrice = hasAnyLot(lots);
+    const unitPrice = bestUnitPrice(lots);
     const itemId = matched?.itemId ?? null;
-    const ratio = hasPrice ? unitPrice / r.xp : 0;
+    const ratio = hasPrice && r.xp > 0 ? unitPrice / r.xp : 0;
     const qty = quantityToFeed(remaining, r.xp);
-    const totalCost = hasPrice && qty !== null ? qty * unitPrice : null;
-    return { name: r.name, itemId, xp: r.xp, unitPrice, ratio, quantityNeeded: qty, totalCost, hasPrice };
+    const totalCost = hasPrice && qty !== null ? decomposeCost(lots, qty) : null;
+    return { name: r.name, itemId, xp: r.xp, lots, unitPrice, ratio, quantityNeeded: qty, totalCost, hasPrice };
   });
 }
 

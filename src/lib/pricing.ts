@@ -125,10 +125,6 @@ export function getOptimalCost(p: PriceData | undefined, quantity: number): numb
       const buyWholeLot = lot.totalPrice;
       const buyFragments = lot.unitPrice * remaining;
 
-      // Si le lot suivant existe, comparer aussi avec son prix unitaire
-      const bestFragmentPrice = nextLot
-        ? Math.min(lot.unitPrice, nextLot.unitPrice)
-        : lot.unitPrice;
       const buyFragmentsFromNext = nextLot
         ? nextLot.unitPrice * remaining
         : Infinity;
