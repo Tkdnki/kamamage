@@ -29,6 +29,16 @@ const JOB_ICONS: Record<string, FC<any>> = {
   Forgeron: Flame, Sculpteur: Wand2, Tailleur: Heart,
 };
 
+// Runes « intermédiaires » (variantes +3 Pa) conservées dans DOFUS_RUNES pour la
+// lecture HDV (prix toujours résolvables), mais EXCLUES de la grille de filtres :
+// elles polluent la sélection cible qui n'a besoin que de la rune SIMPLE.
+const HIDDEN_RUNE_CODES = new Set([
+  'Pa Ret Pa',
+  'Pa Ret Pme',
+  'Pa Es PA',
+  'Pa Es PM',
+]);
+
 export default function BreakingSimulator() {
   const { hdvPrices, setHdvPrice } = useDofus();
   const { selectedServer } = useServer();
@@ -738,7 +748,7 @@ export default function BreakingSimulator() {
 
           {/* Runes cibles (multi-sélection) */}
           <div className="flex flex-wrap gap-1">
-            {DOFUS_RUNES.map(rune => {
+            {DOFUS_RUNES.filter(rune => !HIDDEN_RUNE_CODES.has(rune.code)).map(rune => {
               const active = selectedTargetRunes.includes(rune.code);
               return (
                 <button

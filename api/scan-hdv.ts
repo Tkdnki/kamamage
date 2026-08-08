@@ -8,11 +8,13 @@ export const maxDuration = 30;
 // Nombre max de réessais après un échec de validation JSON du modèle (tentatives = retries + 1).
 const MAX_JSON_RETRIES = 2;
 
-// Timeout de sécurité sur l'appel Groq Vision : on coupe à 25s (sous la limite
-// Vercel de 30s) pour intercepter la fin du temps et renvoyer un JSON propre
-// { error: "Timeout Groq" } au lieu de laisser Vercel couper la réponse avec une
-// page d'erreur HTML (ex. "Unexpected token 'A'" côté client).
-const GROQ_TIMEOUT_MS = 25000;
+// Timeout de sécurité sur l'appel Groq Vision : on coupe à 15s (largement sous
+// la limite Vercel de 30s) pour intercepter la fin du temps et renvoyer un JSON
+// propre { error: "Timeout de réponse Groq" } au lieu de laisser Vercel couper
+// la réponse avec une page d'erreur HTML (ex. "Unexpected token 'A'" côté
+// client). Couplé au redimensionnement client (max 1000px), Groq Vision répond
+// généralement en 2 à 4s, ce timeout n'est donc qu'un filet de sécurité.
+const GROQ_TIMEOUT_MS = 15000;
 
 // Index de rotation Round-Robin : alterne la clé de départ à chaque requête
 // pour répartir la charge sur toutes les clés Groq configurées.
@@ -465,7 +467,7 @@ Si un seul item est visible, retourne-le dans le tableau avec un seul élément.
       if (outcome.kind === 'timeout') {
         // L'appel Groq a dépassé GROQ_TIMEOUT_MS : on répond en JSON propre
         // (504) plutôt que de laisser Vercel couper la réponse avec une page HTML.
-        return res.status(504).json({ error: 'Timeout Groq' });
+        return res.status(504).json({ error: 'Timeout de réponse Groq' });
       }
 
       // Échec non-quota : pas de rotation, renvoyer l'erreur telle quelle.

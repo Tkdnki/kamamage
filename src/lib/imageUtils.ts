@@ -3,12 +3,14 @@
  *
  * Les captures HD/4K envoyées en base64 explosent le nombre de tokens par
  * requête vision (et donc le quota RPM/TPM du provider). On limite la plus
- * grande dimension à 1024px et on ré-encode en JPEG 0.75 pour diviser le
- * poids (~x10) et la consommation de tokens (~x4).
+ * grande dimension à 1000px et on ré-encode en JPEG 0.75 pour diviser le
+ * poids (~x10) et la consommation de tokens (~x4). Une image plus légère
+ * permet aussi à Groq Vision de répondre plus vite (2-4s) et d'éviter les
+ * timeouts 504 sur /api/scan-hdv.
  */
 
 /** Dimension maximale (px) de la plus grande arête après redimensionnement. */
-export const MAX_IMAGE_DIMENSION = 1024;
+export const MAX_IMAGE_DIMENSION = 1000;
 
 /** Qualité JPEG d'export (0 = très compressé, 1 = perte minimale). */
 export const JPEG_QUALITY = 0.75;
