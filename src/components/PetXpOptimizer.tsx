@@ -337,20 +337,30 @@ export default function PetXpOptimizer() {
     window.setTimeout(() => setCopiedName(prev => (prev === name ? null : prev)), 1500);
   };
 
-// File de scan : ressources actuellement sans prix (à scanner). On limite la
-  // file à une taille raisonnable pour ne pas surcharger la modale et le mode
-  // "import par capture" reste accessible via l'onglet Prix HDV.
+// File de scan : TOUTES les ressources du familier (1 302) sont ciblées, que
+  // leurs prix soient déjà renseignés ou non. La modale de scan les garde toutes
+  // disponibles : "Scan complet" = les 1 302, "Prix à actualiser" = uniquement
+  // celles sans aucun lot > 0. Le badge du bouton compte les ressources dont un
+  // prix manque encore.
   const scanQueue = useMemo<ScannerQueueItem[]>(() => {
     const q: ScannerQueueItem[] = [];
     for (const r of petXpResources) {
       const norm = normalizeName(r.name);
-      const lots = priceByKey.get(norm)?.lots;
-      if (lots && (lots.x1 > 0 || lots.x10 > 0 || lots.x100 > 0 || lots.x1000 > 0)) continue;
       q.push({ expectedName: r.name, expectedId: globalPriceKey(norm, realItemByKey), type: 'Ressource' });
-      if (q.length >= 100) break;
     }
     return q;
-  }, [priceByKey, realItemByKey]);
+  }, [realItemByKey]);
+
+  const missingPriceCount = useMemo(() => {
+    let count = 0;
+    for (const r of petXpResources) {
+      const norm = normalizeName(r.name);
+      const lots = priceByKey.get(norm)?.lots;
+      if (lots && (lots.x1 > 0 || lots.x10 > 0 || lots.x100 > 0 || lots.x1000 > 0)) continue;
+      count += 1;
+    }
+    return count;
+  }, [priceByKey]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
@@ -362,18 +372,18 @@ export default function PetXpOptimizer() {
             Optimisation Familier — XP jusqu'au Niveau 100
           </h2>
           <button
-            onClick={() => openScanner(scanQueue.length > 0 ? scanQueue : undefined, { title: 'Scan HDV — Familiers' })}
-            disabled={scanQueue.length === 0}
+            onClick={() => openScanner(scanQueue.length > 0 ? scanQueue : undefined, { title: 'Scan HDV — Familiers', initialScanMode: missingPriceCount > 0 ? 'stale' : 'full' })}
+            disabled={missingPriceCount === 0}
             className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg border transition-colors ${
-              scanQueue.length > 0
+              missingPriceCount > 0
                 ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-transparent shadow-lg hover:opacity-90'
                 : 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed'
             }`}
-            title={scanQueue.length > 0 ? `${scanQueue.length} ressources sans prix à scanner` : 'Toutes les ressources ont un prix'}
+            title={missingPriceCount > 0 ? `${missingPriceCount} ressources sans prix à scanner` : 'Toutes les ressources ont un prix'}
           >
             <RefreshCw className="h-4 w-4" />
             Scanner une capture HDV
-            {scanQueue.length > 0 && <span className="ml-1 px-1.5 py-0.5 bg-black/30 rounded text-[10px]">{scanQueue.length}</span>}
+            {missingPriceCount > 0 && <span className="ml-1 px-1.5 py-0.5 bg-black/30 rounded text-[10px]">{missingPriceCount}</span>}
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-400 leading-relaxed">

@@ -6,31 +6,12 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
--- TABLES DE PRIX EXISTANTES (inchangées)
+-- PRIX CONSOLIDÉS (table UNIQUE, voir section « PRIX CONSOLIDÉS »)
+-- Les anciennes tables kama_prices / kama_hdv_prices sont obsolètes :
+-- consultez ci-dessous. Elles peuvent être supprimées en base :
+--   DROP TABLE IF EXISTS kama_prices;
+--   DROP TABLE IF EXISTS kama_hdv_prices;
 -- ============================================================
-CREATE TABLE IF NOT EXISTS kama_prices (
-  server_name TEXT NOT NULL,
-  category    TEXT NOT NULL,
-  item_key    TEXT NOT NULL,
-  price       INTEGER NOT NULL DEFAULT 0,
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (server_name, category, item_key)
-);
-
-CREATE TABLE IF NOT EXISTS kama_hdv_prices (
-  server_name   TEXT NOT NULL,
-  item_id       TEXT NOT NULL,
-  price_x1      INTEGER NOT NULL DEFAULT 0,
-  price_x10     INTEGER NOT NULL DEFAULT 0,
-  price_x100    INTEGER NOT NULL DEFAULT 0,
-  price_x1000   INTEGER NOT NULL DEFAULT 0,
-  unit_average  REAL NOT NULL DEFAULT 0,
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (server_name, item_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_kama_prices_server ON kama_prices (server_name);
-CREATE INDEX IF NOT EXISTS idx_kama_hdv_prices_server ON kama_hdv_prices (server_name);
 
 -- ============================================================
 -- COLLABORATIVE : PROFIL UTILISATEUR
@@ -320,21 +301,8 @@ DROP POLICY IF EXISTS "votes_update_own" ON price_votes;
 CREATE POLICY "votes_update_own" ON price_votes
   FOR UPDATE USING (auth.uid() = user_id);
 
--- --- kama_prices / kama_hdv_prices existantes ---
--- Lecture publique, écriture via Edge Function seulement
-DROP POLICY IF EXISTS "kama_prices_select_public" ON kama_prices;
-CREATE POLICY "kama_prices_select_public" ON kama_prices FOR SELECT USING (true);
-DROP POLICY IF EXISTS "kama_prices_no_write" ON kama_prices;
-CREATE POLICY "kama_prices_no_write" ON kama_prices FOR INSERT WITH CHECK (false);
-DROP POLICY IF EXISTS "kama_prices_no_update" ON kama_prices;
-CREATE POLICY "kama_prices_no_update" ON kama_prices FOR UPDATE USING (false);
-
-DROP POLICY IF EXISTS "kama_hdv_select_public" ON kama_hdv_prices;
-CREATE POLICY "kama_hdv_select_public" ON kama_hdv_prices FOR SELECT USING (true);
-DROP POLICY IF EXISTS "kama_hdv_no_write" ON kama_hdv_prices;
-CREATE POLICY "kama_hdv_no_write" ON kama_hdv_prices FOR INSERT WITH CHECK (false);
-DROP POLICY IF EXISTS "kama_hdv_no_update" ON kama_hdv_prices;
-CREATE POLICY "kama_hdv_no_update" ON kama_hdv_prices FOR UPDATE USING (false);
+-- --- prix consolidés : aucune écriture directe depuis le client,
+--    uniquement via les RPC SECURITY DEFINER (upsert_consolidated_price(s)).
 
 -- ============================================================
 -- STATISTIQUES UTILISATEUR (pour page profil)

@@ -371,7 +371,6 @@ export function DofusProvider({ children }: { children: ReactNode }) {
   }, [selectedServer, markSynced]);
 
   const setHdvPrice = useCallback((itemId: string, x1: number, x10: number, x100: number, x1000: number, options?: SetHdvPriceOptions) => {
-    if (!user) return;
     let sum = 0;
     let count = 0;
     if (x1 > 0) { sum += x1; count++; }
@@ -403,17 +402,23 @@ export function DofusProvider({ children }: { children: ReactNode }) {
       if (Object.keys(manualZeroLots).length > 0) entry.manualZeroLots = manualZeroLots;
     }
 
+    // Mise à jour LOCALE immédiate — TOUJOURS effectuée (même non connecté),
+    // et persistée dans le cache localStorage : les prix ne sont jamais perdus
+    // au refresh, et seront poussés à Supabase au prochain login (re-sync).
+    setHdvPrices(prev => ({ ...prev, [itemId]: entry }));
+
+    // Sauvegarde asynchrone Supabase : réservée aux utilisateurs connectés.
+    if (!user) return;
+
     // Item modifié → à re-synchroniser (retiré de l'ensemble "synced")
     syncedKeysRef.current.delete(itemId);
     persistSyncedKeys();
 
-    // Mise à jour locale immédiate
-    setHdvPrices(prev => ({ ...prev, [itemId]: entry }));
-
-    // Push à Supabase (debounced 1s pour grouper les changements rapides)
+    // Push à Supabase (debounced 500ms pour grouper les changements rapides
+    // pendant la frappe, sans spammer le RPC upsert à chaque caractère).
     pendingPush.current[itemId] = entry;
     if (pushTimer.current) clearTimeout(pushTimer.current);
-    pushTimer.current = setTimeout(flushPending, 1000);
+    pushTimer.current = setTimeout(flushPending, 500);
   }, [user, flushPending, persistSyncedKeys]);
 
   // Volume de ventes mensuel — même pattern debounced

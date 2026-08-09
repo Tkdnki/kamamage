@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDofus } from '../context/DofusContext';
+import type { PriceData } from '../context/DofusContext';
 import { useAuth } from '../context/AuthContext';
 import { searchItems, normalize, fuzzyFindItem } from '../services/api';
 import type { DofusItem } from '../data/mockData';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { getHdvName, getHdvCategoryForItem } from '../data/hdvCategories';
-import { getPriceRecord, isPriceOutdated } from '../lib/pricing';
+import { getPriceRecord } from '../lib/pricing';
+import { normalizeName } from '../lib/petXp';
 import { compressImage } from '../lib/imageUtils';
 import { Camera, X, Copy, Check, Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Clock, ListChecks, Key, Target, SlidersHorizontal } from 'lucide-react';
 
@@ -328,15 +330,27 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
     }
   }, [isOpen, reset]);
 
-  // Un prix est "à actualiser" s'il est absent, sans lot renseigné, sans date de
-  // mise à jour, ou plus vieux que STALE_PRICE_MS (10 jours).
+    // Recherche un prix dans le store global via la clé NORMALISÉE du nom
+  // (insensible casse/accents) ou la clé `pet:<nom>` héritée des anciennes
+  // versions. `getPriceRecord` ne teste que les clés brutes (expectedId/_id/id/
+  // name) et peut donc rater un prix stocké sous le nom normalisé (Familiers).
+  const lookupPriceByNormalizedName = useCallback((item: ScannerQueueItem): PriceData | undefined => {
+    const rawName = item.expectedName ?? item.name;
+    if (!rawName) return undefined;
+    const norm = normalizeName(rawName);
+    return hdvPrices[norm] ?? hdvPrices[`pet:${norm}`];
+  }, [hdvPrices]);
+
+  // Un prix est "à actualiser" s'il est absent OU si aucun lot (x1/x10/x100/x1000)
+  // n'a un prix strictement positif : la présence d'un prix = au moins UN lot > 0
+  // dans le store hydraté par consolidated_prices. Un item avec un prix connu mais
+  // ancien n'est donc pas "à actualiser" (fraîcheur ≠ présence).
   const isPriceStaleOrMissing = useCallback((item: ScannerQueueItem): boolean => {
-    const p = getPriceRecord(item, hdvPrices);
+    const p = getPriceRecord(item, hdvPrices) ?? lookupPriceByNormalizedName(item);
     if (!p) return true;
     const hasAnyPrice = p.x1 > 0 || p.x10 > 0 || p.x100 > 0 || p.x1000 > 0 || (p.unitAverage ?? 0) > 0;
-    if (!hasAnyPrice) return true;
-    return isPriceOutdated(p.updatedAt, 10);
-  }, [hdvPrices]);
+    return !hasAnyPrice;
+  }, [hdvPrices, lookupPriceByNormalizedName]);
 
   const getItemAgeLabel = useCallback((item: ScannerQueueItem): string => {
     const p = getPriceRecord(item, hdvPrices);
@@ -813,6 +827,11 @@ for (const file of Array.from(e.dataTransfer.files)) {
   if (!isOpen) return null;
 
   const queueCount = queue.length;
+  // TOTAL de ressources ciblées — indépendant du mode de scan : toujours
+  // l'ensemble initial (expectedItems), jamais la liste filtrée active.
+  const totalExpectedCount = expectedItems.length;
+  // Ressources qui N'ONT PAS encore de prix (ou dont le prix est obsolète) :
+  // ce sont elles qui alimentent le mode "Scan à actualiser".
   const staleCount = expectedItems.filter(isPriceStaleOrMissing).length;
   const totalExpected = activeExpected.length;
   const resolvedCount = activeExpected.filter(item => resolvedIds.has(item.expectedId)).length;
@@ -904,7 +923,7 @@ for (const file of Array.from(e.dataTransfer.files)) {
           </div>
 
           {/* Double méthode de scan */}
-          {totalExpected > 0 && !targetedItem && (
+          {totalExpectedCount > 0 && !targetedItem && (
             <div className="p-3 rounded-xl bg-slate-800/30 border border-white/10">
               <div className="flex items-center gap-2 mb-2">
                 <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
@@ -922,7 +941,7 @@ for (const file of Array.from(e.dataTransfer.files)) {
                   <span className="text-[11px] font-bold flex items-center gap-1">
                     <ListChecks className="h-3 w-3" /> Scan complet
                   </span>
-                  <span className="text-[9px] opacity-80">{totalExpected} item{totalExpected > 1 ? 's' : ''}</span>
+                  <span className="text-[9px] opacity-80">{totalExpectedCount} item{totalExpectedCount > 1 ? 's' : ''}</span>
                 </button>
                 <button
                   onClick={() => setScanMode('stale')}
@@ -940,7 +959,7 @@ for (const file of Array.from(e.dataTransfer.files)) {
               </div>
               {scanMode === 'stale' && staleCount === 0 && (
                 <p className="mt-2 text-[10px] text-emerald-400 font-semibold">
-                  Tous les prix de cette section sont à jour (moins de 10 jours) !
+                  Tous les items de cette section ont au moins un prix saisi !
                 </p>
               )}
             </div>
@@ -963,7 +982,7 @@ for (const file of Array.from(e.dataTransfer.files)) {
               <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                 {remainingCount === 0 ? (
                   scanMode === 'stale' && staleCount === 0 ? (
-                    <p className="text-[11px] text-slate-500 italic">Tous les prix sont déjà à jour (moins de 10 jours).</p>
+                    <p className="text-[11px] text-slate-500 italic">Tous les items de cette section ont au moins un prix saisi.</p>
                   ) : (
                     <p className="text-[11px] text-slate-500 italic">Tous les items de la recette ont été scannés.</p>
                   )
