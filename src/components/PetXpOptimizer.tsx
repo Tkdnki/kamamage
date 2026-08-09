@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
 import type { DofusItem } from '../data/mockData';
 import petXpResources from '../data/petXpResources.json';
+import { searchItems } from '../services/api';
 import {
   DEFAULT_MAX_XP,
   MAX_PET_LEVEL,
@@ -43,13 +44,33 @@ const LOT_LABELS: { key: LotKey; label: string }[] = [
 /**
  * Clé de stockage CANONIQUE d'une ressource de familier dans le store global :
  *   - l'itemId DofusDB (`_id`, ex: "312") si le nom est connu du catalogue global
- *     (customItems + mock) ;
+ *     (customItems + mock + résolutions DofusDB) ;
  *   - sinon le nom normalisé, pour qu'une fiche Prix HDV ouverte dessus retrouve
  *     exactement la même clé que l'édition manuelle ici.
  * Les anciennes clés `pet:<nom>` (versions précédentes) sont lues en fallback.
+ * La comparaison est TOUJOURS insensible à la casse et aux accents : "Aigue-marine"
+ * du JSON ⟶ "Aigue-Marine" du catalogue DofusDB.
  */
 function globalPriceKey(normalizedName: string, catalog: Map<string, { itemId: string; name: string }>): string {
   return catalog.get(normalizedName)?.itemId ?? normalizedName;
+}
+
+/** Cache de session : nom normalisé → item DofusDB (évite de re-solliciter l'API). */
+const dofusNameCache = new Map<string, DofusItem | null>();
+
+/** Résout l'item DofusDB officiel d'un nom de ressource (recherche DofusDB). */
+async function resolveDofusItem(name: string): Promise<DofusItem | null> {
+  const norm = normalizeName(name);
+  if (dofusNameCache.has(norm)) return dofusNameCache.get(norm) ?? null;
+  try {
+    const results = await searchItems(name);
+    const found = results.find(it => normalizeName(it.name) === norm) ?? null;
+    dofusNameCache.set(norm, found);
+    return found;
+  } catch {
+    dofusNameCache.set(norm, null);
+    return null;
+  }
 }
 
 export default function PetXpOptimizer() {
@@ -64,6 +85,8 @@ export default function PetXpOptimizer() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   /** Nom de la dernière ressource copiée (affiche la coche 1,5 s). */
   const [copiedName, setCopiedName] = useState<string | null>(null);
+  /** Items DofusDB résolus à la volée (noms absents du catalogue local). */
+  const [resolvedDofusItems, setResolvedDofusItems] = useState<Map<string, DofusItem>>(new Map());
 
   const toLevel = (raw: string): number => {
     const n = Math.floor(Number(raw.replace(',', '.')));
@@ -76,9 +99,8 @@ export default function PetXpOptimizer() {
   const targetXp = xpForLevel(targetLevel);
   const xpRemaining = Math.max(0, targetXp - currentXp);
 
-  // Index nom → item DofusDB : seulement pour les resources qui ont un item
-  // réel (customItems + mock), pour croiser la fiche familier avec l'HDV.
-  const realItemByKey = useMemo(() => {
+  // Catalogue local (customItems + mock) normalisé, indépendant des résolutions.
+  const localCatalogByKey = useMemo(() => {
     const m = new Map<string, { itemId: string; name: string }>();
     for (const it of [...(customItems ?? []), ...DOFUS_MOCK_ITEMS]) {
       if (!it?.name || !it._id) continue;
@@ -87,6 +109,66 @@ export default function PetXpOptimizer() {
     }
     return m;
   }, [customItems]);
+
+  // Résolution asynchrone en tâche de fond : pour chaque ressource du familier
+  // dont le nom n'est pas dans le catalogue local, on interroge DofusDB pour
+  // retrouver l'itemId officiel (insensible casse/accents). Ex: "Aigue-marine"
+  // du JSON ⟶ "Aigue-Marine" (Lvl 150) du catalogue DofusDB.
+  useEffect(() => {
+    let cancelled = false;
+    const missing = petXpResources
+      .map(r => r.name)
+      .filter(n => {
+        const key = normalizeName(n);
+        return !localCatalogByKey.has(key) && !dofusNameCache.has(key);
+      })
+      .slice(0, 60);
+    if (missing.length === 0) return;
+
+    (async () => {
+      const results = await Promise.all(missing.map(n => resolveDofusItem(n)));
+      if (cancelled) return;
+      setResolvedDofusItems(prev => {
+        const next = new Map(prev);
+        let changed = false;
+        for (let i = 0; i < missing.length; i++) {
+          const found = results[i];
+          if (found) {
+            const key = normalizeName(missing[i]);
+            if (!next.has(key)) {
+              next.set(key, found);
+              changed = true;
+            }
+          }
+        }
+        return changed ? next : prev;
+      });
+    })();
+
+    return () => { cancelled = true; };
+  }, [localCatalogByKey, resolvedDofusItems]);
+
+  // Index complet nom → item DofusDB (local + résolutions à la volée),
+  // insensible casse/accents, pour croiser la fiche familier avec l'HDV.
+  const realItemByKey = useMemo(() => {
+    const m = new Map<string, { itemId: string; name: string }>(localCatalogByKey);
+    for (const [key, it] of resolvedDofusItems) {
+      if (!m.has(key)) m.set(key, { itemId: it._id, name: it.name });
+    }
+    return m;
+  }, [localCatalogByKey, resolvedDofusItems]);
+
+  /** Récupère l'item DofusDB complet (catalogue local, sinon résolution) pour
+   * garder le même itemId et ne jamais créer de doublon temporaire. */
+  const getRealItem = (norm: string): Partial<DofusItem> | null => {
+    const fromLocal = [...(customItems ?? []), ...DOFUS_MOCK_ITEMS].find(
+      it => it?.name && it._id && normalizeName(it.name) === norm,
+    );
+    if (fromLocal) return { _id: fromLocal._id, name: fromLocal.name, type: fromLocal.type, level: fromLocal.level, imgUrl: fromLocal.imgUrl };
+    const resolved = resolvedDofusItems.get(norm);
+    if (resolved) return { _id: resolved._id, name: resolved.name, type: resolved.type, level: resolved.level, imgUrl: resolved.imgUrl };
+    return null;
+  };
 
   /**
    * Index complet nomNormalisé → prix par lot, sourcé depuis le store GLOBAL :
@@ -109,9 +191,12 @@ export default function PetXpOptimizer() {
       const real = realItemByKey.get(norm);
       // 1. Store global via la clé canonique (itemId ou nom normalisé).
       const globalEntry = hdvPrices[canonicalKey];
-      // 2. Fallback : ancienne clé isolée `pet:<nom>` (compat).
+      // 2. Fallback : prix enregistré sous le nom normalisé (édition manuelle
+      //    faite avant la résolution DofusDB de l'item).
+      const nameEntry = canonicalKey !== norm ? hdvPrices[norm] : undefined;
+      // 3. Fallback : ancienne clé isolée `pet:<nom>` (versions précédentes).
       const legacyEntry = hdvPrices[`pet:${norm}`];
-      const source = globalEntry || legacyEntry;
+      const source = globalEntry || legacyEntry || nameEntry;
       const itemId = real?.itemId ?? null;
       let lots = source ? lotsOf(source) : { x1: 0, x10: 0, x100: 0, x1000: 0 };
       // Compat ancien format : un prix unique (uniquement unitAverage) devient x1.
@@ -170,11 +255,29 @@ export default function PetXpOptimizer() {
     </th>
   );
 
-/** Édition manuelle d'un lot : écrit dans le store GLOBAL (itemId ou nom
-   *  normalisé) pour que Familiers, Prix HDV et Supabase lisent la même clé. */
+/** Édition manuelle d'un lot : écrit dans le store GLOBAL sous la clé
+   *  CANONIQUE (itemId DofusDB si l'item est connu — y compris résolution à
+   *  la volée —, sinon nom normalisé). Familiers et Prix HDV partagent ainsi
+   *  exactement la même clé, garantissant la synchronisation bidirectionnelle. */
   const updateLot = (resName: string, lot: LotKey, rawValue: string) => {
     const norm = normalizeName(resName);
+    const real = realItemByKey.get(norm);
     const key = globalPriceKey(norm, realItemByKey);
+    // Si l'item n'est pas encore résolu, lance la résolution en tâche de fond :
+    // toutes les prochaine écritures/lectures utiliseront son itemId DofusDB.
+    if (!real) {
+      void resolveDofusItem(resName).then(found => {
+        if (found) {
+          const keyNorm = normalizeName(found.name);
+          setResolvedDofusItems(prev => {
+            if (prev.has(keyNorm)) return prev;
+            const next = new Map(prev);
+            next.set(keyNorm, found);
+            return next;
+          });
+        }
+      });
+    }
     const prev = hdvPrices[key];
     const lots: PetLots = {
       x1: prev?.x1 ?? 0,
@@ -187,21 +290,38 @@ export default function PetXpOptimizer() {
     setHdvPrice(key, lots.x1, lots.x10, lots.x100, lots.x1000, { explicit: true });
   };
 
-  /** Ouvre la fiche/la ligne de la ressource dans l'onglet Prix HDV. */
-  const openInHdv = (row: PetXpRow) => {
+  /** Ouvre la fiche/ligne de la ressource dans l'onglet Prix HDV.
+   *  Résout TOUJOURS l'itemId DofusDB officiel (catalogue local d'abord,
+   *  puis recherche DofusDB à la volée) pour ne jamais ouvrir un item
+   *  temporaire quand l'item existe sous son nom officiel dans le catalogue. */
+  const openInHdv = async (row: PetXpRow) => {
     const norm = normalizeName(row.name);
-    const real = realItemByKey.get(norm);
-    const key = real?.itemId ?? norm;
+    const real = getRealItem(norm);
+    // Passe TOUJOURS le vraie fiche DofusDB (id + métadonnées) quand l'item
+    // existe sous son nom officiel ; sinon un item fallback minimal.
     navigateToHdvItem(
-      {
-        _id: key,
+      real ?? {
+        _id: norm,
         name: row.name,
         type: 'Ressource',
-        level: real?.itemId ? undefined : 0,
+        level: 0,
         imgUrl: '',
       } as Partial<DofusItem>,
-      real?.itemId ?? undefined,
+      real?._id ?? undefined,
     );
+    // Résolution en arrière-plan : dès que l'item DofusDB est trouvé, la
+    // prochaine visite utilisera son itemId réel (et non une clé nom).
+    if (!real) {
+      const found = await resolveDofusItem(row.name);
+      if (found) {
+        const keyNorm = normalizeName(found.name);
+        setResolvedDofusItems(prev => {
+          const next = new Map(prev);
+          if (!next.has(keyNorm)) next.set(keyNorm, found);
+          return next.has(keyNorm) ? next : prev;
+        });
+      }
+    }
   };
 
   /** Copie le nom exact de la ressource + feedback visuel éphémère (1,5 s). */
