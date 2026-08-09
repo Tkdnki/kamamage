@@ -17,6 +17,7 @@ import {
 } from '../lib/petXp';
 import type { PetXpRow, PetLots } from '../lib/petXp';
 import { decodeHtmlEntities } from '../lib/stringUtils';
+import { fetchPetXpOverrides, updateResourceXp } from '../lib/sync';
 import {
   PawPrint,
   TrendingDown,
@@ -88,6 +89,23 @@ export default function PetXpOptimizer() {
   const [copiedName, setCopiedName] = useState<string | null>(null);
   /** Items DofusDB résolus à la volée (noms absents du catalogue local). */
   const [resolvedDofusItems, setResolvedDofusItems] = useState<Map<string, DofusItem>>(new Map());
+  /**
+   * Overrides d'XP chargés/édités (table Supabase `item_xp_overrides`).
+   * Clés : item_id DofusDB (ou nom normalisé en fallback) — même convention
+   * que les prix. Appliqués par-dessus petXpResources.json.
+   */
+  const [xpOverrides, setXpOverrides] = useState<Record<string, number>>({});
+  /** Brouillon de saisie par ressource (clé = item_id) pendant la frappe (évite
+   *  le rebond du contrôle tandis que les calculs sont recalculés). */
+  const [xpDrafts, setXpDrafts] = useState<Record<string, string>>({});
+  /** item_id dont la sauvegarde Supabase vient de réussir (coche verte 1,5 s). */
+  const [savedXp, setSavedXp] = useState<string | null>(null);
+
+  /** Parse une saisie d'XP (accepte virgule) en nombre > 0, sinon 0. */
+  const parseXp = (raw: string): number => {
+    const n = Number(raw.trim().replace(',', '.'));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
 
   const toLevel = (raw: string): number => {
     const n = Math.floor(Number(raw.replace(',', '.')));
@@ -155,6 +173,18 @@ export default function PetXpOptimizer() {
     return () => { cancelled = true; };
   }, [localCatalogByKey, resolvedDofusItems]);
 
+  // Hydratation des overrides d'XP depuis Supabase : les valeurs de
+  // `item_xp_overrides` remplacent celles du JSON statique à l'affichage.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const overrides = await fetchPetXpOverrides();
+      if (cancelled) return;
+      setXpOverrides(prev => (Object.keys(overrides).length > 0 ? { ...prev, ...overrides } : prev));
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Index complet nom → item DofusDB (local + résolutions à la volée),
   // insensible casse/accents, pour croiser la fiche familier avec l'HDV.
   const realItemByKey = useMemo(() => {
@@ -216,8 +246,19 @@ export default function PetXpOptimizer() {
   }, [hdvPrices, realItemByKey]);
 
   const rows = useMemo<PetXpRow[]>(() => {
-    return computeRows(petXpResources, priceByKey, currentXp, targetXp);
-  }, [priceByKey, currentXp, targetXp]);
+    // Applique les overrides Supabase (`item_xp_overrides`) par-dessus le JSON
+    // statique : clé canonique (itemId DofusDB) d'abord, nom normalisé en
+    // fallback — même convention de clés que les prix.
+    const effective = petXpResources.map(res => {
+      const norm = normalizeName(res.name);
+      const key = globalPriceKey(norm, realItemByKey);
+      const override = xpOverrides[key] ?? xpOverrides[norm];
+      return override !== undefined && Number.isFinite(override) && override > 0
+        ? { ...res, xp: override }
+        : res;
+    });
+    return computeRows(effective, priceByKey, currentXp, targetXp);
+  }, [petXpResources, priceByKey, realItemByKey, xpOverrides, currentXp, targetXp]);
 
   const summary = useMemo(() => summarize(rows), [rows]);
 
@@ -292,9 +333,47 @@ export default function PetXpOptimizer() {
       x100: prev?.x100 ?? 0,
       x1000: prev?.x1000 ?? 0,
     };
-    const n = Number(rawValue.replace(',', '.'));
+const n = Number(rawValue.replace(',', '.'));
     lots[lot] = Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
     setHdvPrice(key, lots.x1, lots.x10, lots.x100, lots.x1000, { explicit: true });
+  };
+
+  /** Clé canonique (itemId DofusDB si résolu, sinon nom normalisé) d'une ressource,
+   *  identique pour les prix HDV et pour les overrides d'XP Supabase. */
+  const xpKeyOf = (resName: string): string => globalPriceKey(normalizeName(resName), realItemByKey);
+
+  /** Édition en direct de l'XP : met à jour le brouillon et l'override local
+   *  (recalcul immédiat du ratio / qté / coût), sans toucher à Supabase. */
+  const updateXp = (resName: string, rawValue: string) => {
+    const key = xpKeyOf(resName);
+    setXpDrafts(prev => ({ ...prev, [key]: rawValue }));
+    const n = parseXp(rawValue);
+    if (n > 0) {
+      setXpOverrides(prev => ({ ...prev, [key]: n, [normalizeName(resName)]: n }));
+    }
+  };
+
+  /** Sauvegarde Supabase au blur (upsert silencieux, échec loggé seulement). */
+  const commitXp = (resName: string) => {
+    const key = xpKeyOf(resName);
+    const raw = xpDrafts[key];
+    const n = parseXp(raw ?? '');
+    if (n > 0) {
+      setXpOverrides(prev => ({ ...prev, [key]: n, [normalizeName(resName)]: n }));
+      void updateResourceXp(key, n).then(ok => {
+        if (ok) {
+          setSavedXp(key);
+          window.setTimeout(() => setSavedXp(prev => (prev === key ? null : prev)), 1500);
+        }
+      });
+    }
+    // Efface le brouillon une fois committé (retour à la valeur affichée).
+    setXpDrafts(prev => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   /** Ouvre la fiche/ligne de la ressource dans l'onglet Prix HDV.
@@ -436,7 +515,7 @@ export default function PetXpOptimizer() {
         <div className="bg-[#0c101d]/60 border border-amber-500/20 rounded-lg px-3 py-2 text-xs">
           <span className="text-slate-500 uppercase tracking-wider font-bold mr-2">XP restant</span>
           <span className="font-mono font-extrabold text-amber-400">{Math.round(xpRemaining).toLocaleString()}</span>
-          {xpRemaining <= 0 && <span className="ml-2 text-emerald-400 font-bold">Déjà max ✓</span>}
+          {currentLevel >= targetLevel && <span className="ml-2 text-emerald-400 font-bold">Déjà max ✓</span>}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <div className="relative">
@@ -553,7 +632,24 @@ export default function PetXpOptimizer() {
                         )}
                       </div>
                     </td>
-                  <td className="px-3 py-2 text-right font-mono text-slate-400">{row.xp.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <input
+                        key={xpKeyOf(row.name)}
+                        type="number"
+                        step={0.1}
+                        min={0.1}
+                        inputMode="decimal"
+                        value={xpDrafts[xpKeyOf(row.name)] ?? row.xp}
+                        onChange={e => updateXp(row.name, e.target.value)}
+                        onBlur={e => commitXp(row.name)}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        title="XP offerte — éditable (sauvegardée sur Supabase)"
+                        className="w-20 bg-transparent border border-transparent focus:bg-[#0c101d] focus:border-amber-500/40 hover:border-white/15 rounded px-1 py-1 text-right font-mono text-xs text-slate-200 focus:outline-none transition-colors"
+                      />
+                      {savedXp === xpKeyOf(row.name) && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+                    </div>
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {LOT_LABELS.map(lot => (

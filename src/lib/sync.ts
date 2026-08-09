@@ -21,6 +21,53 @@ async function batchUpsertPrices(payloads: ConsolidatedPricePayload[]): Promise<
   }
 }
 
+// ─── XP des ressources de familiers (overrides) ──────────────────────────
+
+/**
+ * Récupère tous les overrides d'XP de ressources de familiers (table
+ * `item_xp_overrides`), indexés par `item_id`. Sert à remplacer la valeur
+ * du JSON statique par la valeur corrigée en jeu.
+ */
+export async function fetchPetXpOverrides(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('item_xp_overrides')
+    .select('item_id, xp_value');
+
+  if (error) {
+    console.warn('[Sync] ❌ fetchPetXpOverrides error:', error.message);
+    return {};
+  }
+
+  const overrides: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const value = Number(row.xp_value);
+    if (Number.isFinite(value)) overrides[row.item_id] = value;
+  }
+  return overrides;
+}
+
+/**
+ * Upsert d'un override d'XP pour une ressource de familier (`item_xp_overrides`).
+ * `item_id` est l'itemId DofusDB (ou nom normalisé en fallback), comme pour les prix.
+ * @returns true si l'upsert Supabase a réussi.
+ */
+export async function updateResourceXp(itemId: string, xpValue: number): Promise<boolean> {
+  const { error } = await supabase
+    .from('item_xp_overrides')
+    .upsert({
+      item_id: itemId,
+      xp_value: xpValue,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'item_id' });
+
+  if (error) {
+    console.error(`[Sync] ❌ Error upsert item_xp_overrides pour "${itemId}":`, error.message);
+    return false;
+  }
+  console.log(`[Sync] 📤 XP sauvegardée: item_id="${itemId}", xp_value=${xpValue}`);
+  return true;
+}
+
 // ─── Runes ──────────────────────────────────────────────────────────────
 
 export async function pushRunePricesToServer(server: string, data: Record<string, number>): Promise<void> {

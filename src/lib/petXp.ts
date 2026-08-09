@@ -17,24 +17,23 @@ export interface PetXpResource {
 
 /**
  * Table de conversion Niveau → XP cumulée, indexée par niveau (PET_XP_LEVELS[0]
- * = niveau 0). Respecte la courbe réelle des familiers Dofus : il faut 0 XP
- * au niveau 0 et au niveau 1, puis {MAX_XP} XP au niveau 100, avec une
- * croissance exponentielle ~11 % par niveau (source communautaire
- * dofusgadgets / dofustool).
+ * = niveau 0). Un familier fraîchement obtenu est au niveau 0 avec 0 XP ; il
+ * faut 10 XP pour passer au niveau 1 (premier palier du jeu), puis {MAX_XP} XP
+ * au niveau 100, avec une croissance ~11 % par niveau (courbe familiers Dofus).
  */
 export const MAX_PET_LEVEL = 100;
 export const PET_XP_LEVELS = [
   0,
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 10,
-  12, 14, 16, 18, 21, 24, 27, 31, 35, 40,
-  45, 51, 57, 64, 72, 81, 91, 102, 114, 127,
-  141, 157, 175, 195, 217, 241, 268, 298, 331, 368,
-  409, 455, 506, 562, 624, 693, 770, 855, 950, 1055,
-  1171, 1300, 1443, 1602, 1779, 1975, 2193, 2435, 2703, 3001,
-  3332, 3699, 4106, 4558, 5060, 5617, 6236, 6923, 7685, 8531,
-  9470, 10512, 11669, 12953, 14378, 15960, 17716, 19665, 21829, 24231,
-  26897, 29856, 33141, 36787, 40834, 45326, 50313, 55848, 61992, 68812,
-  76382, 84785, 94112, 104465, 115957, 128713, 142872, 158589, 176035, 195400,
+  10, 11, 12, 13, 15, 16, 18, 20, 22, 25,
+  27, 30, 33, 37, 40, 45, 49, 55, 60, 67,
+  74, 81, 90, 99, 110, 121, 134, 148, 164, 181,
+  200, 221, 244, 269, 298, 329, 363, 401, 444, 490,
+  542, 598, 661, 731, 807, 892, 986, 1089, 1204, 1330,
+  1469, 1624, 1794, 1982, 2190, 2420, 2674, 2955, 3265, 3608,
+  3986, 4405, 4867, 5378, 5942, 6566, 7255, 8016, 8857, 9787,
+  10814, 11949, 13203, 14589, 16120, 17811, 19681, 21746, 24029, 26550,
+  29337, 32416, 35818, 39577, 43731, 48320, 53391, 58995, 65186, 72027,
+  79587, 87939, 97169, 107366, 118635, 131085, 144843, 160044, 176841, 195400,
 ] as const;
 
 /** XP totale Level 100 d'un familier (valeur cible par défaut). */
