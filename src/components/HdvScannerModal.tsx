@@ -135,12 +135,20 @@ export default function HdvScannerModal({ isOpen, onClose, initialQueue, targete
   // Suivi des items de recette attendus
   const [expectedItems, setExpectedItems] = useState<ScannerQueueItem[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+const [copiedId, setCopiedId] = useState<string | null>(null);
   const expectedItemsRef = useRef<ScannerQueueItem[]>([]);
   const activeExpectedRef = useRef<ScannerQueueItem[]>([]);
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const recipeDoneRef = useRef(false);
   const targetedItemRef = useRef<ScannerQueueItem | null>(null);
+
+  // ── Saisie manuelle des prix ─────────────────────────────────────────────
+  // Brouillon des 4 lots en chaîne de caractères (la frappe reste fluide).
+  // L'item éditée manual est le 1er item restant à scanner — recalculé après
+  // `remainingExpected`/`activeExpected`, voir plus bas.
+  const [manualPriceDraft, setManualPriceDraft] = useState<{ [k in 'x1' | 'x10' | 'x100' | 'x1000']: string }>({
+    x1: '', x10: '', x100: '', x1000: '',
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -824,6 +832,47 @@ for (const file of Array.from(e.dataTransfer.files)) {
     try { localStorage.setItem('user_groq_key', value); } catch {}
   };
 
+  /** Convertit un brouillon manuel en nombre entier de kamas (>= 0). */
+  const parseLot = (raw: string): number => {
+    const n = Number(raw.trim().replace(',', '.'));
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+  };
+
+  /** Sauvegarde manuelle des 4 lots de l'item courant (`manualTarget`) :
+   *   1. écrit dans le store global HDV (persisté localement + Supabase) ;
+   *   2. marque l'item comme scanné → retiré de "Prix à actualiser" ;
+   *   3. l'item suivant devient automatiquement la cible de saisie.
+   *  Retourne le nombre de lots effectivement enregistrés (> 0 = c'était
+   *  une vraie saisie, 0 = rien à enregistrer). */
+  const saveManualPrices = (): number => {
+    if (!manualTarget) return 0;
+    const x1 = parseLot(manualPriceDraft.x1);
+    const x10 = parseLot(manualPriceDraft.x10);
+    const x100 = parseLot(manualPriceDraft.x100);
+    const x1000 = parseLot(manualPriceDraft.x1000);
+
+    // Un lot à 0 est une décision volontaire de l'utilisateur (lot non proposé
+    // sur l'HDV, par ex.) : on enregistre tout de même via `{ explicit: true }`.
+    setHdvPrice(manualTarget.expectedId, x1, x10, x100, x1000, { explicit: true });
+
+    const newResolved = new Set(resolvedIdsRef.current);
+    newResolved.add(manualTarget.expectedId);
+    resolvedIdsRef.current = newResolved;
+    setResolvedIds(newResolved);
+
+    showToast('success', `Prix de "${manualTarget.expectedName}" enregistrés !`);
+    return 1;
+  };
+
+  /** Appui sur Entrée dans un champ : enregistre et passe à l'item suivant. */
+  const handleManualKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.target as HTMLInputElement).blur();
+      saveManualPrices();
+    }
+  };
+
   if (!isOpen) return null;
 
   const queueCount = queue.length;
@@ -837,6 +886,27 @@ for (const file of Array.from(e.dataTransfer.files)) {
   const resolvedCount = activeExpected.filter(item => resolvedIds.has(item.expectedId)).length;
   const remainingExpected = activeExpected.filter(item => !resolvedIds.has(item.expectedId));
   const remainingCount = remainingExpected.length;
+
+  // Item en cours de saisie manuelle : le 1er item restant à scanner (ou, à
+  // défaut, le 1er de la liste active). Passe automatiquement au suivant dès
+  // que l'item courant est résolu (marqué scanné) par la sauvegarde manuelle.
+  const manualTarget: ScannerQueueItem | undefined = remainingExpected[0] ?? activeExpected[0];
+
+  // Re-synchronise le brouillon avec les prix existants à chaque changement
+  // d'item édité manuellement (ouverture, passage à l'item suivant, résolution).
+  useEffect(() => {
+    if (!manualTarget) {
+      setManualPriceDraft({ x1: '', x10: '', x100: '', x1000: '' });
+      return;
+    }
+    const p = getPriceRecord(manualTarget, hdvPrices) ?? lookupPriceByNormalizedName(manualTarget);
+    setManualPriceDraft({
+      x1: p?.x1 && p.x1 > 0 ? String(p.x1) : '',
+      x10: p?.x10 && p.x10 > 0 ? String(p.x10) : '',
+      x100: p?.x100 && p.x100 > 0 ? String(p.x100) : '',
+      x1000: p?.x1000 && p.x1000 > 0 ? String(p.x1000) : '',
+    });
+  }, [manualTarget?.expectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
@@ -1023,6 +1093,63 @@ for (const file of Array.from(e.dataTransfer.files)) {
                   })
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Saisie manuelle des prix HDV : permet d'entrer au clavier les 4
+              lots de l'item courant, alternative au scan IA lorsqu'on a la
+              valeur sous les yeux (capture, site officiel, etc.). */}
+          {totalExpected > 0 && (
+            <div className="p-3 rounded-xl bg-slate-800/30 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="h-3 w-3" /> Saisie manuelle des prix
+                </span>
+                {remainingCount > 0 && (
+                  <span className="text-[9px] font-bold text-slate-400">
+                    RESTANTS : {remainingCount} · SCANNÉS : {resolvedCount}
+                  </span>
+                )}
+              </div>
+
+              {remainingCount === 0 ? (
+                <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  Toutes les ressources ont été actualisées !
+                </p>
+              ) : manualTarget ? (
+                <div key={manualTarget.expectedId}>
+                  <div className="mb-2 text-[11px] font-semibold text-slate-200 truncate">
+                    {manualTarget.expectedName}
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['x1', 'x10', 'x100', 'x1000'] as const).map(lot => (
+                      <label key={lot} className="flex flex-col gap-0.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold">{lot}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={manualPriceDraft[lot]}
+                          placeholder="—"
+                          onChange={e => setManualPriceDraft(prev => ({ ...prev, [lot]: e.target.value }))}
+                          onKeyDown={handleManualKeyDown}
+                          className="w-full bg-[#070a12] border border-white/10 rounded-lg px-2 py-1.5 text-right font-mono text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500/40 placeholder:text-slate-600"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={saveManualPrices}
+                    className="mt-2.5 w-full flex items-center justify-center gap-1.5 text-[11px] font-bold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+                  >
+                    <Check className="h-3.5 w-3.5" /> Valider
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 italic">Aucune ressource à saisir.</p>
+              )}
             </div>
           )}
 
