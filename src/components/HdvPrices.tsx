@@ -264,12 +264,14 @@ export default function HdvPrices() {
   }, [activePrices.x1, activePrices.x10, activePrices.x100, activePrices.x1000]);
 
   const viewLabels: Record<string, string> = {
-    leveling: 'Conseiller XP',
-    crafts: 'Rentabilité',
-    forgemagie: 'Forgemagie',
-    elevage: 'Élevage',
-    shopping: 'Liste de courses',
-    profile: 'Profil',
+    petxp: "à l'optimiseur Familiers",
+    leveling: 'au Conseiller XP',
+    crafts: 'à la Rentabilité',
+    forgemagie: 'à la Forgemagie',
+    breaking: 'au Brisage',
+    elevage: "à l'Élevage",
+    shopping: 'à la Liste de courses',
+    profile: 'au Profil',
   };
 
   return (
@@ -278,10 +280,10 @@ export default function HdvPrices() {
         <button
           type="button"
           onClick={() => { clearPreviousView(); setActiveView(previousView); }}
-          className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors w-fit"
+          className="flex items-center gap-2 text-xs text-slate-400 hover:text-white hover:bg-white/5 rounded-lg px-2 py-1 transition-colors w-fit"
         >
           <span className="text-base">⬅</span>
-          Retour au {viewLabels[previousView] ?? previousView}
+          Retour {viewLabels[previousView] ?? previousView}
         </button>
       )}
 

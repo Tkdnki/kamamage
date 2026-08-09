@@ -1,83 +1,15 @@
 [
   {
-    "name": "Korria",
-    "xp": 2760
-  },
-  {
-    "name": "Boble magristrale",
-    "xp": 2758
-  },
-  {
-    "name": "Teleb magistrale",
-    "xp": 2669
-  },
-  {
-    "name": "Nahuatl",
-    "xp": 1909
-  },
-  {
     "name": "Masque à zag",
     "xp": 1826
-  },
-  {
-    "name": "Dagob magistrale",
-    "xp": 1812
-  },
-  {
-    "name": "Pikmi magistrale",
-    "xp": 1740
-  },
-  {
-    "name": "Zaihn magistrale",
-    "xp": 1734
-  },
-  {
-    "name": "Butor magistrale",
-    "xp": 1710
-  },
-  {
-    "name": "Pétunia magistrale",
-    "xp": 1696
-  },
-  {
-    "name": "Cafra magistrale",
-    "xp": 1681
   },
   {
     "name": "Bidoche Goutue",
     "xp": 1574
   },
   {
-    "name": "Cafra majeure",
-    "xp": 1506
-  },
-  {
-    "name": "Pého magistrale",
-    "xp": 1496
-  },
-  {
-    "name": "Boble majeure",
-    "xp": 1481
-  },
-  {
     "name": "Dremoan (180)",
     "xp": 1480
-  },
-  {
-    "name": "Dagob majeure",
-    "xp": 1431
-  },
-  {
-    "name": "Critus",
-    "xp": 1429
-  },
-  {
-    "name": "Corrode",
-    "xp": 1380
-  },
-  {
-    "name": "Zaihn majeure",
-    "xp": 1334
   },
   {
     "name": "Bidoche Noire",
@@ -90,30 +22,6 @@
   {
     "name": "Galet acajou",
     "xp": 1250
-  },
-  {
-    "name": "Teleb majeure",
-    "xp": 1163
-  },
-  {
-    "name": "Pénitent",
-    "xp": 1155
-  },
-  {
-    "name": "Domo magistrale",
-    "xp": 1052
-  },
-  {
-    "name": "Horize magistrale",
-    "xp": 1049
-  },
-  {
-    "name": "Hulhu magistrale",
-    "xp": 1032
-  },
-  {
-    "name": "Hoskar",
-    "xp": 1029
   },
   {
     "name": "Bitte d&apos;amarrage",
@@ -130,10 +38,6 @@
   {
     "name": "Orbre régénérant magistral",
     "xp": 938
-  },
-  {
-    "name": "Nyoro magistrale",
-    "xp": 912
   },
   {
     "name": "Bidoche Maigre",
@@ -190,14 +94,6 @@
   {
     "name": "Orbre régénérant majeur",
     "xp": 563
-  },
-  {
-    "name": "Domo majeure",
-    "xp": 549
-  },
-  {
-    "name": "Pétunia majeure",
-    "xp": 541
   },
   {
     "name": "Potion de séisme",
@@ -264,28 +160,12 @@
     "xp": 475
   },
   {
-    "name": "Teleb",
-    "xp": 463
-  },
-  {
-    "name": "Hulhu majeure",
-    "xp": 428
-  },
-  {
-    "name": "Horize majeure",
-    "xp": 409
-  },
-  {
     "name": "Rune GA PM",
     "xp": 405
   },
   {
     "name": "Rune Ga Pme",
     "xp": 405
-  },
-  {
-    "name": "Zaihn",
-    "xp": 391
   },
   {
     "name": "Bidoche Macérée",
@@ -300,10 +180,6 @@
     "xp": 375
   },
   {
-    "name": "Pého majeure",
-    "xp": 369
-  },
-  {
     "name": "Essence du Kolosso",
     "xp": 366
   },
@@ -314,14 +190,6 @@
   {
     "name": "Essence de Fuji Givrefoux",
     "xp": 366
-  },
-  {
-    "name": "Cafra",
-    "xp": 364
-  },
-  {
-    "name": "Pikme majeure",
-    "xp": 357
   },
   {
     "name": "Culotte de Missiz Frizz",
@@ -348,16 +216,8 @@
     "xp": 337
   },
   {
-    "name": "Dagob",
-    "xp": 333
-  },
-  {
     "name": "Galet Solaire",
     "xp": 313
-  },
-  {
-    "name": "Butor majeure",
-    "xp": 311
   },
   {
     "name": "Bidoche persillée",
@@ -388,20 +248,8 @@
     "xp": 286.5
   },
   {
-    "name": "Boble",
-    "xp": 281
-  },
-  {
     "name": "Encre du Kralamoure géant",
     "xp": 281
-  },
-  {
-    "name": "Leukide",
-    "xp": 267
-  },
-  {
-    "name": "Nyan",
-    "xp": 262
   },
   {
     "name": "Hamatum de Glourséleste",
@@ -426,14 +274,6 @@
   {
     "name": "Bidoche Saignante",
     "xp": 237
-  },
-  {
-    "name": "Nyoro majeure",
-    "xp": 218
-  },
-  {
-    "name": "Bihilète magistrale",
-    "xp": 212
   },
   {
     "name": "Pétale d&apos;encre",
@@ -1288,10 +1128,6 @@
     "xp": 39
   },
   {
-    "name": "Horize",
-    "xp": 38
-  },
-  {
     "name": "Corne d&apos;Ombre",
     "xp": 38
   },
@@ -1421,10 +1257,6 @@
   },
   {
     "name": "Essence du Meulou",
-    "xp": 32
-  },
-  {
-    "name": "Cafra mineure",
     "xp": 32
   },
   {
@@ -1564,18 +1396,6 @@
     "xp": 26
   },
   {
-    "name": "Butor",
-    "xp": 26
-  },
-  {
-    "name": "Pikmi",
-    "xp": 26
-  },
-  {
-    "name": "Vaude",
-    "xp": 26
-  },
-  {
     "name": "Clef du garde-manger du Rat blanc",
     "xp": 25
   },
@@ -1593,10 +1413,6 @@
   },
   {
     "name": "Fragment gelé",
-    "xp": 25
-  },
-  {
-    "name": "Bihilète majeure",
     "xp": 25
   },
   {
@@ -1860,10 +1676,6 @@
     "xp": 17
   },
   {
-    "name": "Hulhu",
-    "xp": 17
-  },
-  {
     "name": "Coeur du Mantiscore",
     "xp": 17
   },
@@ -2116,10 +1928,6 @@
     "xp": 15
   },
   {
-    "name": "Zaihn mineure",
-    "xp": 15
-  },
-  {
     "name": "Oeil du Père Ver",
     "xp": 15
   },
@@ -2134,10 +1942,6 @@
   {
     "name": "Cawotte transgénique",
     "xp": 14.3
-  },
-  {
-    "name": "Nyoro",
-    "xp": 14
   },
   {
     "name": "Défense du Phossile",
@@ -2177,10 +1981,6 @@
   },
   {
     "name": "Galet cramoisi",
-    "xp": 13
-  },
-  {
-    "name": "Teleb mineure",
     "xp": 13
   },
   {
@@ -2237,10 +2037,6 @@
   },
   {
     "name": "Poil de Ben le Ripate",
-    "xp": 12
-  },
-  {
-    "name": "Ougah",
     "xp": 12
   },
   {
@@ -2588,10 +2384,6 @@
     "xp": 9
   },
   {
-    "name": "Pétunia",
-    "xp": 9
-  },
-  {
     "name": "Coeur du Capitaine Ekarlatte",
     "xp": 9
   },
@@ -2864,14 +2656,6 @@
     "xp": 7
   },
   {
-    "name": "Horize mineure",
-    "xp": 7
-  },
-  {
-    "name": "Pého mineure",
-    "xp": 7
-  },
-  {
     "name": "Pixel de Fraktale",
     "xp": 7
   },
@@ -2953,18 +2737,6 @@
   },
   {
     "name": "Lamelle de Mérulette",
-    "xp": 6
-  },
-  {
-    "name": "Dagob mineure",
-    "xp": 6
-  },
-  {
-    "name": "Domo",
-    "xp": 6
-  },
-  {
-    "name": "Pikmi mineure",
     "xp": 6
   },
   {
@@ -3117,18 +2889,6 @@
   },
   {
     "name": "Rune So",
-    "xp": 5
-  },
-  {
-    "name": "Bihilète",
-    "xp": 5
-  },
-  {
-    "name": "Domo mineure",
-    "xp": 5
-  },
-  {
-    "name": "Hulhu mineure",
     "xp": 5
   },
   {
@@ -3293,10 +3053,6 @@
   },
   {
     "name": "Rune Ra Sa",
-    "xp": 4
-  },
-  {
-    "name": "Pého",
     "xp": 4
   },
   {
@@ -3473,18 +3229,6 @@
   },
   {
     "name": "Rune Ret Pme",
-    "xp": 3
-  },
-  {
-    "name": "Boble mineure",
-    "xp": 3
-  },
-  {
-    "name": "Nyoro mineure",
-    "xp": 3
-  },
-  {
-    "name": "Proxima",
     "xp": 3
   },
   {
@@ -3681,18 +3425,6 @@
   },
   {
     "name": "Rune Ra Pui",
-    "xp": 2
-  },
-  {
-    "name": "Bihilète mineure",
-    "xp": 2
-  },
-  {
-    "name": "Butor mineure",
-    "xp": 2
-  },
-  {
-    "name": "Pétunia mineure",
     "xp": 2
   },
   {

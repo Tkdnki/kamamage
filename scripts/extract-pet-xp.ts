@@ -15,17 +15,59 @@ const ROOT = join(__dirname, '..');
 const XLSX_SOURCE = join(ROOT, 'Ressources_XP_familier_lvl100.xlsx');
 
 /**
- * Idoles retirées de Dofus : on exclut les ressources dont le nom correspond
- * exactement à l'une d'elles OU commence par leur nom (variantes "mineure",
- * "majeure", "magistrale"...). La comparaison est insensible à la casse et aux
- * accents, avec frontières de mot.
+ * Idoles retirées de Dofus. Une ressource est une idole si son nom normalisé
+ * (minuscules, sans accents) correspond EXACTEMENT à :
+ *   - <NomIdole>
+ *   - <NomIdole> mineure / <NomIdole> majeure / <NomIdole> magistrale / "magistral(e)"
+ *   - ou commence par "idole <NomIdole> ..."
+ * Les ressources de monstres (ex: "Essence d'Ougah", "Épine d'Ougah", "Oeil d'Ougah",
+ * "Fragment de pépite de Sakaï") sont préservées car elles ne correspondent à aucun
+ * de ces motifs stricts.
  */
 const IDOL_BLACKLIST = [
-  'Aroumb', 'Binar', 'Boboule', 'Corrozor', 'Dagore', 'Dakid',
-  'Djim', 'Domak', 'Dynamo', 'Horam', 'Huluhu', 'Kyoub',
-  'Lechane', 'Muta', 'Nekineko', 'Oubi', 'Paho', 'Penyu',
-  'Peon', 'Peto', 'Prohim', 'Protes', 'Sak', 'Symphète',
-  'Ultram', 'Yoche',
+  // Familles à déclinaisons (mineure / majeure / magistrale / magique)
+  // NB: les variantes (Boble/Hulhu/Pého/Pikme...) sont les orthographes réelles du xlsx
+  'Bihilète',
+  'Boule',
+  'Boble',
+  'Butor',
+  'Cafra',
+  'Dagob',
+  'Domo',
+  'Dynamo',
+  'Horize',
+  'Hullhu',
+  'Hulhu',
+  'Kyoub',
+  'Nyoro',
+  'Paho',
+  'Pého',
+  'Pikmi',
+  'Pikme',
+  'Pétunia',
+  'Sak',
+  'Teleb',
+  'Yoche',
+  'Zaihn',
+  // Idoles uniques
+  'Aroumb',
+  'Binar',
+  'Corrozor',
+  'Corrode',
+  'Critus',
+  'Djim',
+  'Hoskar',
+  'Korria',
+  'Leukide',
+  'Muta',
+  'Nahuatl',
+  'Nékinéko',
+  'Nyan',
+  'Ougah',
+  'Pénitent',
+  'Proxima',
+  'Ultram',
+  'Vaude',
 ];
 
 /** Normalise (minuscules, sans accents) — identique à l'app (lib/petXp.ts). */
@@ -33,19 +75,27 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-/** Échappe les caractères spéciaux regex. */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Vrai si le nom désigne une idole (exact ou "nom + suffixe"). */
+/** Vrai si le nom correspond STRICTEMENT à une idole (exact, déclinaison, "idole X"). */
 function isIdolResource(name: string): boolean {
   const norm = normalizeName(name);
   if (!norm) return false;
-  return IDOL_BLACKLIST.some(idol => {
+
+  // Déclinaisons acceptées : mineure/majeure/magistrale (+ masculin magistral)
+  // + la coquille source "magistrale" (un "r" en trop) présente dans le fichier Excel
+  const suffixes = ['mineure', 'majeure', 'magistrale', 'magistral', 'magristrale'];
+
+  for (const idol of IDOL_BLACKLIST) {
     const i = normalizeName(idol);
-    return new RegExp(`(^|\\W)${escapeRegExp(i)}(\\W|$)`, 'i').test(norm);
-  });
+    // Exact
+    if (norm === i) return true;
+    // Préfixe "idole <Nom>..."
+    if (norm.startsWith(`idole ${i}`)) return true;
+    // Déclinaisons <Nom> <suffixe>
+    for (const suffix of suffixes) {
+      if (norm === `${i} ${suffix}`) return true;
+    }
+  }
+  return false;
 }
 
 /** Extrait toutes les toString() des noeuds <si> (shared strings). */

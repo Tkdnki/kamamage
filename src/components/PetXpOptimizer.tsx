@@ -3,6 +3,7 @@ import { useDofus } from '../context/DofusContext';
 import { useNavigation } from '../context/NavigationContext';
 import type { ScannerQueueItem } from '../context/NavigationContext';
 import { DOFUS_MOCK_ITEMS } from '../data/mockData';
+import type { DofusItem } from '../data/mockData';
 import petXpResources from '../data/petXpResources.json';
 import {
   DEFAULT_MAX_XP,
@@ -23,6 +24,9 @@ import {
   Coins,
   Info,
   RefreshCw,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 
 type SortKey = 'name' | 'xp' | 'unitPrice' | 'ratio' | 'quantityNeeded' | 'totalCost';
@@ -36,14 +40,21 @@ const LOT_LABELS: { key: LotKey; label: string }[] = [
   { key: 'x1000', label: 'x1000' },
 ];
 
-/** Clé de stockage canonique d'une ressource de familier : `pet:<nomNormalisé>`. */
-function petKey(name: string): string {
-  return `pet:${normalizeName(name)}`;
+/**
+ * Clé de stockage CANONIQUE d'une ressource de familier dans le store global :
+ *   - l'itemId DofusDB (`_id`, ex: "312") si le nom est connu du catalogue global
+ *     (customItems + mock) ;
+ *   - sinon le nom normalisé, pour qu'une fiche Prix HDV ouverte dessus retrouve
+ *     exactement la même clé que l'édition manuelle ici.
+ * Les anciennes clés `pet:<nom>` (versions précédentes) sont lues en fallback.
+ */
+function globalPriceKey(normalizedName: string, catalog: Map<string, { itemId: string; name: string }>): string {
+  return catalog.get(normalizedName)?.itemId ?? normalizedName;
 }
 
 export default function PetXpOptimizer() {
   const { hdvPrices, customItems, setHdvPrice } = useDofus();
-  const { openScanner } = useNavigation();
+  const { openScanner, navigateToHdvItem } = useNavigation();
 
   const [currentLevelRaw, setCurrentLevelRaw] = useState('1');
   const [targetLevelRaw, setTargetLevelRaw] = useState(String(MAX_PET_LEVEL));
@@ -51,6 +62,8 @@ export default function PetXpOptimizer() {
   const [hideUnpriced, setHideUnpriced] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  /** Nom de la dernière ressource copiée (affiche la coche 1,5 s). */
+  const [copiedName, setCopiedName] = useState<string | null>(null);
 
   const toLevel = (raw: string): number => {
     const n = Math.floor(Number(raw.replace(',', '.')));
@@ -76,11 +89,13 @@ export default function PetXpOptimizer() {
   }, [customItems]);
 
   /**
-   * Index complet nomNormalisé → prix par lot, sourcé :
-   *   1. la clé `pet:<nom>` (édition manuelle ici et dans l'onglet Familiers) ;
-   *   2. l'item DofusDB réel quand il existe (compat avec l'ancien format).
+   * Index complet nomNormalisé → prix par lot, sourcé depuis le store GLOBAL :
+   *   1. la clé canonique (itemId DofusDB si l'item est connu, sinon le nom
+   *      normalisé) — exactement la même clé que l'onglet Prix HDV ;
+   *   2. en fallback, l'ancienne clé `pet:<nom>` des versions précédentes.
+   * Cela synchronise Familiers ⇄ Prix HDV ⇄ Supabase (même itemId/nom partout).
    */
-const priceByKey = useMemo(() => {
+  const priceByKey = useMemo(() => {
     const map = new Map<string, { itemId: string | null; lots: PetLots }>();
     const lotsOf = (p: { x1: number; x10: number; x100: number; x1000: number; unitAverage?: number }): PetLots => ({
       x1: p.x1 ?? 0,
@@ -90,10 +105,13 @@ const priceByKey = useMemo(() => {
     });
     for (const res of petXpResources) {
       const norm = normalizeName(res.name);
-      const petEntry = hdvPrices[petKey(res.name)];
+      const canonicalKey = globalPriceKey(norm, realItemByKey);
       const real = realItemByKey.get(norm);
-      const realEntry = real ? hdvPrices[real.itemId] : undefined;
-      const source = petEntry || realEntry;
+      // 1. Store global via la clé canonique (itemId ou nom normalisé).
+      const globalEntry = hdvPrices[canonicalKey];
+      // 2. Fallback : ancienne clé isolée `pet:<nom>` (compat).
+      const legacyEntry = hdvPrices[`pet:${norm}`];
+      const source = globalEntry || legacyEntry;
       const itemId = real?.itemId ?? null;
       let lots = source ? lotsOf(source) : { x1: 0, x10: 0, x100: 0, x1000: 0 };
       // Compat ancien format : un prix unique (uniquement unitAverage) devient x1.
@@ -152,9 +170,11 @@ const priceByKey = useMemo(() => {
     </th>
   );
 
-  /** Édition manuelle d'un lot : écrite en local + Supabase via le contexte. */
+/** Édition manuelle d'un lot : écrit dans le store GLOBAL (itemId ou nom
+   *  normalisé) pour que Familiers, Prix HDV et Supabase lisent la même clé. */
   const updateLot = (resName: string, lot: LotKey, rawValue: string) => {
-    const key = petKey(resName);
+    const norm = normalizeName(resName);
+    const key = globalPriceKey(norm, realItemByKey);
     const prev = hdvPrices[key];
     const lots: PetLots = {
       x1: prev?.x1 ?? 0,
@@ -167,7 +187,36 @@ const priceByKey = useMemo(() => {
     setHdvPrice(key, lots.x1, lots.x10, lots.x100, lots.x1000, { explicit: true });
   };
 
-  // File de scan : ressources actuellement sans prix (à scanner). On limite la
+  /** Ouvre la fiche/la ligne de la ressource dans l'onglet Prix HDV. */
+  const openInHdv = (row: PetXpRow) => {
+    const norm = normalizeName(row.name);
+    const real = realItemByKey.get(norm);
+    const key = real?.itemId ?? norm;
+    navigateToHdvItem(
+      {
+        _id: key,
+        name: row.name,
+        type: 'Ressource',
+        level: real?.itemId ? undefined : 0,
+        imgUrl: '',
+      } as Partial<DofusItem>,
+      real?.itemId ?? undefined,
+    );
+  };
+
+  /** Copie le nom exact de la ressource + feedback visuel éphémère (1,5 s). */
+  const copyResourceName = async (e: React.MouseEvent, name: string) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(name);
+    } catch {
+      // presse-papier indisponible : on ignore silencieusement
+    }
+    setCopiedName(name);
+    window.setTimeout(() => setCopiedName(prev => (prev === name ? null : prev)), 1500);
+  };
+
+// File de scan : ressources actuellement sans prix (à scanner). On limite la
   // file à une taille raisonnable pour ne pas surcharger la modale et le mode
   // "import par capture" reste accessible via l'onglet Prix HDV.
   const scanQueue = useMemo<ScannerQueueItem[]>(() => {
@@ -176,11 +225,11 @@ const priceByKey = useMemo(() => {
       const norm = normalizeName(r.name);
       const lots = priceByKey.get(norm)?.lots;
       if (lots && (lots.x1 > 0 || lots.x10 > 0 || lots.x100 > 0 || lots.x1000 > 0)) continue;
-      q.push({ expectedName: r.name, expectedId: petKey(r.name), type: 'Ressource' });
+      q.push({ expectedName: r.name, expectedId: globalPriceKey(norm, realItemByKey), type: 'Ressource' });
       if (q.length >= 100) break;
     }
     return q;
-  }, [priceByKey]);
+  }, [priceByKey, realItemByKey]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
@@ -278,11 +327,18 @@ const priceByKey = useMemo(() => {
 
       {/* Carte récapitulative — la plus rentable */}
       {summary.bestResource ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="glass-panel rounded-xl p-4 border border-emerald-500/20 bg-gradient-to-r from-[#0d1512] to-[#122019] sm:col-span-1 flex flex-col items-center justify-center text-center gap-1">
             <TrendingDown className="h-5 w-5 text-emerald-400" />
             <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">La plus rentable en HDV</div>
-            <div className="text-base font-extrabold text-white truncate w-full" title={summary.bestResource.name}>{summary.bestResource.name}</div>
+            <button
+              type="button"
+              onClick={() => openInHdv(summary.bestResource!)}
+              title="Ouvrir dans Prix HDV"
+              className="text-base font-extrabold text-white truncate w-full hover:text-amber-400 transition-colors leading-snug"
+            >
+              {summary.bestResource.name}
+            </button>
           </div>
           <div className="glass-panel rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center gap-1">
             <Target className="h-5 w-5 text-amber-400" />
@@ -331,15 +387,35 @@ const priceByKey = useMemo(() => {
                   className={`border-b border-white/5 hover:bg-white/[0.03] transition-colors ${
                     summary.bestResource && summary.bestResource.name === row.name ? 'bg-emerald-500/[0.06]' : ''
                   }`}
-                >
-                  <td className="px-3 py-2 text-left">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-200 font-semibold">{row.name}</span>
-                      {summary.bestResource?.name === row.name && (
-                        <TrendingDown className="h-3.5 w-3.5 text-emerald-400" title="Plus rentable" />
-                      )}
-                    </div>
-                  </td>
+>
+                    <td className="px-3 py-2 text-left">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openInHdv(row)}
+                          title="Ouvrir dans Prix HDV"
+                          className="group/name flex items-center gap-1 text-slate-200 font-semibold hover:text-amber-400 transition-colors text-left cursor-pointer"
+                        >
+                          {row.name}
+                          <ExternalLink className="h-3 w-3 text-slate-600 group-hover/name:text-amber-400/70 shrink-0" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => copyResourceName(e, row.name)}
+                          title={copiedName === row.name ? 'Copié !' : 'Copier le nom'}
+                          className="shrink-0 p-1 rounded-md hover:bg-white/10 text-slate-500 hover:text-slate-200 transition-colors"
+                        >
+                          {copiedName === row.name ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        {summary.bestResource?.name === row.name && (
+                          <TrendingDown className="h-3.5 w-3.5 text-emerald-400 shrink-0" title="Plus rentable" />
+                        )}
+                      </div>
+                    </td>
                   <td className="px-3 py-2 text-right font-mono text-slate-400">{row.xp.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
