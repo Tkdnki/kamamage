@@ -76,6 +76,14 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+/**
+ * Ressources obsolètes ou retirées du jeu à exclure de l'export, quel que soit
+ * leur orthographe (comparaison insensible à la casse et aux accents).
+ */
+const RESOURCE_BLACKLIST = [
+  'Galet acajou', // ancienne ressource doplons, n'existe plus dans Dofus actuel
+];
+
 /** Vrai si le nom correspond STRICTEMENT à une idole (exact, déclinaison, "idole X"). */
 function isIdolResource(name: string): boolean {
   const norm = normalizeName(name);
@@ -223,9 +231,10 @@ function main() {
   });
 
   const target = join(ROOT, 'src', 'data', 'petXpResources.json');
-  const filtered = resourcesFixed.filter(r => !isIdolResource(r.name));
+  const blacklisted = new Set(RESOURCE_BLACKLIST.map(b => normalizeName(b)));
+  const filtered = resourcesFixed.filter(r => !isIdolResource(r.name) && !blacklisted.has(normalizeName(r.name)));
   writeFileSync(target, JSON.stringify(filtered, null, 2) + '\n', 'utf8');
-  console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles exclues)`);
+  console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles/obsolètes exclues)`);
   console.log('Aperçu (5 premiers) :', JSON.stringify(filtered.slice(0, 5)));
   console.log('Dernier échantillon :', JSON.stringify(filtered.slice(-3)));
   console.log('Aperçu des idoles exclues :', JSON.stringify(resourcesFixed.filter(r => isIdolResource(r.name)).map(r => r.name).sort()));
