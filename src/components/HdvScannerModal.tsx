@@ -873,8 +873,6 @@ for (const file of Array.from(e.dataTransfer.files)) {
     }
   };
 
-  if (!isOpen) return null;
-
   const queueCount = queue.length;
   // TOTAL de ressources ciblées — indépendant du mode de scan : toujours
   // l'ensemble initial (expectedItems), jamais la liste filtrée active.
@@ -886,7 +884,6 @@ for (const file of Array.from(e.dataTransfer.files)) {
   const resolvedCount = activeExpected.filter(item => resolvedIds.has(item.expectedId)).length;
   const remainingExpected = activeExpected.filter(item => !resolvedIds.has(item.expectedId));
   const remainingCount = remainingExpected.length;
-
   // Item en cours de saisie manuelle : le 1er item restant à scanner (ou, à
   // défaut, le 1er de la liste active). Passe automatiquement au suivant dès
   // que l'item courant est résolu (marqué scanné) par la sauvegarde manuelle.
@@ -907,6 +904,8 @@ for (const file of Array.from(e.dataTransfer.files)) {
       x1000: p?.x1000 && p.x1000 > 0 ? String(p.x1000) : '',
     });
   }, [manualTarget?.expectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto" onClick={onClose}>
