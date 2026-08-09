@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { decodeHtmlEntities } from '../src/lib/stringUtils';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -146,6 +147,26 @@ function readZip(): Record<string, Buffer> {
   return names;
 }
 
+/**
+ * Corrections nom → nom réel. Certaines lignes du xlsx portent le nom brut du
+ * monstre (ex "Dremoan (180)") alors que la ressource consommée par le familier
+ * est un objet DofusDB précis (ex "Sporme de Dremoan").
+ */
+const RESOURCE_REMAPS: Record<string, string> = {
+  'Dremoan (180)': 'Sporme de Dremoan',
+};
+
+/**
+ * Retire les suffixes de niveau " (180)" / " (200)" laissés par la source.
+ * À n'appliquer QUE si le nom sans suffixe correspond à une ressource valide
+ * (présente dans le tableau initial), sinon on garde le nom d'origine.
+ */
+function cleanLevelSuffix(name: string, knownNames: Set<string>): string {
+  const stipped = name.replace(/\s*\(\d+\)$/, '').trim();
+  if (stipped !== name && knownNames.has(stipped)) return stipped;
+  return name;
+}
+
 function main() {
   if (!existsSync(XLSX_SOURCE)) {
     throw new Error(`Fichier introuvable : ${XLSX_SOURCE}`);
@@ -188,23 +209,26 @@ function main() {
     if (!name) continue;
     const xp = Number(String(xpRaw ?? '').trim().replace(',', '.'));
     if (Number.isNaN(xp)) continue;
-    const clean = name
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
+    const clean = decodeHtmlEntities(name).trim();
     if (clean) resources.push({ name: clean, xp });
   }
 
+  // Noms connus (base des remplacements) pour le nettoyage des suffixes " (N)".
+  const knownNames = new Set(resources.map(r => normalizeName(r.name)));
+
+  const resourcesFixed = resources.map(r => {
+    const remapped = RESOURCE_REMAPS[r.name] ?? r.name;
+    const fixed = cleanLevelSuffix(remapped, knownNames);
+    return { ...r, name: fixed };
+  });
+
   const target = join(ROOT, 'src', 'data', 'petXpResources.json');
-  const filtered = resources.filter(r => !isIdolResource(r.name));
+  const filtered = resourcesFixed.filter(r => !isIdolResource(r.name));
   writeFileSync(target, JSON.stringify(filtered, null, 2) + '\n', 'utf8');
   console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles exclues)`);
   console.log('Aperçu (5 premiers) :', JSON.stringify(filtered.slice(0, 5)));
   console.log('Dernier échantillon :', JSON.stringify(filtered.slice(-3)));
-  console.log('Aperçu des idoles exclues :', JSON.stringify(resources.filter(r => isIdolResource(r.name)).map(r => r.name).sort()));
+  console.log('Aperçu des idoles exclues :', JSON.stringify(resourcesFixed.filter(r => isIdolResource(r.name)).map(r => r.name).sort()));
 }
 
 import { existsSync } from 'node:fs';

@@ -1,6 +1,7 @@
 import type { DofusDbItem, DofusDbRecipe, DofusDbPaginatedResponse } from '../types/dofusdb';
 import type { DofusItem } from '../data/mockData';
 import type { DofusDbEffect } from '../lib/breaking';
+import { decodeHtmlEntities } from '../lib/stringUtils';
 
 const DOFUSDB_BASE_URL = 'https://api.dofusdb.fr';
 const TIMEOUT_MS = 5000;
@@ -163,7 +164,7 @@ async function dofusdbGet<T>(path: string): Promise<T> {
 export function normalizeDofusDbItem(raw: DofusDbItem): DofusItem {
   return {
     _id: String(raw.id),
-    name: raw.name.fr,
+    name: decodeHtmlEntities(raw.name.fr ?? ''),
     type: raw.type?.name?.fr ?? String(raw.typeId),
     level: raw.level,
     imgUrl: raw.img,

@@ -6,6 +6,7 @@
  */
 
 import { getOptimalCost } from './pricing';
+import { decodeHtmlEntities } from './stringUtils';
 import type { PriceData } from '../context/DofusContext';
 
 /** Ressource du fichier exporté (une ligne de petXpResources.json). */
@@ -96,9 +97,10 @@ export interface PetXpNameIndexItem {
   name: string;
 }
 
-/** Normalise un nom (minuscules, sans accents) pour comparaison fiable. */
+/** Normalise un nom (minuscules, sans accents, entités HTML décodées) pour
+ *  comparaison fiable : "DofusDB d&apos;amarrage" == "d'amarrage". */
 export function normalizeName(name: string): string {
-  return name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return decodeHtmlEntities(name.trim()).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 /**

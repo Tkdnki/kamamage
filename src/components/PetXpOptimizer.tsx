@@ -16,6 +16,7 @@ import {
   summarize,
 } from '../lib/petXp';
 import type { PetXpRow, PetLots } from '../lib/petXp';
+import { decodeHtmlEntities } from '../lib/stringUtils';
 import {
   PawPrint,
   TrendingDown,
@@ -164,9 +165,9 @@ export default function PetXpOptimizer() {
     const fromLocal = [...(customItems ?? []), ...DOFUS_MOCK_ITEMS].find(
       it => it?.name && it._id && normalizeName(it.name) === norm,
     );
-    if (fromLocal) return { _id: fromLocal._id, name: fromLocal.name, type: fromLocal.type, level: fromLocal.level, imgUrl: fromLocal.imgUrl };
+    if (fromLocal) return { _id: fromLocal._id, name: decodeHtmlEntities(fromLocal.name), type: fromLocal.type, level: fromLocal.level, imgUrl: fromLocal.imgUrl };
     const resolved = resolvedDofusItems.get(norm);
-    if (resolved) return { _id: resolved._id, name: resolved.name, type: resolved.type, level: resolved.level, imgUrl: resolved.imgUrl };
+    if (resolved) return { _id: resolved._id, name: decodeHtmlEntities(resolved.name), type: resolved.type, level: resolved.level, imgUrl: resolved.imgUrl };
     return null;
   };
 
