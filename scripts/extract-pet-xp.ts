@@ -169,7 +169,17 @@ const RESOURCE_REMAPS: Record<string, string> = {
   'Orbre régénérant magistral': 'Orbe régénérant magistral',
 };
 
-/** Règle de sécurité : remplace TÔUTE occurrence isolée de "Orbre" par "Orbe"
+/**
+ * Valeurs d'XP corrigées (nom → XP réelle en jeu).
+ * Les ressources de niveau < 10 donnent une XP décimale (level/10, ex: 0.5 XP),
+ * mais le fichier source les arrondit par excès à 1. On ne corrige QUE ces cas
+ * (plume etc.) et on conserve toutes les autres valeurs du xlsx telles quelles.
+ */
+const XP_OVERRIDES: Record<string, number> = {
+  'Plume de Crowneille': 0.5, // 4 unités = 2 XP (vérifié en jeu)
+};
+
+/** Règle de sécurité : remplace TŒUTE occurrence générale de "Orbre" par "Orbe"
  * (insensible à la casse et aux accents), quelle que soit la déclinaison. */
 function fixOrbreSpelling(name: string): string {
   return name.replace(/\bOrbre\b/gi, 'Orbe');
@@ -239,7 +249,8 @@ function main() {
     const remapped = RESOURCE_REMAPS[r.name] ?? r.name;
     const fixedOrbre = fixOrbreSpelling(remapped);
     const fixed = cleanLevelSuffix(fixedOrbre, knownNames);
-    return { ...r, name: fixed };
+    const correctedXp = XP_OVERRIDES[fixed] ?? r.xp;
+    return { name: fixed, xp: correctedXp };
   });
 
   const target = join(ROOT, 'src', 'data', 'petXpResources.json');

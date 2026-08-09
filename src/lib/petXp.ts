@@ -17,9 +17,10 @@ export interface PetXpResource {
 
 /**
  * Table de conversion Niveau → XP cumulée, indexée par niveau (PET_XP_LEVELS[0]
- * est inutilisé). Respecte la courbe réelle des familiers Dofus : il faut 0 XP
- * au niveau 1 et {MAX_XP} XP au niveau 100, avec une croissance exponentielle
- * ~11 % par niveau (source communautaire dofusgadgets / dofustool).
+ * = niveau 0). Respecte la courbe réelle des familiers Dofus : il faut 0 XP
+ * au niveau 0 et au niveau 1, puis {MAX_XP} XP au niveau 100, avec une
+ * croissance exponentielle ~11 % par niveau (source communautaire
+ * dofusgadgets / dofustool).
  */
 export const MAX_PET_LEVEL = 100;
 export const PET_XP_LEVELS = [
@@ -40,12 +41,13 @@ export const PET_XP_LEVELS = [
 export const DEFAULT_MAX_XP = 195400;
 
 /**
- * XP cumulée nécessaire pour être au niveau donné (1..100), ou 0 hors bornes.
- * Le niveau 100 vaut DEFAULT_MAX_XP.
+ * XP cumulée nécessaire pour être au niveau donné (0..100), ou 0 hors bornes.
+ * Le niveau 100 vaut DEFAULT_MAX_XP. Un familier fraîchement obtenu est au
+ * niveau 0 avec 0 XP cumulé ; de Niv.0 à Niv.100 il faut donc tout {DEFAULT_MAX_XP}.
  */
 export function xpForLevel(level: number): number {
   const lvl = Math.floor(level);
-  if (!Number.isFinite(lvl) || lvl < 1 || lvl > PET_XP_LEVELS.length - 1) return 0;
+  if (!Number.isFinite(lvl) || lvl < 0 || lvl > PET_XP_LEVELS.length - 1) return 0;
   return PET_XP_LEVELS[lvl];
 }
 

@@ -78,7 +78,7 @@ export default function PetXpOptimizer() {
   const { hdvPrices, customItems, setHdvPrice } = useDofus();
   const { openScanner, navigateToHdvItem } = useNavigation();
 
-  const [currentLevelRaw, setCurrentLevelRaw] = useState('1');
+  const [currentLevelRaw, setCurrentLevelRaw] = useState('0');
   const [targetLevelRaw, setTargetLevelRaw] = useState(String(MAX_PET_LEVEL));
   const [searchQuery, setSearchQuery] = useState('');
   const [hideUnpriced, setHideUnpriced] = useState(false);
@@ -91,11 +91,17 @@ export default function PetXpOptimizer() {
 
   const toLevel = (raw: string): number => {
     const n = Math.floor(Number(raw.replace(',', '.')));
-    if (!Number.isFinite(n)) return 1;
-    return Math.min(MAX_PET_LEVEL, Math.max(1, n));
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(MAX_PET_LEVEL, Math.max(0, n));
   };
   const currentLevel = toLevel(currentLevelRaw);
-  const targetLevel = toLevel(targetLevelRaw);
+  const toTargetLevel = (raw: string): number => {
+    const n = Math.floor(Number(raw.replace(',', '.')));
+    if (!Number.isFinite(n)) return MAX_PET_LEVEL;
+    // Niveau ciblé : min 1, max 100, et jamais inférieur au niveau actuel.
+    return Math.min(MAX_PET_LEVEL, Math.max(currentLevel, Math.max(1, n)));
+  };
+  const targetLevel = toTargetLevel(targetLevelRaw);
   const currentXp = xpForLevel(currentLevel);
   const targetXp = xpForLevel(targetLevel);
   const xpRemaining = Math.max(0, targetXp - currentXp);
@@ -393,7 +399,7 @@ export default function PetXpOptimizer() {
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
             <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">2. Niveau du familier</div>
-            Niveau actuel (1) → niveau ciblé (100). La conversion est automatique : niveau 1 = 0 XP, niveau {MAX_PET_LEVEL} = {DEFAULT_MAX_XP.toLocaleString()} XP.
+            Niveau actuel (0) → niveau ciblé (100). La conversion est automatique : niveau 0 = 0 XP, niveau {MAX_PET_LEVEL} = {DEFAULT_MAX_XP.toLocaleString()} XP.
           </div>
           <div className="bg-[#090d16]/60 rounded-lg p-3 border border-white/5">
             <div className="text-amber-400 font-bold uppercase tracking-wider mb-1">3. Scan HDV</div>
@@ -407,7 +413,7 @@ export default function PetXpOptimizer() {
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Niveau actuel</label>
           <input
             type="number"
-            min={1}
+            min={0}
             max={MAX_PET_LEVEL}
             value={currentLevelRaw}
             onChange={e => setCurrentLevelRaw(e.target.value)}
@@ -419,7 +425,7 @@ export default function PetXpOptimizer() {
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Niveau ciblé</label>
           <input
             type="number"
-            min={1}
+            min={Math.max(1, currentLevel)}
             max={MAX_PET_LEVEL}
             value={targetLevelRaw}
             onChange={e => setTargetLevelRaw(e.target.value)}
