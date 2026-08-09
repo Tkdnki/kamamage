@@ -15,39 +15,37 @@ export interface PetXpResource {
   xp: number;
 }
 
-/**
- * Table de conversion Niveau → XP cumulée, indexée par niveau (PET_XP_LEVELS[0]
- * = niveau 0). Un familier fraîchement obtenu est au niveau 0 avec 0 XP ; il
- * faut 10 XP pour passer au niveau 1 (premier palier du jeu), puis {MAX_XP} XP
- * au niveau 100, avec une croissance ~11 % par niveau (courbe familiers Dofus).
- */
 export const MAX_PET_LEVEL = 100;
-export const PET_XP_LEVELS = [
-  0,
-  10, 11, 12, 13, 15, 16, 18, 20, 22, 25,
-  27, 30, 33, 37, 40, 45, 49, 55, 60, 67,
-  74, 81, 90, 99, 110, 121, 134, 148, 164, 181,
-  200, 221, 244, 269, 298, 329, 363, 401, 444, 490,
-  542, 598, 661, 731, 807, 892, 986, 1089, 1204, 1330,
-  1469, 1624, 1794, 1982, 2190, 2420, 2674, 2955, 3265, 3608,
-  3986, 4405, 4867, 5378, 5942, 6566, 7255, 8016, 8857, 9787,
-  10814, 11949, 13203, 14589, 16120, 17811, 19681, 21746, 24029, 26550,
-  29337, 32416, 35818, 39577, 43731, 48320, 53391, 58995, 65186, 72027,
-  79587, 87939, 97169, 107366, 118635, 131085, 144843, 160044, 176841, 195400,
-] as const;
 
-/** XP totale Level 100 d'un familier (valeur cible par défaut). */
+/**
+ * Table exacte du jeu Dofus : XP cumulée nécessaire pour être au niveau donné,
+ * indexée par niveau (index 0 = niveau 0 avec 0 XP, index 100 = niveau 100 avec
+ * 195 400 XP). Vérifiée pour chaque transition de niveau (0 → 1 = 1 XP, etc.).
+ */
+export const PET_XP_BY_LEVEL: number[] = [
+  0,       1,       2,       4,       7,       11,      16,      22,      29,      37,      // Niv 0 à 9
+  46,      56,      67,      79,      92,      106,     121,     137,     154,     172,     // Niv 10 à 19
+  191,     211,     232,     254,     277,     301,     326,     352,     379,     407,     // Niv 20 à 29
+  436,     466,     497,     529,     562,     596,     631,     667,     704,     742,     // Niv 30 à 39
+  781,     821,     862,     904,     947,     991,     1036,    1082,    1129,    1177,    // Niv 40 à 49
+  1226,    1276,    1327,    1379,    1432,    1486,    1541,    1597,    1654,    1712,    // Niv 50 à 59
+  1771,    1831,    1892,    1954,    2017,    2081,    2146,    2212,    2279,    2347,    // Niv 60 à 69
+  2416,    2486,    2557,    2629,    2702,    2776,    2851,    2927,    3004,    3082,    // Niv 70 à 79
+  3161,    3241,    3322,    3404,    3487,    3571,    3656,    3742,    3829,    3917,    // Niv 80 à 89
+  4006,    4096,    4187,    4279,    4372,    4466,    4561,    4657,    4754,    4852,    // Niv 90 à 99
+  195400,                                                                                    // Niv 100
+];
+
+/** XP totale au niveau 100 d'un familier (valeur cible par défaut). */
 export const DEFAULT_MAX_XP = 195400;
 
 /**
- * XP cumulée nécessaire pour être au niveau donné (0..100), ou 0 hors bornes.
- * Le niveau 100 vaut DEFAULT_MAX_XP. Un familier fraîchement obtenu est au
- * niveau 0 avec 0 XP cumulé ; de Niv.0 à Niv.100 il faut donc tout {DEFAULT_MAX_XP}.
+ * XP cumulée nécessaire pour être au niveau donné, bornée à 0..100 (hors bornes
+ * ou non-fini → 0). Un familier fraîchement obtenu est au niveau 0 avec 0 XP ;
+ * de Niv.0 à Niv.100 il faut donc tout {DEFAULT_MAX_XP} XP.
  */
 export function xpForLevel(level: number): number {
-  const lvl = Math.floor(level);
-  if (!Number.isFinite(lvl) || lvl < 0 || lvl > PET_XP_LEVELS.length - 1) return 0;
-  return PET_XP_LEVELS[lvl];
+  return PET_XP_BY_LEVEL[Math.min(100, Math.max(0, Math.floor(level)))];
 }
 
 /** Prix d'un même objet selon 4 lots HDV : x1, x10, x100, x1000. */
