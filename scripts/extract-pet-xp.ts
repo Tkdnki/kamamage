@@ -162,7 +162,18 @@ function readZip(): Record<string, Buffer> {
  */
 const RESOURCE_REMAPS: Record<string, string> = {
   'Dremoan (180)': 'Sporme de Dremoan',
+  // Coquille "Orbre" → "Orbe" (les 4 déclinaisons présentes dans la source).
+  'Orbre régénérant': 'Orbe régénérant',
+  'Orbre régénérant mineur': 'Orbe régénérant mineur',
+  'Orbre régénérant majeur': 'Orbe régénérant majeur',
+  'Orbre régénérant magistral': 'Orbe régénérant magistral',
 };
+
+/** Règle de sécurité : remplace TÔUTE occurrence isolée de "Orbre" par "Orbe"
+ * (insensible à la casse et aux accents), quelle que soit la déclinaison. */
+function fixOrbreSpelling(name: string): string {
+  return name.replace(/\bOrbre\b/gi, 'Orbe');
+}
 
 /**
  * Retire les suffixes de niveau " (180)" / " (200)" laissés par la source.
@@ -226,7 +237,8 @@ function main() {
 
   const resourcesFixed = resources.map(r => {
     const remapped = RESOURCE_REMAPS[r.name] ?? r.name;
-    const fixed = cleanLevelSuffix(remapped, knownNames);
+    const fixedOrbre = fixOrbreSpelling(remapped);
+    const fixed = cleanLevelSuffix(fixedOrbre, knownNames);
     return { ...r, name: fixed };
   });
 
