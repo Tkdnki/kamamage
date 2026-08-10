@@ -566,7 +566,7 @@ const n = Number(rawValue.replace(',', '.'));
           </div>
           <div className="glass-panel rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center gap-1">
             <Coins className="h-5 w-5 text-amber-400" />
-            <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Coût total Level 100</div>
+            <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Coût total Level {targetLevel}</div>
             <div className="text-xl font-black text-slate-100">
               {summary.totalCost !== null && summary.totalCost !== undefined ? `${Math.round(summary.totalCost).toLocaleString()} K` : '—'}
             </div>
