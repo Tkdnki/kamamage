@@ -3,13 +3,19 @@
  * (parse direct du XML OOXML, sans dépendance) et génère src/data/petXpResources.json
  * sous la forme [{ name, xp }].
  *
- * Usage : npx tsx scripts/extract-pet-xp.ts
+ * Intègre aussi le contrôle DofusDB (alias + suppression des items inexistants) :
+ * les noms qui ne correspondent à aucun item DofusDB sont exclus de l'export,
+ * évitant toute réintroduction d'items obsolètes lors des re-scraps.
+ * Passer --skip-dofusdb pour contourner le contrôle réseau (hors-ligne).
+ *
+ * Usage : npx tsx scripts/extract-pet-xp.ts [--skip-dofusdb]
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodeHtmlEntities } from '../src/lib/stringUtils';
+import { applyAlias, lookupDofusdbName } from './dofusdb-audit';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -203,7 +209,29 @@ function cleanLevelSuffix(name: string, knownNames: Set<string>): string {
   return name;
 }
 
-function main() {
+/** Vérifie sur DofusDB qu'une ressource existe, applique les alias de nommage. */
+async function validateAgainstDofusdb(resources: { name: string; xp: number }[]): Promise<{ name: string; xp: number }[]> {
+  const validated: { name: string; xp: number }[] = [];
+  let removed = 0;
+  let renamed = 0;
+
+  for (const res of resources) {
+    const aliased = applyAlias(res.name);
+    const official = await lookupDofusdbName(aliased);
+    if (!official) {
+      removed++;
+      continue;
+    }
+    if (official !== res.name) renamed++;
+    validated.push({ name: official, xp: res.xp });
+  }
+
+  console.log(`DofusDB validation : ${validated.length} retenues, ${removed} supprimées (introuvables), ${renamed} renommées`);
+  return validated;
+}
+
+async function main() {
+  const skipDofusdb = process.argv.includes('--skip-dofusdb');
   if (!existsSync(XLSX_SOURCE)) {
     throw new Error(`Fichier introuvable : ${XLSX_SOURCE}`);
   }
@@ -262,13 +290,23 @@ function main() {
 
   const target = join(ROOT, 'src', 'data', 'petXpResources.json');
   const blacklisted = new Set(RESOURCE_BLACKLIST.map(b => normalizeName(b)));
-  const filtered = resourcesFixed.filter(r => !isIdolResource(r.name) && !blacklisted.has(normalizeName(r.name)));
+  let filtered = resourcesFixed.filter(r => !isIdolResource(r.name) && !blacklisted.has(normalizeName(r.name)));
+
+  // Contrôle DofusDB : aliases + exclusion des ressources inexistantes.
+  if (!skipDofusdb) {
+    filtered = await validateAgainstDofusdb(filtered);
+  } else {
+    console.log('DofusDB validation contournée (--skip-dofusdb)');
+  }
+
   writeFileSync(target, JSON.stringify(filtered, null, 2) + '\n', 'utf8');
-  console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles/obsolètes exclues)`);
+  console.log(`✅ ${filtered.length} ressources écrites dans ${target} (${resources.length - filtered.length} idoles/obsolètes/invalides exclues)`);
   console.log('Aperçu (5 premiers) :', JSON.stringify(filtered.slice(0, 5)));
   console.log('Dernier échantillon :', JSON.stringify(filtered.slice(-3)));
   console.log('Aperçu des idoles exclues :', JSON.stringify(resourcesFixed.filter(r => isIdolResource(r.name)).map(r => r.name).sort()));
 }
 
-import { existsSync } from 'node:fs';
-main();
+main().catch((err) => {
+  console.error('Erreur fatale :', err);
+  process.exit(1);
+});

@@ -1,10 +1,10 @@
 [
   {
-    "name": "Masque à zag",
+    "name": "Masque à Zag",
     "xp": 1826
   },
   {
-    "name": "Bidoche Goutue",
+    "name": "Bidoche Goûtue",
     "xp": 1574
   },
   {
@@ -92,19 +92,19 @@
     "xp": 563
   },
   {
-    "name": "Potion de séisme",
+    "name": "Potion de Séisme",
     "xp": 507.78
   },
   {
-    "name": "Potion d'incendie",
+    "name": "Potion d'Incendie",
     "xp": 507.78
   },
   {
-    "name": "Potion de tsunami",
+    "name": "Potion de Tsunami",
     "xp": 507.78
   },
   {
-    "name": "Potion d'ouragan",
+    "name": "Potion d'Ouragan",
     "xp": 507.78
   },
   {
@@ -144,20 +144,12 @@
     "xp": 506
   },
   {
-    "name": "Rune GA PA",
-    "xp": 500
-  },
-  {
     "name": "Rune Ga Pa",
     "xp": 500
   },
   {
     "name": "Bidoche de Brousse",
     "xp": 475
-  },
-  {
-    "name": "Rune GA PM",
-    "xp": 405
   },
   {
     "name": "Rune Ga Pme",
@@ -168,7 +160,7 @@
     "xp": 377
   },
   {
-    "name": "Coeur Gelé",
+    "name": "Cœur Gelé",
     "xp": 375
   },
   {
@@ -196,7 +188,7 @@
     "xp": 338
   },
   {
-    "name": "Coeur de Merkator",
+    "name": "Cœur de Merkator",
     "xp": 338
   },
   {
@@ -216,7 +208,7 @@
     "xp": 313
   },
   {
-    "name": "Bidoche persillée",
+    "name": "Bidoche Persillée",
     "xp": 300
   },
   {
@@ -240,7 +232,7 @@
     "xp": 289
   },
   {
-    "name": "Clef de la maison du Papa Nowel",
+    "name": "Clef de la Maison du Papa Nowel",
     "xp": 286.5
   },
   {
@@ -272,7 +264,7 @@
     "xp": 205
   },
   {
-    "name": "Pétale de papier",
+    "name": "Pétale de Papier",
     "xp": 205
   },
   {
@@ -284,7 +276,7 @@
     "xp": 200
   },
   {
-    "name": "Oeil de verre",
+    "name": "Œil de verre",
     "xp": 200
   },
   {
@@ -296,7 +288,7 @@
     "xp": 200
   },
   {
-    "name": "Oeil de Korriandre",
+    "name": "Œil de Korriandre",
     "xp": 196
   },
   {
@@ -308,10 +300,6 @@
     "xp": 188
   },
   {
-    "name": "Fragment de carte de Viti Glourson",
-    "xp": 183
-  },
-  {
     "name": "Sabot du Minotot",
     "xp": 179
   },
@@ -320,27 +308,23 @@
     "xp": 177
   },
   {
-    "name": "Essence de l'obsidiantre",
+    "name": "Essence de l'Obsidiantre",
     "xp": 177
   },
   {
-    "name": "Fragment de carte de Dremoan",
-    "xp": 164
-  },
-  {
-    "name": "Potion de courant d'air",
+    "name": "Potion de Courant d'Air",
     "xp": 161.84
   },
   {
-    "name": "Potion de secousse",
+    "name": "Potion de Secousse",
     "xp": 161.84
   },
   {
-    "name": "Potion de crachin",
+    "name": "Potion de Crachin",
     "xp": 161.84
   },
   {
-    "name": "Potion d'etincelle",
+    "name": "Potion d'Étincelle",
     "xp": 161.84
   },
   {
@@ -348,7 +332,7 @@
     "xp": 161
   },
   {
-    "name": "Clef de la caverne de Nowel",
+    "name": "Clef de la Caverne de Nowel",
     "xp": 159
   },
   {
@@ -360,24 +344,16 @@
     "xp": 144
   },
   {
-    "name": "Essence de Sphincter",
-    "xp": 143
-  },
-  {
     "name": "Essence de Ben le Ripate",
     "xp": 143
   },
   {
-    "name": "Étoffe de Sphincter cell",
+    "name": "Étoffe de Sphincter Cell",
     "xp": 142
   },
   {
     "name": "Artefact Pandawushu",
     "xp": 135.856
-  },
-  {
-    "name": "Rune PO",
-    "xp": 130
   },
   {
     "name": "Rune Po",
@@ -392,11 +368,11 @@
     "xp": 120
   },
   {
-    "name": "Appendice démoniaque",
+    "name": "Appendice Démoniaque",
     "xp": 119
   },
   {
-    "name": "Bidoche Fraiche",
+    "name": "Bidoche Fraîche",
     "xp": 119
   },
   {
@@ -404,7 +380,7 @@
     "xp": 116
   },
   {
-    "name": "Peau de trithon",
+    "name": "Peau de Trithon",
     "xp": 111
   },
   {
@@ -412,11 +388,11 @@
     "xp": 111
   },
   {
-    "name": "Clef de la tanière Givrefoux",
+    "name": "Clef de la Tanière Givrefoux",
     "xp": 109
   },
   {
-    "name": "Aigue-marine",
+    "name": "Aigue-Marine",
     "xp": 105
   },
   {
@@ -432,7 +408,7 @@
     "xp": 103
   },
   {
-    "name": "Terre stérile",
+    "name": "Terre Stérile",
     "xp": 103
   },
   {
@@ -448,7 +424,7 @@
     "xp": 101
   },
   {
-    "name": "Oreille de Mecanofoux",
+    "name": "Oreille de Mécanofoux",
     "xp": 101
   },
   {
@@ -456,7 +432,7 @@
     "xp": 101
   },
   {
-    "name": "Etoffe de Grodruche",
+    "name": "Étoffe de Grodruche",
     "xp": 101
   },
   {
@@ -500,7 +476,7 @@
     "xp": 101
   },
   {
-    "name": "Ethmoide de Stalak",
+    "name": "Ethmoïde de Stalak",
     "xp": 101
   },
   {
@@ -520,11 +496,11 @@
     "xp": 101
   },
   {
-    "name": "Parasite aquatique",
+    "name": "Parasite Aquatique",
     "xp": 101
   },
   {
-    "name": "Pierre angulaire",
+    "name": "Pierre Angulaire",
     "xp": 101
   },
   {
@@ -556,15 +532,15 @@
     "xp": 101
   },
   {
-    "name": "Frange d'ebourifauve",
+    "name": "Frange d'Ébourifauve",
     "xp": 101
   },
   {
-    "name": "Tresse de domptueuse",
+    "name": "Tresse de Domptueuse",
     "xp": 101
   },
   {
-    "name": "Mis en plis de voracle",
+    "name": "Mise en plis de Voracle",
     "xp": 101
   },
   {
@@ -588,11 +564,11 @@
     "xp": 101
   },
   {
-    "name": "Brulame encapsulé",
+    "name": "Brûlâme encapsulé",
     "xp": 101
   },
   {
-    "name": "Oeil de Crocodaille Albinos",
+    "name": "Œil de Crocodaille albinos",
     "xp": 101
   },
   {
@@ -600,7 +576,7 @@
     "xp": 101
   },
   {
-    "name": "Coquille de submergé",
+    "name": "Coquille de Submergé",
     "xp": 101
   },
   {
@@ -616,27 +592,7 @@
     "xp": 96
   },
   {
-    "name": "Étoffe de Sphincter Cell",
-    "xp": 96
-  },
-  {
-    "name": "Ethmoïde de Stalak",
-    "xp": 92
-  },
-  {
-    "name": "Oreille de Mécanofoux",
-    "xp": 92
-  },
-  {
     "name": "Pédoncule de Mérulor",
-    "xp": 92
-  },
-  {
-    "name": "Coeur d'Empaillé",
-    "xp": 92
-  },
-  {
-    "name": "Étoffe de Grodruche",
     "xp": 92
   },
   {
@@ -652,11 +608,7 @@
     "xp": 92
   },
   {
-    "name": "Clef de la tombe du Shogun",
-    "xp": 91
-  },
-  {
-    "name": "Oeuf de Gobus",
+    "name": "Œuf de Gobus",
     "xp": 91
   },
   {
@@ -664,27 +616,19 @@
     "xp": 90
   },
   {
-    "name": "Essence d'el Piko",
+    "name": "Essence d'El Piko",
     "xp": 90
   },
   {
-    "name": "Essence de Tanukoui",
+    "name": "Œuf du Mansot Royal",
     "xp": 90
   },
   {
-    "name": "Oeuf du Mansot Royal",
-    "xp": 90
-  },
-  {
-    "name": "Delko du Perkü",
-    "xp": 88
-  },
-  {
-    "name": "Clef de la canopée du Kimbo",
+    "name": "Clef de la Canopée du Kimbo",
     "xp": 87.7
   },
   {
-    "name": "Crinière du Venerable endormi",
+    "name": "Crinière du Vénérable Endormi",
     "xp": 84.2
   },
   {
@@ -710,10 +654,6 @@
   {
     "name": "Barbe de Merkator",
     "xp": 84
-  },
-  {
-    "name": "Queue de Marôdeur",
-    "xp": 78
   },
   {
     "name": "Croc de Krokille",
@@ -748,23 +688,7 @@
     "xp": 76
   },
   {
-    "name": "Queue Magique du Péki",
-    "xp": 76
-  },
-  {
-    "name": "Étoffe de Péki",
-    "xp": 76
-  },
-  {
     "name": "Ambre du Tynril",
-    "xp": 76
-  },
-  {
-    "name": "Peau lacérée du Tynril",
-    "xp": 76
-  },
-  {
-    "name": "Écorce du Tynril",
     "xp": 76
   },
   {
@@ -772,23 +696,11 @@
     "xp": 76
   },
   {
-    "name": "Bourgeon du Chêne Mou",
-    "xp": 76
-  },
-  {
-    "name": "Calcaneus de Meliglours",
-    "xp": 75
-  },
-  {
     "name": "Aile de Gloursaya",
     "xp": 75
   },
   {
-    "name": "Etoffe de Glourmand",
-    "xp": 75
-  },
-  {
-    "name": "Vomer d'Aperiglours",
+    "name": "Vomer d'Apériglours",
     "xp": 75
   },
   {
@@ -804,15 +716,15 @@
     "xp": 75
   },
   {
-    "name": "Verrou de servitude",
+    "name": "Verrou de Servitude",
     "xp": 75
   },
   {
-    "name": "Oeil de Fleuro",
+    "name": "Œil de Fleuro",
     "xp": 75
   },
   {
-    "name": "Fragment de pépite de Sakai",
+    "name": "Fragment de pépite de Sakaï",
     "xp": 74
   },
   {
@@ -824,24 +736,8 @@
     "xp": 69
   },
   {
-    "name": "Œil de Fleuro",
+    "name": "Essence du Chêne Mou",
     "xp": 69
-  },
-  {
-    "name": "Essence du Chene Mou",
-    "xp": 69
-  },
-  {
-    "name": "Etoffe de Croleur",
-    "xp": 67
-  },
-  {
-    "name": "Oreille de Blerice",
-    "xp": 67
-  },
-  {
-    "name": "Queue de Blerom",
-    "xp": 67
   },
   {
     "name": "Galet Lunaire",
@@ -860,11 +756,11 @@
     "xp": 60
   },
   {
-    "name": "Clef de la salle Minotot",
+    "name": "Clef de la salle du Minotot",
     "xp": 59
   },
   {
-    "name": "Bidoche séchée",
+    "name": "Bidoche Séchée",
     "xp": 58
   },
   {
@@ -876,11 +772,7 @@
     "xp": 57
   },
   {
-    "name": "Clef de la Fabrique de Foux",
-    "xp": 57
-  },
-  {
-    "name": "Fibre de chanvre",
+    "name": "Fibre de Chanvre",
     "xp": 56
   },
   {
@@ -892,7 +784,7 @@
     "xp": 56
   },
   {
-    "name": "Langue du Champodonte",
+    "name": "Langue de Champodonte",
     "xp": 56
   },
   {
@@ -928,11 +820,11 @@
     "xp": 51
   },
   {
-    "name": "Pedoncule de Fongeur",
+    "name": "Pédoncule de Fongeur",
     "xp": 51
   },
   {
-    "name": "Pedoncule de Merulette",
+    "name": "Pédoncule de Mérulette",
     "xp": 51
   },
   {
@@ -948,20 +840,12 @@
     "xp": 51
   },
   {
-    "name": "Dé du Chaloeil",
-    "xp": 51
-  },
-  {
     "name": "Aile de Vortex",
     "xp": 51
   },
   {
-    "name": "Oeuf de Crapeur",
+    "name": "Œuf de Crapeur",
     "xp": 50
-  },
-  {
-    "name": "Essence du Blop Multi",
-    "xp": 49
   },
   {
     "name": "Patte de Korriandre",
@@ -976,55 +860,11 @@
     "xp": 48
   },
   {
-    "name": "Carapace de ver des sables",
-    "xp": 47
-  },
-  {
-    "name": "Clef de la Vallée de la Dame",
-    "xp": 47
-  },
-  {
-    "name": "Oeil de Dramanite",
-    "xp": 47
-  },
-  {
-    "name": "Pédoncule de Fongeur",
-    "xp": 47
-  },
-  {
-    "name": "Pédoncule de Mérulette",
-    "xp": 47
-  },
-  {
-    "name": "Coquille de Submergé",
+    "name": "Carapace de Ver des Sables",
     "xp": 47
   },
   {
     "name": "Scarabée Chrysonéfritin",
-    "xp": 47
-  },
-  {
-    "name": "Poil de Maître Pandore",
-    "xp": 47
-  },
-  {
-    "name": "Peau de Maître Pandore",
-    "xp": 47
-  },
-  {
-    "name": "Étoffe de Maître Pandore",
-    "xp": 47
-  },
-  {
-    "name": "Cuir du Minotoror",
-    "xp": 47
-  },
-  {
-    "name": "Sabot du Minotoror",
-    "xp": 47
-  },
-  {
-    "name": "Fémur du Minotoror",
     "xp": 47
   },
   {
@@ -1060,23 +900,15 @@
     "xp": 43
   },
   {
-    "name": "Brûlâme encapsulé",
-    "xp": 43
-  },
-  {
     "name": "Poignée du Gorgouille",
     "xp": 43
-  },
-  {
-    "name": "Clef de l'atelier du Tanuk",
-    "xp": 42
   },
   {
     "name": "Patte de Soryo Givrefoux",
     "xp": 40
   },
   {
-    "name": "Crâne de Yokai Givrefoux",
+    "name": "Crâne de Yokaï Givrefoux",
     "xp": 40
   },
   {
@@ -1092,51 +924,27 @@
     "xp": 39
   },
   {
-    "name": "Radius d'Ouilleur",
-    "xp": 39
-  },
-  {
     "name": "Corne d'Ombre",
     "xp": 38
-  },
-  {
-    "name": "Peau du Rasboul Majeur",
-    "xp": 37
   },
   {
     "name": "Queue emplumée du Rasboul Majeur",
     "xp": 37
   },
   {
-    "name": "Œuf de Crapeur",
+    "name": "Œil de Vigie Pirate",
     "xp": 36
   },
   {
-    "name": "Oeil de Vigie Pirate",
+    "name": "Nœud de l'Abrakleur clair",
     "xp": 36
   },
   {
-    "name": "Noeud de l'Abrakleur clair",
-    "xp": 36
-  },
-  {
-    "name": "Etoffe de Samourai Fantome",
+    "name": "Étoffe de Samouraï fantôme",
     "xp": 35
   },
   {
-    "name": "Moumoute du Sapeur",
-    "xp": 35
-  },
-  {
-    "name": "Tephra d'Atomystique",
-    "xp": 34
-  },
-  {
-    "name": "Frimousse d'Alhyene",
-    "xp": 34
-  },
-  {
-    "name": "Vomer d'Apériglours",
+    "name": "Frimousse d'Alhyène",
     "xp": 34
   },
   {
@@ -1148,19 +956,11 @@
     "xp": 34
   },
   {
-    "name": "Epaulette de Dazak Martegel",
+    "name": "Épaulière de Dazak Martegel",
     "xp": 34
   },
   {
     "name": "Queue de Bethel Akarna",
-    "xp": 34
-  },
-  {
-    "name": "Patte de Gobosteur",
-    "xp": 34
-  },
-  {
-    "name": "Borderie de Nileza",
     "xp": 34
   },
   {
@@ -1192,7 +992,7 @@
     "xp": 34
   },
   {
-    "name": "Dent de Fantomat",
+    "name": "Dent de Fantômat",
     "xp": 33
   },
   {
@@ -1200,7 +1000,7 @@
     "xp": 33
   },
   {
-    "name": "Etoffe de Kaniblou",
+    "name": "Étoffe de Kaniblou",
     "xp": 33
   },
   {
@@ -1208,7 +1008,7 @@
     "xp": 33
   },
   {
-    "name": "Boucle d'Orfelin",
+    "name": "Boucle d'Orfélin",
     "xp": 33
   },
   {
@@ -1232,11 +1032,11 @@
     "xp": 31
   },
   {
-    "name": "Bidoche tendre",
+    "name": "Bidoche Tendre",
     "xp": 30.2
   },
   {
-    "name": "Eclat Obscur",
+    "name": "Éclat Obscur",
     "xp": 30
   },
   {
@@ -1244,7 +1044,7 @@
     "xp": 30
   },
   {
-    "name": "Clef de la sousouricière du rat noir",
+    "name": "Clef de la Sousouricière du Rat Noir",
     "xp": 30
   },
   {
@@ -1272,43 +1072,7 @@
     "xp": 29
   },
   {
-    "name": "Testicules de Meulou",
-    "xp": 29
-  },
-  {
-    "name": "Dents de Meulou",
-    "xp": 29
-  },
-  {
-    "name": "Mojo du Meulou",
-    "xp": 29
-  },
-  {
     "name": "Testicules Magiques du Meulou",
-    "xp": 29
-  },
-  {
-    "name": "Oeil de Meulou",
-    "xp": 29
-  },
-  {
-    "name": "Crâne du Dragon Cochon",
-    "xp": 29
-  },
-  {
-    "name": "Sang de Dragon Cochon",
-    "xp": 29
-  },
-  {
-    "name": "Dragolait",
-    "xp": 29
-  },
-  {
-    "name": "Queue de Dragon Cochon",
-    "xp": 29
-  },
-  {
-    "name": "Défense de Dragon Cochon",
     "xp": 29
   },
   {
@@ -1324,11 +1088,7 @@
     "xp": 29
   },
   {
-    "name": "Œil de Vigie pirate",
-    "xp": 28
-  },
-  {
-    "name": "Petale de Malter",
+    "name": "Pétale de Malter",
     "xp": 28
   },
   {
@@ -1336,7 +1096,7 @@
     "xp": 28
   },
   {
-    "name": "Oeil de Champmane",
+    "name": "Œil de Champmane",
     "xp": 28
   },
   {
@@ -1360,11 +1120,11 @@
     "xp": 26.4
   },
   {
-    "name": "Clef du goulet du Rasboul",
+    "name": "Clef du Goulet du Rasboul",
     "xp": 26
   },
   {
-    "name": "Clef du garde-manger du Rat blanc",
+    "name": "Clef du Garde-manger du Rat Blanc",
     "xp": 25
   },
   {
@@ -1380,10 +1140,6 @@
     "xp": 25
   },
   {
-    "name": "Fragment gelé",
-    "xp": 25
-  },
-  {
     "name": "Fausse dent de Grozilla",
     "xp": 25
   },
@@ -1392,23 +1148,7 @@
     "xp": 25
   },
   {
-    "name": "Pilule de Rat Pine",
-    "xp": 25
-  },
-  {
-    "name": "Corde de Fancrome",
-    "xp": 24
-  },
-  {
     "name": "Kamatrix",
-    "xp": 24
-  },
-  {
-    "name": "Pierre Angulaire",
-    "xp": 24
-  },
-  {
-    "name": "Peau de Trithon",
     "xp": 24
   },
   {
@@ -1417,10 +1157,6 @@
   },
   {
     "name": "Corne de XLII",
-    "xp": 23
-  },
-  {
-    "name": "Parasite Aquatique",
     "xp": 23
   },
   {
@@ -1436,11 +1172,11 @@
     "xp": 22
   },
   {
-    "name": "Pelage aerodynamique",
+    "name": "Pelage aérodynamique",
     "xp": 22
   },
   {
-    "name": "Etoffe de Firefoux",
+    "name": "Étoffe de Firefoux",
     "xp": 22
   },
   {
@@ -1464,11 +1200,11 @@
     "xp": 22
   },
   {
-    "name": "Oeil de Branche Invocatrice",
+    "name": "Œil de Branche Invocatrice",
     "xp": 22
   },
   {
-    "name": "Oeil de Branche Soignante",
+    "name": "Œil de Branche Soignante",
     "xp": 22
   },
   {
@@ -1476,7 +1212,7 @@
     "xp": 21.3
   },
   {
-    "name": "Tete de mort",
+    "name": "Tête de mort",
     "xp": 21
   },
   {
@@ -1500,15 +1236,7 @@
     "xp": 20
   },
   {
-    "name": "Etoffe de Kaniglou",
-    "xp": 20
-  },
-  {
-    "name": "Crâne de Yokaï Givrefoux",
-    "xp": 20
-  },
-  {
-    "name": "Oeil torve de Fricochère",
+    "name": "Œil torve de Fricochère",
     "xp": 20
   },
   {
@@ -1536,19 +1264,11 @@
     "xp": 19
   },
   {
-    "name": "Œil torve de Fricochere",
-    "xp": 19
-  },
-  {
     "name": "Orbe régénérant mineur",
     "xp": 19
   },
   {
     "name": "Épine d'Ougah",
-    "xp": 19
-  },
-  {
-    "name": "Oeil d'Ougah",
     "xp": 19
   },
   {
@@ -1580,10 +1300,6 @@
     "xp": 18
   },
   {
-    "name": "Oeil de la Gardienne des Égouts",
-    "xp": 18
-  },
-  {
     "name": "Ambre d'Abraknyde Sombre Irascible",
     "xp": 18
   },
@@ -1596,7 +1312,7 @@
     "xp": 17.9
   },
   {
-    "name": "Jus de cacterre",
+    "name": "Jus de Cacterre",
     "xp": 17.9
   },
   {
@@ -1612,7 +1328,7 @@
     "xp": 17.8
   },
   {
-    "name": "Piège désamorcé de Machassin",
+    "name": "Piège désamorcé de Mâchassin",
     "xp": 17.8
   },
   {
@@ -1620,11 +1336,11 @@
     "xp": 17.8
   },
   {
-    "name": "Epaulière de Bouroliste",
+    "name": "Épaulière de Bourôliste",
     "xp": 17.8
   },
   {
-    "name": "Defense du Sanglacier",
+    "name": "Défense du Sanglacier",
     "xp": 17
   },
   {
@@ -1632,7 +1348,7 @@
     "xp": 17
   },
   {
-    "name": "Poils magique de Tanuki",
+    "name": "Poils magiques de Tanuki",
     "xp": 17
   },
   {
@@ -1640,11 +1356,7 @@
     "xp": 17
   },
   {
-    "name": "Défense du Sanglacier",
-    "xp": 17
-  },
-  {
-    "name": "Coeur du Mantiscore",
+    "name": "Cœur du Mantiscore",
     "xp": 17
   },
   {
@@ -1652,11 +1364,11 @@
     "xp": 17
   },
   {
-    "name": "Capuche d'armécréante",
+    "name": "Capuche d'Armécréante",
     "xp": 16.87
   },
   {
-    "name": "Manche de fouet",
+    "name": "Manche de Fouet",
     "xp": 16.87
   },
   {
@@ -1664,15 +1376,15 @@
     "xp": 16.87
   },
   {
-    "name": "Baguete rythmique",
+    "name": "Baguette Rythmique",
     "xp": 16.87
   },
   {
-    "name": "Bois de Pagaie usée",
+    "name": "Bois de pagaie usée",
     "xp": 16.87
   },
   {
-    "name": "Viande Goutue",
+    "name": "Viande Goûtue",
     "xp": 16.82
   },
   {
@@ -1688,7 +1400,7 @@
     "xp": 16.8
   },
   {
-    "name": "Astragale de Mecanofoux",
+    "name": "Astragale de Mécanofoux",
     "xp": 16.8
   },
   {
@@ -1717,10 +1429,6 @@
   },
   {
     "name": "Patte de Termystique",
-    "xp": 16.8
-  },
-  {
-    "name": "Bracté de Drosérâle",
     "xp": 16.8
   },
   {
@@ -1772,7 +1480,7 @@
     "xp": 16.8
   },
   {
-    "name": "Tentacule de N'yalg",
+    "name": "Tentacule de N'Yalg",
     "xp": 16.8
   },
   {
@@ -1784,7 +1492,7 @@
     "xp": 16.8
   },
   {
-    "name": "Dent de lévitrof",
+    "name": "Dent de Lévitrof",
     "xp": 16.8
   },
   {
@@ -1796,15 +1504,7 @@
     "xp": 16.8
   },
   {
-    "name": "Baguette Rythmique",
-    "xp": 16.8
-  },
-  {
     "name": "Bec du Timansot",
-    "xp": 16
-  },
-  {
-    "name": "Gland d'écumouth",
     "xp": 16
   },
   {
@@ -1844,35 +1544,23 @@
     "xp": 16
   },
   {
-    "name": "Casque de scatulipe",
+    "name": "Poing de Coquelicogne",
     "xp": 16
   },
   {
-    "name": "Poing de coquelicogne",
+    "name": "Épine d'Armuguet",
     "xp": 16
   },
   {
-    "name": "Epine d'armuguet",
+    "name": "Mousse de Caméliache",
     "xp": 16
   },
   {
-    "name": "Mousse de cameliache",
-    "xp": 16
-  },
-  {
-    "name": "Liane de soldalia",
-    "xp": 16
-  },
-  {
-    "name": "Dent de Fantômat",
+    "name": "Liane de Soldalia",
     "xp": 16
   },
   {
     "name": "Scorie d'Obsidiantre",
-    "xp": 16
-  },
-  {
-    "name": "Couche de Daïgoro",
     "xp": 16
   },
   {
@@ -1884,7 +1572,7 @@
     "xp": 16
   },
   {
-    "name": "Tete de marteau en jade",
+    "name": "Tête de Marteau en Jade",
     "xp": 15
   },
   {
@@ -1896,11 +1584,7 @@
     "xp": 15
   },
   {
-    "name": "Oeil du Père Ver",
-    "xp": 15
-  },
-  {
-    "name": "Étoffe de Maho Firefoux",
+    "name": "Œil du Père Ver",
     "xp": 15
   },
   {
@@ -1908,7 +1592,7 @@
     "xp": 15
   },
   {
-    "name": "Cawotte transgénique",
+    "name": "Cawotte Transgénique",
     "xp": 14.3
   },
   {
@@ -1916,35 +1600,23 @@
     "xp": 14
   },
   {
-    "name": "Carapace de Ver des Sables",
-    "xp": 14
-  },
-  {
-    "name": "Queue de Boufmouth Légendaire",
+    "name": "Étoffe Zoth",
     "xp": 13
   },
   {
-    "name": "Etoffe Zoth",
+    "name": "Clef du Donjon de Nowel",
     "xp": 13
   },
   {
-    "name": "Clef du donjon de Nowel",
+    "name": "Œil de Boufmouth de guerre",
     "xp": 13
   },
   {
-    "name": "Oeil de Boufmouth de guerre",
-    "xp": 13
-  },
-  {
-    "name": "Gland de l'Ecumouth",
+    "name": "Gland de l'Écumouth",
     "xp": 13
   },
   {
     "name": "Galet Saisonnier",
-    "xp": 13
-  },
-  {
-    "name": "Galet bistré",
     "xp": 13
   },
   {
@@ -1964,38 +1636,6 @@
     "xp": 13
   },
   {
-    "name": "Étoffe de Fantôme Léopardo",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Maho Firefoux",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Pandikaze",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Pandore",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Pandule",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Soryo Firefoux",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Tanukouï San",
-    "xp": 13
-  },
-  {
-    "name": "Étoffe de Fantôme Yokai Firefoux",
-    "xp": 13
-  },
-  {
     "name": "Viande Noire",
     "xp": 12.774
   },
@@ -2012,7 +1652,7 @@
     "xp": 12
   },
   {
-    "name": "Oeil de Harpille",
+    "name": "Œil de Harpille",
     "xp": 12
   },
   {
@@ -2052,23 +1692,11 @@
     "xp": 12
   },
   {
-    "name": "Perruque du Kimbo",
-    "xp": 12
-  },
-  {
-    "name": "Pourdre explosive de Gourlo",
-    "xp": 12
-  },
-  {
     "name": "Clavicule de Boufmouth",
     "xp": 11
   },
   {
-    "name": "Œil de Boufmouth de guerre",
-    "xp": 11
-  },
-  {
-    "name": "Poil de rat Brakmarien",
+    "name": "Poil de Rat Brâkmarien",
     "xp": 11
   },
   {
@@ -2077,10 +1705,6 @@
   },
   {
     "name": "Boomerang du Koalak Sanguin",
-    "xp": 11
-  },
-  {
-    "name": "Queue de Koalak Sanguin",
     "xp": 11
   },
   {
@@ -2104,7 +1728,7 @@
     "xp": 10
   },
   {
-    "name": "Ecume de mer",
+    "name": "Écume de mer",
     "xp": 10
   },
   {
@@ -2112,7 +1736,7 @@
     "xp": 10
   },
   {
-    "name": "Nectar de l'orient",
+    "name": "Nectar de l'Orient",
     "xp": 10
   },
   {
@@ -2212,14 +1836,6 @@
     "xp": 10
   },
   {
-    "name": "Peau de Sphincter Cell",
-    "xp": 10
-  },
-  {
-    "name": "Oreille de Sphincter Cell",
-    "xp": 10
-  },
-  {
     "name": "Fémur de Sphincter Cell",
     "xp": 10
   },
@@ -2228,7 +1844,7 @@
     "xp": 10
   },
   {
-    "name": "Oeil de Halbardent",
+    "name": "Œil de Halbardent",
     "xp": 10
   },
   {
@@ -2240,7 +1856,7 @@
     "xp": 10
   },
   {
-    "name": "Oeil de Gouligane",
+    "name": "Œil de Gouligane",
     "xp": 10
   },
   {
@@ -2252,20 +1868,12 @@
     "xp": 10
   },
   {
-    "name": "Trompe de Minoskito",
-    "xp": 10
-  },
-  {
     "name": "Bâton du Kilibriss",
     "xp": 10
   },
   {
     "name": "Viande Gâtée",
     "xp": 9.67
-  },
-  {
-    "name": "Etoffe de ouassinge",
-    "xp": 9.4
   },
   {
     "name": "Tuf de Mofette",
@@ -2292,27 +1900,7 @@
     "xp": 9
   },
   {
-    "name": "Fragment de pépite de Sakaï",
-    "xp": 9
-  },
-  {
     "name": "Pierre du Courtilieur",
-    "xp": 9
-  },
-  {
-    "name": "Bois de Gobus",
-    "xp": 9
-  },
-  {
-    "name": "Estomac du Perkü",
-    "xp": 9
-  },
-  {
-    "name": "Bracée de Drosérâle",
-    "xp": 9
-  },
-  {
-    "name": "Astragale de Mécanofoux",
     "xp": 9
   },
   {
@@ -2332,15 +1920,11 @@
     "xp": 9
   },
   {
-    "name": "Oeil de Feutôme",
+    "name": "Œil de Feutôme",
     "xp": 9
   },
   {
-    "name": "Oeil de Harrogant",
-    "xp": 9
-  },
-  {
-    "name": "Oeil de Cycloïde",
+    "name": "Œil de Cycloïde",
     "xp": 9
   },
   {
@@ -2352,7 +1936,7 @@
     "xp": 9
   },
   {
-    "name": "Coeur du Capitaine Ekarlatte",
+    "name": "Cœur du Capitaine Ekarlatte",
     "xp": 9
   },
   {
@@ -2376,23 +1960,11 @@
     "xp": 9
   },
   {
-    "name": "Jus de Cacterre",
-    "xp": 9
-  },
-  {
-    "name": "Étoffe de Soryo Firefoux",
-    "xp": 9
-  },
-  {
-    "name": "Lait de Porsalu",
-    "xp": 9
-  },
-  {
     "name": "Coco du Bitouf des Plaines",
     "xp": 9
   },
   {
-    "name": "Coeur de pierre poli",
+    "name": "Cœur de pierre poli",
     "xp": 9
   },
   {
@@ -2404,7 +1976,7 @@
     "xp": 9
   },
   {
-    "name": "Poil de rat Bontarien",
+    "name": "Poil de Rat Bontarien",
     "xp": 8.9
   },
   {
@@ -2457,10 +2029,6 @@
   },
   {
     "name": "Rune Pa Ret Pme",
-    "xp": 8
-  },
-  {
-    "name": "Éclat Obscur",
     "xp": 8
   },
   {
@@ -2572,11 +2140,7 @@
     "xp": 8
   },
   {
-    "name": "Pic de Picténia",
-    "xp": 7.7
-  },
-  {
-    "name": "Patte de Matiscroc",
+    "name": "Patte de Masticroc",
     "xp": 7.7
   },
   {
@@ -2584,7 +2148,7 @@
     "xp": 7.7
   },
   {
-    "name": "Peau de Tremorse",
+    "name": "Peau de Trémorse",
     "xp": 7.7
   },
   {
@@ -2596,7 +2160,7 @@
     "xp": 7
   },
   {
-    "name": "Pierre d'aigue-marine",
+    "name": "Pierre d'Aigue-Marine",
     "xp": 7
   },
   {
@@ -2608,7 +2172,7 @@
     "xp": 7
   },
   {
-    "name": "Oeil de Verminocule",
+    "name": "Œil de Verminocule",
     "xp": 7
   },
   {
@@ -2628,31 +2192,11 @@
     "xp": 7
   },
   {
-    "name": "Poil de Péki",
-    "xp": 7
-  },
-  {
-    "name": "Étoffe de Yokai Firefoux",
-    "xp": 7
-  },
-  {
-    "name": "Étoffe de Pandore",
-    "xp": 7
-  },
-  {
-    "name": "Calice du Tynril",
-    "xp": 7
-  },
-  {
     "name": "Pistil du Tynril",
     "xp": 7
   },
   {
     "name": "Rotule du Disciple Zoth",
-    "xp": 7
-  },
-  {
-    "name": "Écorce du Chêne Mou",
     "xp": 7
   },
   {
@@ -2668,7 +2212,7 @@
     "xp": 6.1
   },
   {
-    "name": "Viande Fraiche",
+    "name": "Viande fraîche",
     "xp": 6.08
   },
   {
@@ -2676,7 +2220,7 @@
     "xp": 6
   },
   {
-    "name": "Coeur de Crapeur",
+    "name": "Cœur de Crapeur",
     "xp": 6
   },
   {
@@ -2768,23 +2312,7 @@
     "xp": 6
   },
   {
-    "name": "Poils de Tanukouï San",
-    "xp": 6
-  },
-  {
-    "name": "Peau de Tanukouï San",
-    "xp": 6
-  },
-  {
-    "name": "Triquetrum du Maître Pandore",
-    "xp": 6
-  },
-  {
     "name": "Poil de Bworkette",
-    "xp": 6
-  },
-  {
-    "name": "Étoffe Corailleuse",
     "xp": 6
   },
   {
@@ -2800,11 +2328,11 @@
     "xp": 5.7
   },
   {
-    "name": "Deuxième clef du donjon de Sphincter",
+    "name": "Deuxième clef du Donjon de Sphincter",
     "xp": 5.7
   },
   {
-    "name": "Emeraude",
+    "name": "Émeraude",
     "xp": 5.5
   },
   {
@@ -2816,27 +2344,27 @@
     "xp": 5
   },
   {
-    "name": "Chaine de Panthégros",
+    "name": "Chaîne de Panthègros",
     "xp": 5
   },
   {
-    "name": "Crinière d'Orfelin",
+    "name": "Crinière d'Orfélin",
     "xp": 5
   },
   {
-    "name": "Griffe de Félygiene",
+    "name": "Griffe de Félygiène",
     "xp": 5
   },
   {
-    "name": "Cheveux d'Alhyene",
+    "name": "Cheveux d'Alhyène",
     "xp": 5
   },
   {
-    "name": "Boulon wabbit",
+    "name": "Boulon Wabbit",
     "xp": 5
   },
   {
-    "name": "Sable fin",
+    "name": "Sable Fin",
     "xp": 5
   },
   {
@@ -2857,22 +2385,6 @@
   },
   {
     "name": "Rune So",
-    "xp": 5
-  },
-  {
-    "name": "Épaulette de Bourôliste",
-    "xp": 5
-  },
-  {
-    "name": "Piège désamorcé de Mâchassin",
-    "xp": 5
-  },
-  {
-    "name": "Corne de Kamasterik",
-    "xp": 5
-  },
-  {
-    "name": "Dent de Lévitrof",
     "xp": 5
   },
   {
@@ -2900,7 +2412,7 @@
     "xp": 5
   },
   {
-    "name": "Oeil de Krokille",
+    "name": "Œil de Krokille",
     "xp": 5
   },
   {
@@ -2948,15 +2460,15 @@
     "xp": 4.929
   },
   {
-    "name": "Queue de mère veilleuse",
+    "name": "Queue de Mère Veilleuse",
     "xp": 4.79
   },
   {
-    "name": "Pierre d'agathe",
+    "name": "Pierre d'Agathe",
     "xp": 4.57
   },
   {
-    "name": "Mat de fantomat",
+    "name": "Mât de Fantômat",
     "xp": 4.1
   },
   {
@@ -3012,10 +2524,6 @@
     "xp": 4
   },
   {
-    "name": "Rune Pa Pi",
-    "xp": 4
-  },
-  {
     "name": "Rune Pa Tac",
     "xp": 4
   },
@@ -3044,35 +2552,7 @@
     "xp": 4
   },
   {
-    "name": "Dent de Rat Blanc",
-    "xp": 4
-  },
-  {
-    "name": "Étoffe de Rat Blanc",
-    "xp": 4
-  },
-  {
-    "name": "Peau de Rat Blanc",
-    "xp": 4
-  },
-  {
-    "name": "Peau de Rat Noir",
-    "xp": 4
-  },
-  {
-    "name": "Cubitus de Rat Noir",
-    "xp": 4
-  },
-  {
-    "name": "Étoffe de Rat Noir",
-    "xp": 4
-  },
-  {
     "name": "Fragment du Gorgouille",
-    "xp": 4
-  },
-  {
-    "name": "Laine du Minotoror",
     "xp": 4
   },
   {
@@ -3112,11 +2592,11 @@
     "xp": 3.72
   },
   {
-    "name": "Poils de Petartifoux",
+    "name": "Poils de Pétartifoux",
     "xp": 3.72
   },
   {
-    "name": "Viande persillée",
+    "name": "Viande Persillée",
     "xp": 3
   },
   {
@@ -3148,10 +2628,6 @@
     "xp": 3
   },
   {
-    "name": "Mât de Fantômat",
-    "xp": 3
-  },
-  {
     "name": "Écaille de Harpirate",
     "xp": 3
   },
@@ -3160,7 +2636,7 @@
     "xp": 3
   },
   {
-    "name": "Oeil de Sapeur",
+    "name": "Œil de Sapeur",
     "xp": 3
   },
   {
@@ -3200,10 +2676,6 @@
     "xp": 3
   },
   {
-    "name": "Queue de Mère Veilleuse",
-    "xp": 3
-  },
-  {
     "name": "Peau de Métaphorreur",
     "xp": 3
   },
@@ -3216,15 +2688,11 @@
     "xp": 3
   },
   {
-    "name": "Oeil de Phozami",
+    "name": "Œil de Phozami",
     "xp": 3
   },
   {
     "name": "Relique du Rasboul Majeur",
-    "xp": 3
-  },
-  {
-    "name": "Sable Fin",
     "xp": 3
   },
   {
@@ -3240,14 +2708,6 @@
     "xp": 3
   },
   {
-    "name": "Tentacule de N'Yalg",
-    "xp": 3
-  },
-  {
-    "name": "Oeil de Shokkoth",
-    "xp": 3
-  },
-  {
     "name": "Encre de Poulpée",
     "xp": 3
   },
@@ -3260,7 +2720,7 @@
     "xp": 3
   },
   {
-    "name": "Poils de Barbe de Dragodinde",
+    "name": "Poils de barbe de dragodinde",
     "xp": 3
   },
   {
@@ -3268,7 +2728,7 @@
     "xp": 3
   },
   {
-    "name": "Oeil de Crowneille",
+    "name": "Œil de Crowneille",
     "xp": 3
   },
   {
@@ -3284,11 +2744,7 @@
     "xp": 3
   },
   {
-    "name": "Racine Magique de Bambouto Sacré",
-    "xp": 3
-  },
-  {
-    "name": "Noeud de Marin",
+    "name": "Nœud de Marin",
     "xp": 3
   },
   {
@@ -3308,15 +2764,11 @@
     "xp": 3
   },
   {
-    "name": "Sourcil du Rasboul majeur",
-    "xp": 3
-  },
-  {
     "name": "Plume du Rasboul Majeur",
     "xp": 3
   },
   {
-    "name": "Fleur de kalyptus",
+    "name": "Fleur de Kaliptus",
     "xp": 2.76
   },
   {
@@ -3324,7 +2776,7 @@
     "xp": 2.384
   },
   {
-    "name": "Pierre de topaze",
+    "name": "Pierre de Topaze",
     "xp": 2
   },
   {
@@ -3348,7 +2800,7 @@
     "xp": 2
   },
   {
-    "name": "Oeil de Crabe Hijacob",
+    "name": "Œil de Crabe Hijacob",
     "xp": 2
   },
   {
@@ -3388,15 +2840,7 @@
     "xp": 2
   },
   {
-    "name": "Rune Ra Pi Per",
-    "xp": 2
-  },
-  {
     "name": "Rune Ra Pui",
-    "xp": 2
-  },
-  {
-    "name": "Tête de mort",
     "xp": 2
   },
   {
@@ -3468,14 +2912,6 @@
     "xp": 2
   },
   {
-    "name": "Patte de Masticroc",
-    "xp": 2
-  },
-  {
-    "name": "Peau de Trémorse",
-    "xp": 2
-  },
-  {
     "name": "Écaille de Grasmera",
     "xp": 2
   },
@@ -3516,31 +2952,11 @@
     "xp": 2
   },
   {
-    "name": "Oeil de Rat Masseur",
-    "xp": 2
-  },
-  {
-    "name": "Queue de Rat Pine",
-    "xp": 2
-  },
-  {
-    "name": "Poil de Rat Brâkmarien",
-    "xp": 2
-  },
-  {
-    "name": "Fibre de Chanvre",
-    "xp": 2
-  },
-  {
     "name": "Faux Visage de Choudini",
     "xp": 2
   },
   {
-    "name": "Pommeau d'Epée",
-    "xp": 2
-  },
-  {
-    "name": "Scalp de Meulou",
+    "name": "Scalp du Meulou",
     "xp": 2
   },
   {
@@ -3548,15 +2964,7 @@
     "xp": 2
   },
   {
-    "name": "Poils de Kitsou Nufeu",
-    "xp": 2
-  },
-  {
     "name": "Groin de Dragon Cochon",
-    "xp": 2
-  },
-  {
-    "name": "Poils de Moon",
     "xp": 2
   },
   {
@@ -3600,18 +3008,6 @@
     "xp": 2
   },
   {
-    "name": "Ambre Ancestral",
-    "xp": 2
-  },
-  {
-    "name": "Écorce d'Abraknyde Ancestral",
-    "xp": 2
-  },
-  {
-    "name": "Bois Envoûté",
-    "xp": 2
-  },
-  {
     "name": "Patte d'Abrakne Irascible",
     "xp": 2
   },
@@ -3624,59 +3020,19 @@
     "xp": 2
   },
   {
-    "name": "Pom de pin",
+    "name": "Pom de Pin",
     "xp": 1.9
   },
   {
-    "name": "Viande séchée",
+    "name": "Viande Séchée",
     "xp": 1.84
-  },
-  {
-    "name": "Peau de Maho Firefoux",
-    "xp": 1.59
   },
   {
     "name": "Peau de Cochon de Farle",
     "xp": 1.55
   },
   {
-    "name": "Os de Fantôme Léopardo",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Maho Firefoux",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Pandikaze",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Pandore",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Pandule",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Soryo Firefoux",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Tanukouï San",
-    "xp": 1.3
-  },
-  {
-    "name": "Os de Fantôme Yokai Firefoux",
-    "xp": 1.3
-  },
-  {
     "name": "Pépite",
-    "xp": 1.25
-  },
-  {
-    "name": "Rose des sables",
     "xp": 1.25
   },
   {
@@ -3712,11 +3068,11 @@
     "xp": 1
   },
   {
-    "name": "Queue d'Ecumouth",
+    "name": "Queue d'Écumouth",
     "xp": 1
   },
   {
-    "name": "Poil de Smilomouth",
+    "name": "Poils de Smilomouth",
     "xp": 1
   },
   {
@@ -3820,10 +3176,6 @@
     "xp": 1
   },
   {
-    "name": "Rune Pa Pi Per",
-    "xp": 1
-  },
-  {
     "name": "Rune Pa Pod",
     "xp": 1
   },
@@ -3869,14 +3221,6 @@
   },
   {
     "name": "Rune Pa Vi",
-    "xp": 1
-  },
-  {
-    "name": "Rune Pi",
-    "xp": 1
-  },
-  {
-    "name": "Rune Pi Per",
     "xp": 1
   },
   {
@@ -3980,7 +3324,7 @@
     "xp": 1
   },
   {
-    "name": "Oeil de Morcac",
+    "name": "Œil de Morcac",
     "xp": 1
   },
   {
@@ -4012,10 +3356,6 @@
     "xp": 1
   },
   {
-    "name": "Jeton du Chazino Matougarous",
-    "xp": 1
-  },
-  {
     "name": "Pixel de Segmantid",
     "xp": 1
   },
@@ -4032,7 +3372,7 @@
     "xp": 1
   },
   {
-    "name": "Oeil de Léolhyène",
+    "name": "Œil de Léolhyène",
     "xp": 1
   },
   {
@@ -4080,7 +3420,7 @@
     "xp": 1
   },
   {
-    "name": "Jaune d'Oeuf de Krokille",
+    "name": "Jaune d'Œuf de Krokille",
     "xp": 1
   },
   {
@@ -4180,47 +3520,23 @@
     "xp": 1
   },
   {
-    "name": "Pic de Dragodinde",
+    "name": "Pic de dragodinde",
     "xp": 1
   },
   {
-    "name": "Lait de Dragodinde",
+    "name": "Aile de dragodinde",
     "xp": 1
   },
   {
-    "name": "Aile de Dragodinde",
+    "name": "Aile de dragodinde dorée",
     "xp": 1
   },
   {
-    "name": "Queue de Dragodinde",
+    "name": "Pic de dragodinde dorée",
     "xp": 1
   },
   {
-    "name": "Aile de Dragodinde Dorée",
-    "xp": 1
-  },
-  {
-    "name": "Pic de Dragodinde Dorée",
-    "xp": 1
-  },
-  {
-    "name": "Dent de Dragodinde",
-    "xp": 1
-  },
-  {
-    "name": "Pic de Dragodinde Rousse Sauvage",
-    "xp": 1
-  },
-  {
-    "name": "Queue de Dragodinde Rousse Sauvage",
-    "xp": 1
-  },
-  {
-    "name": "Feuille de Kaliptus",
-    "xp": 1
-  },
-  {
-    "name": "Fleur de Kaliptus",
+    "name": "Dent de dragodinde",
     "xp": 1
   },
   {
@@ -4304,10 +3620,6 @@
     "xp": 1
   },
   {
-    "name": "Cuir du Boufcoul",
-    "xp": 1
-  },
-  {
     "name": "Corne du Boufcoul",
     "xp": 1
   },
@@ -4328,7 +3640,7 @@
     "xp": 1
   },
   {
-    "name": "Oeil d'Arakmuté",
+    "name": "Œil d'Arakmuté",
     "xp": 1
   },
   {
@@ -4336,19 +3648,11 @@
     "xp": 1
   },
   {
-    "name": "Intestin d'araknosé",
+    "name": "Intestin d'Araknosé",
     "xp": 1
   },
   {
     "name": "Bec du Tofu",
-    "xp": 1
-  },
-  {
-    "name": "Puces Sauteuses",
-    "xp": 1
-  },
-  {
-    "name": "Bave Empoisonnée",
     "xp": 1
   },
   {
@@ -4376,7 +3680,7 @@
     "xp": 1
   },
   {
-    "name": "Oeil de Ramane Strubien",
+    "name": "Œil de Ramane Strubien",
     "xp": 1
   },
   {
@@ -4420,23 +3724,7 @@
     "xp": 1
   },
   {
-    "name": "Oreilles de Croc Gland",
-    "xp": 1
-  },
-  {
-    "name": "Queue de Croc Gland",
-    "xp": 1
-  },
-  {
     "name": "Papatte de Croc Gland",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Croc Gland",
-    "xp": 1
-  },
-  {
-    "name": "Croquette",
     "xp": 1
   },
   {
@@ -4448,35 +3736,11 @@
     "xp": 1
   },
   {
-    "name": "Poil d'Ouginak",
-    "xp": 1
-  },
-  {
     "name": "Babines de Macien",
     "xp": 1
   },
   {
-    "name": "Chaîne de l'Ouginak",
-    "xp": 1
-  },
-  {
-    "name": "Pince de Scorbute",
-    "xp": 1
-  },
-  {
-    "name": "Queue de scorbute",
-    "xp": 1
-  },
-  {
-    "name": "Carapace de Scorbute",
-    "xp": 1
-  },
-  {
-    "name": "Patte de Scorbute",
-    "xp": 1
-  },
-  {
-    "name": "Oeil de Cocholou",
+    "name": "Œil de Cocholou",
     "xp": 1
   },
   {
@@ -4496,178 +3760,6 @@
     "xp": 1
   },
   {
-    "name": "Poils de Léopardo",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Léopardo",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Maho Firefoux",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Soryo Firefoux",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Soryo Firefoux",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Yokai Firefoux",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Yokai Firefoux",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Kitsou Nae",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Kitsou Nae",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Kitsou Nakwa",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Kitsou Nakwa",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Kitsou Nere",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Kitsou Nere",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Kitsou Nufeu",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Daïgoro",
-    "xp": 1
-  },
-  {
-    "name": "Patte d'Araknawa",
-    "xp": 1
-  },
-  {
-    "name": "Oeuf d'Araknawa",
-    "xp": 1
-  },
-  {
-    "name": "Brassard de Braconnier",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Cooleuvre",
-    "xp": 1
-  },
-  {
-    "name": "Dent magique de Cooleuvre",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Pandore",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Pandore",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Pandikaze",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Pandikaze",
-    "xp": 1
-  },
-  {
-    "name": "Étoffe de Pandikaze",
-    "xp": 1
-  },
-  {
-    "name": "Griffe de Pandikaze Vertige",
-    "xp": 1
-  },
-  {
-    "name": "Poils de Pandule",
-    "xp": 1
-  },
-  {
-    "name": "Peau de Pandule",
-    "xp": 1
-  },
-  {
-    "name": "Ambre de Bambouto",
-    "xp": 1
-  },
-  {
-    "name": "Feuille de Bambouto",
-    "xp": 1
-  },
-  {
-    "name": "Bois de Bambouto",
-    "xp": 1
-  },
-  {
-    "name": "Racine Magique de Bambouto",
-    "xp": 1
-  },
-  {
-    "name": "Feuille de Bambouto Sacré",
-    "xp": 1
-  },
-  {
-    "name": "Ambre de Bambouto Sacré",
-    "xp": 1
-  },
-  {
-    "name": "Bois de Bambouto Sacré",
-    "xp": 1
-  },
-  {
-    "name": "Racine de Bulbambou",
-    "xp": 1
-  },
-  {
-    "name": "Pousses de Bulbambou",
-    "xp": 1
-  },
-  {
-    "name": "Écorce magique de Bulbambou",
-    "xp": 1
-  },
-  {
-    "name": "Racine de Bulbiflore",
-    "xp": 1
-  },
-  {
-    "name": "Écorce magique de Bulbiflore",
-    "xp": 1
-  },
-  {
-    "name": "Racine de Bulbig",
-    "xp": 1
-  },
-  {
-    "name": "Écorce magique de Bulbig",
-    "xp": 1
-  },
-  {
-    "name": "Écorce magique de Bulbuisson",
-    "xp": 1
-  },
-  {
     "name": "Jeton du Bworker",
     "xp": 1
   },
@@ -4680,7 +3772,7 @@
     "xp": 1
   },
   {
-    "name": "Épaulette de Bwork",
+    "name": "Épaulière de Bwork",
     "xp": 1
   },
   {
@@ -4728,7 +3820,7 @@
     "xp": 1
   },
   {
-    "name": "Dent en Or du Craqueleur",
+    "name": "Dent en Or de Craqueleur",
     "xp": 1
   },
   {
@@ -4736,11 +3828,11 @@
     "xp": 1
   },
   {
-    "name": "Coeur de Craqueleur",
+    "name": "Cœur de Craqueleur",
     "xp": 1
   },
   {
-    "name": "Oeil de Craquelope",
+    "name": "Œil de Craquelope",
     "xp": 1
   },
   {
@@ -4760,14 +3852,6 @@
     "xp": 1
   },
   {
-    "name": "Ongle de Chevaucheur de Karne",
-    "xp": 1
-  },
-  {
-    "name": "Dent de Karne",
-    "xp": 1
-  },
-  {
     "name": "Noix de Pécan",
     "xp": 1
   },
@@ -4776,19 +3860,7 @@
     "xp": 1
   },
   {
-    "name": "Gant de Martoa",
-    "xp": 1
-  },
-  {
-    "name": "Oeil de Pikdoa",
-    "xp": 1
-  },
-  {
-    "name": "Casque de Sherpoa",
-    "xp": 1
-  },
-  {
-    "name": "Gelée de Dégelée",
+    "name": "Œil de Pikdoa",
     "xp": 1
   },
   {
@@ -5084,10 +4156,6 @@
     "xp": 1
   },
   {
-    "name": "Étoffe Zoth",
-    "xp": 1
-  },
-  {
     "name": "Jouet de Gamine Zoth",
     "xp": 1
   },
@@ -5117,14 +4185,6 @@
   },
   {
     "name": "Écorce d'Abrakne Sombre",
-    "xp": 1
-  },
-  {
-    "name": "Écorce d'Abraknyde",
-    "xp": 1
-  },
-  {
-    "name": "Bourgeon d'Abraknyde",
     "xp": 1
   },
   {
@@ -5164,7 +4224,7 @@
     "xp": 1
   },
   {
-    "name": "Pierre d'emeraude",
+    "name": "Pierre d'Émeraude",
     "xp": 0.8
   },
   {
@@ -5172,7 +4232,7 @@
     "xp": 0.45
   },
   {
-    "name": "Viande tendre",
+    "name": "Viande Tendre",
     "xp": 0.309
   },
   {
