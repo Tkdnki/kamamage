@@ -82,6 +82,13 @@ function normalizeName(name: string): string {
  */
 const RESOURCE_BLACKLIST = [
   'Galet acajou', // ancienne ressource doplons, n'existe plus dans Dofus actuel
+  'Étoffe givrée', // ressource retirée du jeu
+  'Galet boucané', // ressource retirée du jeu
+  'Corne du Minotot', // ressource retirée du jeu
+  'Cuir du Minotot', // ressource retirée du jeu
+  'Laine du Minotot', // ressource retirée du jeu
+  'Fémur du Minotot', // ressource retirée du jeu
+  'Pierre précieuse du Kimbo', // ressource retirée du jeu
 ];
 
 /** Vrai si le nom correspond STRICTEMENT à une idole (exact, déclinaison, "idole X"). */
